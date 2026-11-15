@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "status": "draft-not-released",
+  "baseline_version": "0.4.3-test.3",
+  "candidate_id": "controls-wbdiff-20261110",
+  "notes": {
+    "new": [
+      "Página Atualizações na barra lateral, com versão, novidades e correções antes de instalar.",
+      "Controles: estilos Auto, Switch, Xbox, PlayStation 4/5 e Steam Deck, com remapeamento real de gamepad e teclado/mouse.",
+      "Preparação automática dos ícones a partir dos arquivos locais do jogo."
+    ],
+    "fixes": [
+      "Menu se ajusta à tela; contador de FPS mantém sua própria escala.",
+      "Caminhos com colchetes tratados na geração.",
+      "Configurações dos controles salvas por substituição atômica; mods de ícones têm prioridade.",
+      "Diagnóstico GPU_PROFILE não invalida shaders por si só; cronômetros detalhados por draw são opcionais.",
+      "Reutilização verificada dos objetos numa candidata isolada, preservando a instalação anterior."
+    ],
+    "experimental": [
+      "Write-back diferencial disponível para teste; desligado por padrão. Ganho e imagem ainda devem ser medidos no jogo.",
+      "Backports de orçamento de memória, targets e afinidade: validar nas placas de teste."
+    ],
+    "known_issues": [
+      "FSR temporal e AMD Frame Generation ainda não integrados.",
+      "Teste de cores, cutscenes, água e controles Windows ainda pendente neste candidato.",
+      "Estas são notas de desenvolvimento; a versão final e o pacote instalável dependem da validação Windows."
+    ]
+  }
+}

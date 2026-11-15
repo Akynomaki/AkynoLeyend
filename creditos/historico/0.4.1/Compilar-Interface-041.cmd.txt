@@ -1,0 +1,33 @@
+@echo off
+chcp 65001 >nul
+setlocal
+cd /d "%~dp0"
+where dotnet >nul 2>nul
+if errorlevel 1 (
+  echo Nao encontrei o SDK .NET 8 no Windows.
+  echo Voce pode compilar o jogo com Compilar-Visual-041.cmd mesmo sem isto.
+  echo Para atualizar a INTERFACE instale o SDK .NET 8 em https://dotnet.microsoft.com/download/dotnet/8.0
+  pause
+  exit /b 1
+)
+echo Recompilando a interface WPF para incluir as opcoes atuais dos fontes.
+dotnet publish "%~dp0builder\AkynoLeyendBuilder\AkynoLeyendBuilder.csproj" -c Release -r win-x64 --self-contained true -o "%~dp0builder\publish-Visual041"
+if errorlevel 1 (
+ echo Erro de compilacao da interface. O executavel anterior nao foi substituido.
+ pause
+ exit /b 1
+)
+if not exist "%~dp0builder\publish-Visual041\AkynoLeyendBuilder.exe" (
+ echo Falta o executavel compilado. A interface anterior foi preservada.
+ pause
+ exit /b 1
+)
+copy /Y "%~dp0builder\publish-Visual041\AkynoLeyendBuilder.exe" "%~dp0AkynoLeyendBuilder.exe" >nul
+if errorlevel 1 (
+ echo Nao foi possivel copiar o EXE. Feche a interface e tente novamente.
+ pause
+ exit /b 1
+)
+echo Interface Windows recompilada com sucesso; confira a versao no rodape.
+pause
+exit /b 0

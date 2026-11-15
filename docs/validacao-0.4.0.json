@@ -1,0 +1,74 @@
+{
+  "version": "0.4.0-dev.1",
+  "date": "2026-11-08",
+  "target": "Windows x64 / x86-64-v3",
+  "python": {
+    "discovered": 124,
+    "passed": 115,
+    "skipped": 9,
+    "failed": 0
+  },
+  "runner_csharp": {
+    "passed": 7,
+    "failed": 0,
+    "host": "Linux; real Python child"
+  },
+  "native": {
+    "clean_units": 182,
+    "failed": 0,
+    "public_export": "mkwvk_init",
+    "game_code": "synthetic empty units; not distributed"
+  },
+  "launcher": {
+    "published": true,
+    "framework": ".NET 8.0.33 WPF self-contained win-x64",
+    "sdk": "8.0.427",
+    "sha256": "41478ebbbd4be2b65ca89bc9333c549e8125b85873fa30eadeb13bc6fa6ba73b",
+    "window_executed": false
+  },
+  "renderer": {
+    "schema": 1,
+    "config": {
+      "target": "windows-gnu",
+      "march": "x86-64-v3",
+      "release": "1"
+    },
+    "source_sha256": "5170840939dc0aa23e08ff047584461a69f0225a580e8eb3c8123f55e52ca75d",
+    "binary_sha256": "0b716677c67dadbe5bb83e6f763f0880b871c77b534e6d132934f4795bdbcb12",
+    "compiler": "LLVM-MinGW 20261020 / Clang 23.1.5; Linux host, Windows x64 target",
+    "game_data": false,
+    "translation_units": 182,
+    "physical_gpu_tested": false,
+    "release": "0.4.0-dev.1"
+  },
+  "shader_stamp": "2fd6984aaeff3c88",
+  "ruff": {
+    "scope": [
+      "akynoleyend",
+      "tests/test_release040.py",
+      "tools/make_distribution.py"
+    ],
+    "passed": true
+  },
+  "physical_gpu_tested": false,
+  "game_executed": false,
+  "fps_benchmark": false,
+  "opengl_implemented": false,
+  "amd_crash": {
+    "gpu": "AMD Radeon RX 9060 XT",
+    "result": -4,
+    "exit": 70,
+    "exact_cause_confirmed": false,
+    "last_used_mb": 9992,
+    "last_allowed_mb": 11557,
+    "last_free_in_blocks_mb": 2299,
+    "texture_mb": 5073,
+    "exe_dll_hashes_in_supplied_txt": false
+  },
+  "pending": [
+    "physical AMD/NVIDIA visual test",
+    "RX 9060 XT crash reproduction/root cause",
+    "FPS measurements",
+    "OpenGL backend"
+  ]
+}

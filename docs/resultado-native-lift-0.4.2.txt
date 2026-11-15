@@ -1,0 +1,10 @@
+occlusion off: 6 of 6 sites
+chunks: 1, boundaries from sizes (saved)
+chunks: alvo novo 6291456 bytes; funcoes inteiras, tamanho real pode ultrapassar o alvo
+PASS: native a64emit -> discover -> chunks.write -> C compilation/execution; local registers=0
+PASS: Windows x64 compilation/link of the same synthetic generated C (not executed)
+occlusion off: 6 of 6 sites
+chunks: 1, boundaries from sizes (saved)
+chunks: alvo novo 6291456 bytes; funcoes inteiras, tamanho real pode ultrapassar o alvo
+PASS: native a64emit -> discover -> chunks.write -> C compilation/execution; local registers=31
+PASS: Windows x64 compilation/link of the same synthetic generated C (not executed)

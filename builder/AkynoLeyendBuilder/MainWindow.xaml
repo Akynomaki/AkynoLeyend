@@ -1,0 +1,565 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="AkynoLeyendBuilder.MainWindow" Title="AkynoLeyend" Width="1280" Height="900" MinWidth="1000" MinHeight="680" WindowStartupLocation="CenterScreen" Background="{StaticResource Page}" AllowDrop="True" UseLayoutRounding="True" SnapsToDevicePixels="True" FontFamily="{StaticResource Ui}" FontSize="15" Foreground="{StaticResource Ink}" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Auto">
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="36" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+  </WindowChrome.WindowChrome>
+  <Grid Margin="0,0,0,6">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="232" />
+      <ColumnDefinition />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="36" />
+      <RowDefinition Height="102" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True" Grid.Column="1">
+      <Button Style="{StaticResource Caption}" Click="Minimize" ToolTip="Minimize">
+        <Rectangle Width="10" Height="1" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+      </Button>
+      <Button Style="{StaticResource Caption}" Click="ToggleMaximize" ToolTip="Maximizar / Restaurar" AutomationProperties.Name="Maximizar ou restaurar janela">
+        <Rectangle Width="11" Height="10" StrokeThickness="1" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+      </Button>
+      <Button Style="{StaticResource Caption}" Click="CloseWindow" ToolTip="Close">
+        <Path Data="M0,0 L10,10 M10,0 L0,10" StrokeThickness="1" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+      </Button>
+    </StackPanel>
+    <ScrollViewer x:Name="SetupPage" Grid.Row="2" Margin="28,8,26,18" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+      <StackPanel Margin="0,0,10,6">
+        <Border Style="{StaticResource Banner}">
+          <Grid Height="116" ClipToBounds="True">
+            <ContentControl Template="{StaticResource AbstractBackdrop}" />
+            <StackPanel Margin="30,20,24,22">
+              <TextBlock Text="—   AKYNOLEYEND   —" FontFamily="Georgia" FontSize="12" Foreground="{StaticResource InkSoft}" />
+              <TextBlock Text="Sua próxima jornada" FontFamily="Georgia" FontSize="36" FontStyle="Italic" Foreground="{StaticResource AccentHover}" Margin="0,10,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+            <Path Data="M0,18 L0,0 L18,0 M4,12 L4,4 L12,4" Stroke="{StaticResource Accent}" StrokeThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" IsHitTestVisible="False" />
+            <Border BorderBrush="{StaticResource LineStrong}" BorderThickness="1" IsHitTestVisible="False" />
+          </Grid>
+        </Border>
+        <Border Style="{StaticResource Card}">
+          <StackPanel Margin="0">
+            <TextBlock Text="Prepare sua jornada" Style="{StaticResource Section}" Margin="0,0,0,6" />
+            <TextBlock Text="Selecione os arquivos do jogo e escolha como jogar." Style="{StaticResource Note}" Margin="0,0,0,24" />
+            <Grid Margin="0,0,0,10">
+              <TextBlock x:Name="GameFilesLabel" Style="{StaticResource Label}" VerticalAlignment="Center" Margin="0" />
+              <Border HorizontalAlignment="Right" Background="{StaticResource Raised}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Padding="2">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton x:Name="UseNup" Style="{StaticResource Seg}" GroupName="Source" IsChecked="True" Checked="SourceKindChanged" />
+                  <RadioButton x:Name="UseFolders" Style="{StaticResource Seg}" GroupName="Source" Checked="SourceKindChanged" />
+                </StackPanel>
+              </Border>
+            </Grid>
+            <Grid x:Name="NupRow">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="NupPath" Style="{StaticResource Path}" TextChanged="PathsChanged" />
+              <Button x:Name="BrowseA" Grid.Column="1" Style="{StaticResource Quiet}" Margin="8,0,0,0" Click="BrowseNup" />
+            </Grid>
+            <StackPanel x:Name="FolderRows" Visibility="Collapsed">
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="58" />
+                  <ColumnDefinition />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="romfs" Style="{StaticResource Note}" VerticalAlignment="Center" />
+                <TextBox x:Name="RomfsPath" Grid.Column="1" Style="{StaticResource Path}" TextChanged="PathsChanged" />
+                <Button x:Name="BrowseB" Grid.Column="2" Style="{StaticResource Quiet}" Margin="8,0,0,0" Click="BrowseRomfs" />
+              </Grid>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="58" />
+                  <ColumnDefinition />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="exefs" Style="{StaticResource Note}" VerticalAlignment="Center" />
+                <TextBox x:Name="ExefsPath" Grid.Column="1" Style="{StaticResource Path}" TextChanged="PathsChanged" />
+                <Button x:Name="BrowseC" Grid.Column="2" Style="{StaticResource Quiet}" Margin="8,0,0,0" Click="BrowseExefs" />
+              </Grid>
+            </StackPanel>
+            <TextBlock x:Name="CheckText" Style="{StaticResource Note}" Margin="0,10,0,0" MinHeight="18" />
+            <TextBlock x:Name="SaveToLabel" Style="{StaticResource Label}" Margin="0,28,0,8" />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="OutPath" Style="{StaticResource Path}" TextChanged="OutputChanged" />
+              <Button x:Name="BrowseD" Grid.Column="1" Style="{StaticResource Quiet}" Margin="8,0,0,0" Click="BrowseOut" />
+            </Grid>
+            <Grid Margin="0,24,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock x:Name="JobsLabel" Style="{StaticResource Label}" />
+                <ComboBox x:Name="JobsBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem x:Name="AutoJobs" Content="Automático" />
+                  <ComboBoxItem Content="1" />
+                  <ComboBoxItem Content="2" />
+                  <ComboBoxItem Content="3" />
+                  <ComboBoxItem Content="4" />
+                  <ComboBoxItem Content="5" />
+                  <ComboBoxItem Content="6" />
+                  <ComboBoxItem Content="7" />
+                  <ComboBoxItem Content="8" />
+                </ComboBox>
+                <TextBlock x:Name="HardwareText" Text="Consultando CPU e memória..." Style="{StaticResource Note}" Margin="0,10,0,0" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock x:Name="ProfileLabel" Style="{StaticResource Label}" />
+                <ComboBox x:Name="ProfileBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Original" />
+                  <ComboBoxItem x:Name="Profile8" Content="8 GB (experimental)" />
+                  <ComboBoxItem Content="Nítido (sem histórico temporal)" />
+                  <ComboBoxItem Content="Compatibilidade (memória)" />
+                  <ComboBoxItem Content="Desempenho · 2560×1600" />
+                </ComboBox>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Border>
+        <Grid Margin="0,18,0,6">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock x:Name="SpaceText" Style="{StaticResource Note}" VerticalAlignment="Center" Margin="0,0,16,0" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <Button x:Name="ExistingPlay" Style="{StaticResource Primary}" Visibility="Collapsed" Click="PlayExisting" Margin="0,0,8,0" Height="44" MinWidth="88" />
+            <Button x:Name="UpdateBuildButton" Content="Atualizações" Tag="updates" Style="{StaticResource Quiet}" Click="Navigate" Margin="0,0,8,0" Height="44" MinWidth="88" />
+            <Button x:Name="BuildButton" Style="{StaticResource Quiet}" IsEnabled="False" Click="StartBuild" Height="44" MinWidth="88" />
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </ScrollViewer>
+    <Grid x:Name="BuildPage" Grid.Row="2" Margin="28,8,26,18" Visibility="Collapsed" Grid.Column="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <StackPanel>
+        <TextBlock x:Name="BuildTitle" Style="{StaticResource Heading}" />
+        <TextBlock x:Name="BuildNote" Style="{StaticResource Note}" Margin="0,6,0,0" />
+        <ProgressBar x:Name="ShaderProgress" Style="{StaticResource Thin}" Minimum="0" Maximum="1" Height="6" Margin="0,12,0,12" Visibility="Collapsed" />
+      </StackPanel>
+      <Grid Grid.Row="1" Margin="0,28,0,16">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <StackPanel x:Name="StageList" />
+        <TextBox x:Name="Log" Grid.Row="1" Margin="0,14,0,0" Visibility="Collapsed" IsReadOnly="True" BorderThickness="1" BorderBrush="{StaticResource Line}" Background="{StaticResource Raised}" Foreground="{StaticResource InkSoft}" FontFamily="{StaticResource Mono}" FontSize="11" Padding="8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap" />
+      </Grid>
+      <Grid Grid.Row="2">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <ToggleButton x:Name="ShowLog" Style="{StaticResource Link}" VerticalAlignment="Center" Checked="LogToggled" Unchecked="LogToggled" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button x:Name="OpenButton" Style="{StaticResource Quiet}" Visibility="Collapsed" Click="OpenFolder" Margin="0,0,8,0" />
+          <Button x:Name="BackButton" Style="{StaticResource Quiet}" Visibility="Collapsed" Click="Back" />
+          <Button x:Name="CancelButton" Style="{StaticResource Quiet}" Click="CancelBuild" />
+          <Button x:Name="PlayButton" Style="{StaticResource Primary}" Visibility="Collapsed" Click="Play" />
+        </StackPanel>
+      </Grid>
+    </Grid>
+    <Border Grid.RowSpan="3" BorderBrush="{StaticResource LineStrong}" BorderThickness="1" Margin="10,8,0,8">
+      <Grid Margin="18,28,18,24">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel>
+          <Viewbox Width="100" Height="100" HorizontalAlignment="Center" Margin="0,0,0,20">
+            <Canvas Width="100" Height="88">
+              <Path Fill="{StaticResource Accent}" Data="M50,2 L65,28 L35,28 Z M33,32 L48,58 L18,58 Z M67,32 L82,58 L52,58 Z" />
+              <Path Stroke="{StaticResource Accent}" StrokeThickness="2" Data="M50,66 L50,86 M47,75 C22,74 7,56 3,38 M53,75 C78,74 93,56 97,38 M20,56 L6,54 M29,65 L13,67 M80,56 L94,54 M71,65 L87,67" />
+            </Canvas>
+          </Viewbox>
+          <TextBlock Text="AkynoLeyend" FontFamily="Georgia" FontSize="25" Foreground="{StaticResource Accent}" HorizontalAlignment="Center" />
+          <TextBlock Text="UMA NOVA JORNADA" FontSize="10" Foreground="{StaticResource InkFaint}" Margin="0,10,0,28" HorizontalAlignment="Center" />
+        </StackPanel>
+        <StackPanel x:Name="Navigation" Grid.Row="1" VerticalAlignment="Top" Margin="0,16,0,0">
+          <Button x:Name="NavHome" Tag="home" Style="{StaticResource Nav}" Click="Navigate" AutomationProperties.Name="Início">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="" FontFamily="Segoe MDL2 Assets" FontSize="19" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+              <TextBlock Text="Início" FontSize="17" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="NavGraphics" Tag="graphics" Style="{StaticResource Nav}" Click="Navigate" AutomationProperties.Name="Gráficos">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="" FontFamily="Segoe MDL2 Assets" FontSize="19" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+              <TextBlock Text="Gráficos" FontSize="17" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="NavUpdates" Tag="updates" Style="{StaticResource Nav}" Click="Navigate" AutomationProperties.Name="Atualizações">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="" FontFamily="Segoe MDL2 Assets" FontSize="19" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+              <TextBlock Text="Atualizações" FontSize="17" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="NavTools" Tag="tools" Style="{StaticResource Nav}" Click="Navigate" AutomationProperties.Name="Ferramentas">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="" FontFamily="Segoe MDL2 Assets" FontSize="19" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+              <TextBlock Text="Ferramentas" FontSize="17" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="NavCredits" Tag="credits" Style="{StaticResource Nav}" Click="Navigate" AutomationProperties.Name="Créditos">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="" FontFamily="Segoe MDL2 Assets" FontSize="19" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+              <TextBlock Text="Créditos" FontSize="17" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+        <StackPanel Grid.Row="2">
+          <Border Height="1" Background="{StaticResource Line}" Margin="0,0,0,16" />
+          <TextBlock x:Name="BuilderVersion" Text="Launcher" FontSize="13" Foreground="{StaticResource InkFaint}" />
+          <TextBlock Text="Construído para explorar." Style="{StaticResource Note}" FontSize="11" Margin="0,8,0,0" />
+        </StackPanel>
+      </Grid>
+    </Border>
+    <ScrollViewer x:Name="GraphicsPage" Grid.Row="2" Grid.Column="1" Margin="28,8,26,18" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+      <StackPanel Margin="0,0,10,6">
+        <Border Style="{StaticResource Banner}">
+          <Grid Height="116" ClipToBounds="True">
+            <ContentControl Template="{StaticResource AbstractBackdrop}" />
+            <StackPanel Margin="30,20,24,22">
+              <TextBlock Text="—   AKYNOLEYEND   —" FontFamily="Georgia" FontSize="12" Foreground="{StaticResource InkSoft}" />
+              <TextBlock Text="A imagem do seu jeito" FontFamily="Georgia" FontSize="36" FontStyle="Italic" Foreground="{StaticResource AccentHover}" Margin="0,10,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+            <Path Data="M0,18 L0,0 L18,0 M4,12 L4,4 L12,4" Stroke="{StaticResource Accent}" StrokeThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" IsHitTestVisible="False" />
+            <Border BorderBrush="{StaticResource LineStrong}" BorderThickness="1" IsHitTestVisible="False" />
+          </Grid>
+        </Border>
+        <TextBlock Text="Os ajustes são aplicados ao jogar. Compare a mesma cena para avaliar FPS e qualidade." Style="{StaticResource Note}" Margin="0,0,0,22" />
+        <WrapPanel Margin="0,0,0,20">
+          <Button Content="AMD básico · Full HD + FSR" Tag="amd-low" Click="Preset" Style="{StaticResource Primary}" Margin="0,0,10,8" />
+          <Button Content="Qualidade" Tag="quality" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+          <Button Content="Equilibrado" Tag="balanced" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+          <Button Content="Fluidez" Tag="smooth" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+          <Button Content="Desempenho · 2560×1600" Tag="1600p" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+          <Button Content="Usar opções do jogo" Tag="saved" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,0,8" />
+        </WrapPanel>
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <StackPanel Margin="0,0,0,20">
+              <TextBlock Text="Resolução de saída (reiniciar o jogo)" Style="{StaticResource Label}" />
+              <ComboBox x:Name="OutputBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                <ComboBoxItem Content="1920×1080 · Full HD" Tag="1080p" />
+                <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                <ComboBoxItem Content="2048×1152 · padrão do jogo" Tag="game" />
+                <ComboBoxItem Content="1280×720 · HD" Tag="720p" />
+                <ComboBoxItem Content="2560×1440" Tag="1440p" />
+                <ComboBoxItem Content="2560×1600 · 16:10" Tag="1600p" />
+                <ComboBoxItem Content="3840×2160 · exige mais da GPU" Tag="4k" />
+              </ComboBox>
+            </StackPanel>
+            <Grid Margin="0,0,0,20">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="API gráfica" Style="{StaticResource Label}" />
+                <ComboBox x:Name="BackendBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Vulkan" Tag="vulkan" />
+                  <ComboBoxItem Content="OpenGL · ainda indisponível" Tag="opengl" IsEnabled="False" />
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Resolução interna" Style="{StaticResource Label}" />
+                <ComboBox x:Name="ResolutionBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Usar opção salva no jogo" Tag="saved" />
+                  <ComboBoxItem Content="Automática (dinâmica)" Tag="auto" />
+                  <ComboBoxItem Content="Escala interna · 100% (referencia)" Tag="100" />
+                  <ComboBoxItem Content="125% · escala experimental (exige EXE recompilado)" Tag="125" />
+                  <ComboBoxItem Content="150% · escala experimental (exige EXE recompilado)" Tag="150" />
+                  <ComboBoxItem Content="75% · mais leve" Tag="75" />
+                  <ComboBoxItem Content="67% · mais leve" Tag="67" />
+                  <ComboBoxItem Content="50% · desempenho" Tag="50" />
+                </ComboBox>
+              </StackPanel>
+            </Grid>
+            <Grid Margin="0,0,0,20">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="Ampliação" Style="{StaticResource Label}" />
+                <ComboBox x:Name="UpscaleBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                  <ComboBoxItem Content="Desligado" Tag="off" />
+                  <ComboBoxItem Content="Catmull-Rom" Tag="catmull-rom" />
+                  <ComboBoxItem Content="Lanczos" Tag="lanczos" />
+                  <ComboBoxItem Content="AMD FSR 1 · EASU + RCAS" Tag="fsr" />
+                  <ComboBoxItem Content="AMD FSR 3.1 · desempenho (50–75%)" Tag="fsr-temporal" />
+                  <ComboBoxItem Content="AMD FSR 3.1 · Native AA (100%)" Tag="fsr-native-aa" />
+                  <ComboBoxItem Content="AMD FSR 4.1 · Radeon compatível" Tag="fsr4" />
+                  <ComboBoxItem Content="AMD FSR 4.1 · Native AA (Radeon compatível)" Tag="fsr4-native-aa" />
+                  <ComboBoxItem Content="NVIDIA DLSS · RTX (50–75%)" Tag="dlss" />
+                  <ComboBoxItem Content="NVIDIA DLAA · RTX (100%)" Tag="dlaa" />
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Nitidez" Style="{StaticResource Label}" />
+                <ComboBox x:Name="SharpnessBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                  <ComboBoxItem Content="0% · natural" Tag="0" />
+                  <ComboBoxItem Content="10% · suave" Tag="10" />
+                  <ComboBoxItem Content="20%" Tag="20" />
+                  <ComboBoxItem Content="30%" Tag="30" />
+                </ComboBox>
+              </StackPanel>
+            </Grid>
+            <Grid Margin="0,0,0,20">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="Velocidade do jogo (FPS dinâmico)" Style="{StaticResource Label}" />
+                <ComboBox x:Name="SpeedBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                  <ComboBoxItem Content="Tempo real · recomendado" Tag="realtime" />
+                  <ComboBoxItem Content="Por quadro · pode ficar lento" Tag="per-frame" />
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Geração de quadros" Style="{StaticResource Label}" />
+                <ComboBox x:Name="FramegenBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                  <ComboBoxItem Content="Desligada" Tag="0" />
+                  <ComboBoxItem Content="2×" Tag="2" />
+                  <ComboBoxItem Content="3×" Tag="3" />
+                  <ComboBoxItem Content="4×" Tag="4" />
+                  <ComboBoxItem Content="5×" Tag="5" />
+                  <ComboBoxItem Content="6×" Tag="6" />
+                  <ComboBoxItem Content="7×" Tag="7" />
+                  <ComboBoxItem Content="8×" Tag="8" />
+                  <ComboBoxItem Content="Dinâmica · segue o monitor" Tag="9" />
+                </ComboBox>
+              </StackPanel>
+            </Grid>
+            <Grid Margin="0,0,0,20">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="Ritmo de quadros" Style="{StaticResource Label}" />
+                <ComboBox x:Name="PacingBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                  <ComboBoxItem Content="Ligado" Tag="on" />
+                  <ComboBoxItem Content="Desligado" Tag="off" />
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Cache de shaders" Style="{StaticResource Label}" />
+                <ComboBox x:Name="CacheBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Original" Tag="original" />
+                  <ComboBoxItem Content="Streaming · limites de leitura" Tag="streaming" />
+                  <ComboBoxItem Content="Equilibrado · mais RAM e workers" Tag="equilibrado" />
+                </ComboBox>
+              </StackPanel>
+            </Grid>
+            <Grid Margin="0,0,0,20">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="Contador de FPS" Style="{StaticResource Label}" />
+                <ComboBox x:Name="FpsBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                  <ComboBoxItem Content="Mostrar FPS" Tag="on" />
+                  <ComboBoxItem Content="Ocultar FPS" Tag="off" />
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Perfil portátil (reiniciar o jogo)" Style="{StaticResource Label}" />
+                <ComboBox x:Name="HandheldBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                  <ComboBoxItem Content="Ligado · usado pelo AMD básico" Tag="on" />
+                  <ComboBoxItem Content="Desligado" Tag="off" />
+                </ComboBox>
+              </StackPanel>
+            </Grid>
+            <TextBlock Text="No jogo: Ctrl+M abre o menu. Use mouse ou WASD. Os shaders são conferidos e preparados automaticamente ao jogar. Tempo real mantém a simulação; não aumenta os quadros renderizados." Style="{StaticResource Note}" FontSize="11" />
+          </StackPanel>
+        </Border>
+        <TextBlock x:Name="GraphicsNote" Text="Para aplicar uma troca de FSR feita no F1, feche o jogo e clique em Jogar novamente." Style="{StaticResource Note}" Margin="0,18,0,18" />
+        <Button Content="Aplicar configurações" Style="{StaticResource Primary}" HorizontalAlignment="Center" Click="SaveGraphics" Height="52" MinWidth="340" />
+      </StackPanel>
+    </ScrollViewer>
+    <ScrollViewer x:Name="UpdatesPage" Grid.Row="2" Grid.Column="1" Margin="28,8,26,18" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+      <StackPanel Margin="0,0,10,6">
+        <Border Style="{StaticResource Banner}">
+          <Grid Height="116" ClipToBounds="True">
+            <ContentControl Template="{StaticResource AbstractBackdrop}" />
+            <StackPanel Margin="30,20,24,22">
+              <TextBlock Text="—   AKYNOLEYEND   —" FontFamily="Georgia" FontSize="12" Foreground="{StaticResource InkSoft}" />
+              <TextBlock Text="Atualizações" FontFamily="Georgia" FontSize="36" FontStyle="Italic" Foreground="{StaticResource AccentHover}" Margin="0,10,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+            <Path Data="M0,18 L0,0 L18,0 M4,12 L4,4 L12,4" Stroke="{StaticResource Accent}" StrokeThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" IsHitTestVisible="False" />
+            <Border BorderBrush="{StaticResource LineStrong}" BorderThickness="1" IsHitTestVisible="False" />
+          </Grid>
+        </Border>
+        <TextBlock Text="Mantenha o launcher e o jogo atualizados na mesma instalação." Style="{StaticResource Note}" Margin="0,14,0,20" />
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock x:Name="InstalledVersion" Text="Versão instalada: não identificada" Style="{StaticResource Section}" />
+            <TextBlock Text="Escolha um pacote de atualização. Confira as novidades e correções antes de instalar. Seus saves e configurações serão mantidos." Style="{StaticResource Note}" Margin="0,8,0,18" />
+            <Button x:Name="ChooseUpdateButton" Content="Selecionar atualização (.zip)" Click="UpdateBuild" Style="{StaticResource Primary}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+          <StackPanel>
+            <TextBlock x:Name="UpdateVersion" Text="Novidades e correções" Style="{StaticResource Section}" />
+            <TextBlock x:Name="UpdateChanges" Text="Selecione um pacote para ver o que muda nesta atualização." Style="{StaticResource Note}" Margin="0,12,0,18" TextWrapping="Wrap" />
+            <Button x:Name="ApplyUpdateButton" Content="Instalar atualização e reiniciar launcher" Click="ApplySelectedUpdate" Style="{StaticResource Primary}" HorizontalAlignment="Left" IsEnabled="False" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+          <StackPanel>
+            <TextBlock Text="Atualizar a build do jogo" Style="{StaticResource Section}" />
+            <TextBlock Text="Aplica os componentes já instalados, reaproveitando a compilação existente. Mantenha a pasta work. Se faltar algum objeto necessário, a operação será interrompida com uma explicação." Style="{StaticResource Note}" Margin="0,8,0,18" />
+            <Button x:Name="MaintainUpdateButton" Content="Atualizar componentes alterados" Tag="maintain-build" Click="RunTool" Style="{StaticResource Quiet}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </Border>
+        <TextBlock x:Name="UpdatesNote" Style="{StaticResource Note}" Margin="0,18,0,0" TextWrapping="Wrap" />
+      </StackPanel>
+    </ScrollViewer>
+    <ScrollViewer x:Name="ToolsPage" Grid.Row="2" Grid.Column="1" Margin="28,8,26,18" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+      <StackPanel Margin="0,0,10,6">
+        <Border Style="{StaticResource Banner}">
+          <Grid Height="116" ClipToBounds="True">
+            <ContentControl Template="{StaticResource AbstractBackdrop}" />
+            <StackPanel Margin="30,20,24,22">
+              <TextBlock Text="—   FERRAMENTAS   —" FontFamily="Georgia" FontSize="12" Foreground="{StaticResource InkSoft}" />
+              <TextBlock Text="Tudo pronto para jogar" FontFamily="Georgia" FontSize="36" FontStyle="Italic" Foreground="{StaticResource AccentHover}" Margin="0,10,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+            <Path Data="M0,18 L0,0 L18,0 M4,12 L4,4 L12,4" Stroke="{StaticResource Accent}" StrokeThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" IsHitTestVisible="False" />
+            <Border BorderBrush="{StaticResource LineStrong}" BorderThickness="1" IsHitTestVisible="False" />
+          </Grid>
+        </Border>
+        <TextBlock Text="Use a pasta de saída escolhida em Início. Preparar e atualizar preservam saves e objetos compilados." Style="{StaticResource Note}" Margin="0,0,0,26" />
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="Preparação" Style="{StaticResource Section}" />
+            <TextBlock Text="Antecipe a tradução dos shaders para reduzir pausas. A primeira preparação pode demorar." Style="{StaticResource Note}" Margin="0,0,0,20" />
+            <WrapPanel>
+              <Button Content="Preparar shaders" Tag="prepare-shaders" Click="RunTool" Style="{StaticResource Primary}" Margin="0,0,12,10" Width="280" Height="56" />
+              <Button Content="Baixar DLSS da NVIDIA" Tag="dlss-runtime" Click="RunTool" Style="{StaticResource Quiet}" Margin="0,0,12,10" ToolTip="Baixa nvngx_dlss.dll do repositório oficial da NVIDIA depois que você aceita a licença dela" Width="280" Height="56" />
+              <Button Content="Exportar Save" Click="ExportSaves" Style="{StaticResource Quiet}" Margin="0,0,12,10" ToolTip="Copia o save compatível de um emulador (Fritz, MDias, PokeDinner ou Lichii) para a pasta de saves deste port" Width="280" Height="56" />
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource Card}" Margin="0,20,0,0">
+          <StackPanel>
+            <TextBlock Text="Diagnóstico" Style="{StaticResource Section}" />
+            <TextBlock Text="Reúna os registros da última execução para investigar crashes, iluminação e travamentos." Style="{StaticResource Note}" Margin="0,0,0,20" />
+            <WrapPanel>
+              <Button Content="Coletar relatório" Tag="collect-crash" Click="RunTool" Style="{StaticResource Quiet}" Margin="0,0,12,10" Width="280" Height="56" />
+              <Button Content="Verificar ferramentas" Tag="doctor" Click="RunTool" Style="{StaticResource Quiet}" Margin="0,0,12,10" Width="280" Height="56" />
+              <Button Content="Abrir pasta do jogo" Click="OpenGameFolder" Style="{StaticResource Quiet}" Margin="0,0,0,10" Width="280" Height="56" />
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+        <TextBlock x:Name="ToolNote" Style="{StaticResource Note}" Margin="0,18,0,0" />
+      </StackPanel>
+    </ScrollViewer>
+    <ScrollViewer x:Name="CreditsPage" Grid.Row="2" Grid.Column="1" Margin="28,8,26,18" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+      <StackPanel Margin="0,0,10,6">
+        <Border Style="{StaticResource Banner}">
+          <Grid Height="116" ClipToBounds="True">
+            <ContentControl Template="{StaticResource AbstractBackdrop}" />
+            <StackPanel Margin="30,20,24,22">
+              <TextBlock Text="—   AKYNOLEYEND   —" FontFamily="Georgia" FontSize="12" Foreground="{StaticResource InkSoft}" />
+              <TextBlock Text="Créditos" FontFamily="Georgia" FontSize="36" FontStyle="Italic" Foreground="{StaticResource AccentHover}" Margin="0,10,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+            <Path Data="M0,18 L0,0 L18,0 M4,12 L4,4 L12,4" Stroke="{StaticResource Accent}" StrokeThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" IsHitTestVisible="False" />
+            <Border BorderBrush="{StaticResource LineStrong}" BorderThickness="1" IsHitTestVisible="False" />
+          </Grid>
+        </Border>
+        <TextBlock Text="Uma jornada construída em conjunto." FontSize="18" Margin="0,0,0,14" TextWrapping="Wrap" />
+        <Border Style="{StaticResource Card}" Padding="18">
+          <StackPanel>
+            <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Margin="0,0,0,10">
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Akino e comunidade" Style="{StaticResource Section}" FontFamily="Georgia" FontSize="17" Margin="0,0,24,0" TextWrapping="Wrap" />
+                <TextBlock Text="Direção do AkynoLeyend, identidade e testes fornecidos." Style="{StaticResource Note}" Margin="0" Grid.Column="1" />
+              </Grid>
+            </Border>
+            <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Margin="0,0,0,10">
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="NotRexed / Hookshot" Style="{StaticResource Label}" FontFamily="Georgia" FontSize="17" Margin="0,0,24,0" TextWrapping="Wrap" />
+                <TextBlock Text="Base ARM64, runtime nativo, renderizador e builder original." Style="{StaticResource Note}" Margin="0" Grid.Column="1" />
+              </Grid>
+            </Border>
+            <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Margin="0,0,0,10">
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="EvilBoyce / evilmfkr / EvilOOT · SkippySteve" Style="{StaticResource Label}" FontFamily="Georgia" FontSize="17" Margin="0,0,24,0" TextWrapping="Wrap" />
+                <TextBlock Text="Folhagem, iluminação, sincronização e otimizações de desenho." Style="{StaticResource Note}" Margin="0" Grid.Column="1" />
+              </Grid>
+            </Border>
+            <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Margin="0,0,0,10">
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Eden / Eglantine · suyu / yuzu · Sirit" Style="{StaticResource Label}" FontFamily="Georgia" FontSize="17" Margin="0,0,24,0" TextWrapping="Wrap" />
+                <TextBlock Text="Componentes e tradutores herdados, com licenças preservadas." Style="{StaticResource Note}" Margin="0" Grid.Column="1" />
+              </Grid>
+            </Border>
+            <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Margin="0,0,0,10">
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="ProfMPPDias / MDias · Dark / Lichii" Style="{StaticResource Label}" FontFamily="Georgia" FontSize="17" Margin="0,0,24,0" TextWrapping="Wrap" />
+                <TextBlock Text="Referências estudadas. O IPS de FPS não foi transplantado." Style="{StaticResource Note}" Margin="0" Grid.Column="1" />
+              </Grid>
+            </Border>
+            <Button Content="Abrir créditos, licenças e histórico" Click="OpenCredits" Style="{StaticResource Quiet}" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="1" Grid.Column="1" Margin="38,5,28,10">
+      <Grid>
+        <TextBlock Text="AkynoLeyend" Style="{StaticResource Heading}" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="40" Margin="0,0,210,0" />
+        <ComboBox x:Name="LanguageBox" Style="{StaticResource Choice}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="190" AutomationProperties.Name="Language" SelectionChanged="LanguageChanged" />
+      </Grid>
+      <TextBlock x:Name="Subtitle" Style="{StaticResource Note}" Margin="0,6,0,0" FontFamily="Georgia" FontStyle="Italic" FontSize="20" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -1,0 +1,65 @@
+CORRECAO DE ACESSO — OCARINA 0.3.8-dev.2
+
+Este ZIP pequeno atualiza a instalacao 0.3.8 que voce ja usa.
+
+1. Feche jogo e launcher.
+2. Extraia o CONTEUDO deste ZIP na pasta que tem manage.py e OcarinaBuilder.exe,
+   aceitando substituir. Preserve work e jogo. O nome antigo da pasta pode ficar.
+3. De dois cliques em Reparar-Acesso.cmd, normalmente. Ele pedira a elevacao do
+   Windows somente para corrigir os acessos que foram negados.
+4. Ao terminar, ele confere a leitura e os hashes de volta no usuario normal.
+   Abra OcarinaBuilder.exe normalmente e teste Jogar.
+
+Nao precisa recompilar nem apagar o jogo para este reparo. Se houver outro
+problema de integridade ou recursos ausentes, a verificacao o mostrara.
+
+O QUE O DIAGNOSTICO MOSTROU
+
+O ZIP 20261107-205245-647183-1124.zip mostrou o manifesto legivel e os tres
+arquivos hookshot.exe, hookshot_vk.dll e image.bin com WinError 5. Tambem
+houve acesso negado ao consultar suas ACLs. Nao havia hookshot.exe em execucao;
+os tres itens eram arquivos regulares, sem EFS nem reparse point.
+
+A causa provavel e a publicacao a partir de TemporaryDirectory criada por um
+processo elevado. O Python usa uma ACL com OWNER RIGHTS; com elevacao, o dono
+pode ser Administrators. O arquivo movido conserva essa ACL e o usuario normal
+fica sem acesso. Esse padrao e documentado em:
+https://github.com/python/cpython/issues/157876
+
+O proprietario/DACL antigo registrado pelo reparo permite confirmar essa
+hipotese no PC. A mensagem WinError 5 sozinha nao prova antivirus nem uma
+falha de GPU. Este reparo nao executa o jogo como administrador.
+
+ESCOPO DO REPARO
+
+- Os tres arquivos nomeados acima, da pasta com manifesto Ocarina reconhecido.
+- O SID do usuario original e capturado antes de solicitar a elevacao.
+- A heranca e restaurada nos tres arquivos; acesso de modificacao e concedido
+  somente ao usuario original. Os dados dos arquivos nao sao alterados.
+- A leitura e a integridade SHA-256 sao verificadas; o manifesto nao e burlado.
+- Se a verificacao NORMAL detectar System/Pack inacessiveis, a permissao
+  herdavel do usuario pode ser acrescentada somente na raiz da entrada privada
+  work/inputs/<hash>/romfs registrada. O reparo nao redefine o work inteiro.
+- Links, juncoes e caminhos de cache fora dessa estrutura sao recusados.
+- Um registro JSON guarda o dono e as ACLs que puderem ser lidos e as operacoes.
+
+Se falhar, envie o arquivo mais recente diagnosticos-acesso/reparo-*.json
+junto do novo ZIP de Diagnosticar-Acesso.cmd. Nao repita a compilacao longa.
+Para um destino personalizado, use:
+  Reparar-Acesso.cmd -PastaJogo "D:\MinhaPasta\jogo"
+
+PREVENCAO NO CODIGO
+
+Os cinco pontos que publicam arquivos/diretorios temporarios agora concedem
+acesso ao SID real de quem esta compilando, em vez de depender apenas do dono
+padrao do token elevado. A pasta continua privada: usuario, SYSTEM e
+Administrators. Nao e adicionada uma permissao Everyone.
+
+VALIDACAO
+
+103 testes descobertos:94 passaram; nove dependentes de PowerShell/Windows
+foram omitidos neste host Linux. As APIs Windows e o reparo elevado nao foram
+executados neste ambiente. O resultado no seu PC sera confirmado pela coleta
+apos o reparo. Nao houve alteracao no C/C++/SPIR-V da entrega 0.3.8; a DLL
+Vulkan e o cache de shaders permanecem os mesmos. As piscadas sao outro
+problema e nao estao declaradas como corrigidas por este ajuste de acesso.

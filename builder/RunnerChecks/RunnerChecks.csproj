@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../AkynoLeyendBuilder/UpdatePreview.cs" Link="UpdatePreview.cs"/>
+    <Compile Include="../AkynoLeyendBuilder/Runner.cs" Link="Runner.cs"/>
+    <Compile Include="../AkynoLeyendBuilder/Strings.cs" Link="Strings.cs"/>
+    <Compile Include="../AkynoLeyendBuilder/LaunchOptions.cs" Link="LaunchOptions.cs"/>
+    <Compile Include="../AkynoLeyendBuilder/UiLogBuffer.cs" Link="UiLogBuffer.cs"/>
+  </ItemGroup>
+</Project>

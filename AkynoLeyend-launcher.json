@@ -1,0 +1,24 @@
+{
+  "Schema": 1,
+  "Output": "E:\\CLAUDE\\AkynoLeyend-0.4.7\\jogo",
+  "Nup": "",
+  "Romfs": "",
+  "Exefs": "",
+  "Folders": false,
+  "Jobs": 0,
+  "Profile": 0,
+  "Language": "pt-BR",
+  "Graphics": {
+    "Backend": "vulkan",
+    "Resolution": "saved",
+    "OutputResolution": "1080p",
+    "Speed": "saved",
+    "Upscaling": "saved",
+    "Sharpness": "saved",
+    "Framegen": "saved",
+    "Pacing": "saved",
+    "FpsCounter": "saved",
+    "Handheld": "saved",
+    "Cache": "original"
+  }
+}

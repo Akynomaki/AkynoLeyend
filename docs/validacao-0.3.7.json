@@ -1,0 +1,31 @@
+{
+  "version": "0.3.7-dev.1",
+  "tests_discovered": 85,
+  "passed": 78,
+  "skipped": 7,
+  "skip_reason": "PowerShell unavailable",
+  "vulkan_units": 182,
+  "vulkan_windows_dll_link": "passed",
+  "native_cpp_policy_executed": "passed",
+  "native_incremental_local_hits": 182,
+  "native_incremental_compiled": 0,
+  "wpf_republished": false,
+  "game_executed_here": false,
+  "physical_gpu_tested_here": false,
+  "shader_translator_stamp": "7d16d3d712a683ce",
+  "shader_translator_matches_036": true,
+  "prebuilt_renderer": {
+    "schema": 1,
+    "config": {
+      "target": "windows-gnu",
+      "march": "x86-64-v3",
+      "release": "1"
+    },
+    "source_sha256": "3854d47ae58f4130dac57a9d619da120e94200d113a9c0a2af03220302c4efc0",
+    "binary_sha256": "6d28f08ceef901d3962d9fc670928a7ca29e4ad012751f6e203f093255b01008",
+    "compiler": "LLVM-MinGW 20261020 / Clang 23.1.5, Linux host, Windows x64 target",
+    "game_data": false,
+    "translation_units": 182,
+    "physical_gpu_tested": false
+  }
+}

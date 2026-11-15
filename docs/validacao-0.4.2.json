@@ -1,0 +1,81 @@
+{
+  "version": "0.4.2-rc.1",
+  "python_tests": {
+    "discovered": 152,
+    "passed": 143,
+    "skipped": 9,
+    "failed": 0
+  },
+  "runner_checks": {
+    "passed": 8,
+    "failed": 0
+  },
+  "native": {
+    "schema": 1,
+    "units": 182,
+    "jobs": 4,
+    "renderer_prebuilt": false,
+    "compile_seconds": 8.145,
+    "local_hits": 163,
+    "shared_hits": 0,
+    "compiled": 19,
+    "failed": 0
+  },
+  "host_units": [
+    {
+      "file": "nn_fs.c",
+      "exit": 0,
+      "error": ""
+    },
+    {
+      "file": "nn_vi.c",
+      "exit": 0,
+      "error": ""
+    },
+    {
+      "file": "hos_main.c",
+      "exit": 0,
+      "error": ""
+    },
+    {
+      "file": "rx_backend.c",
+      "exit": 0,
+      "error": ""
+    }
+  ],
+  "launcher": {
+    "schema": 1,
+    "version": "0.4.2-rc.1",
+    "pe_product_version": "0.4.2-rc.1",
+    "source_sha256": "83bdbf52a7c783cb3a3a282d2edf256bceb12e0d53f68a5a71921a8031a8f427",
+    "binary_sha256": "5c6d2c1518ae17e5fe53e2fd98bb2b9842745cbec391e0988497ca9ea4511a7f",
+    "toolchain": ".NET SDK 8.0.427, Microsoft.NETCore.App/WindowsDesktop 8.0.33, self-contained win-x64",
+    "wpf_window_executed": false
+  },
+  "renderer": {
+    "schema": 1,
+    "release": "0.4.2-rc.1",
+    "config": {
+      "target": "windows-gnu",
+      "march": "x86-64-v3",
+      "release": "1"
+    },
+    "source_sha256": "d12505f6dad7db67a3494f40fc922ab115ca312d2ca506cb210a59a779114902",
+    "binary_sha256": "2cae8e3db9d9abd9f1d3de5be967bffa8636c3b8b0ec091c21d653f381482be8",
+    "toolchain": "LLVM-MinGW 20261020 (Clang 23.1.5), Linux-host cross compilation",
+    "units": 182,
+    "physical_gpu_tested": false
+  },
+  "cache_asan_ubsan": true,
+  "leak_sanitizer": false,
+  "full_game_executable_linked": false,
+  "game_executed": false,
+  "wpf_window_executed": false,
+  "physical_gpu_tested": false,
+  "opengl_implemented": false,
+  "max_resolution_ips_implemented": false,
+  "fps_gain_measured": false,
+  "input_archive_sha256": "207094fa6e26f0d539e0f22aa6d3b8cb3bd664be9bcc0c5ad2f00f5af9a51e11",
+  "diagnostic_archive": "20261108-221038-988787-15212.zip",
+  "diagnostic_runtime_version": "0.4.0-dev.1"
+}

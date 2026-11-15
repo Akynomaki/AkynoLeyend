@@ -1,0 +1,21 @@
+OCARINA BUILDER 0.3.1 - WINDOWS x64
+
+Abra OcarinaBuilder.exe.
+Escolha um arquivo .nup ou as pastas romfs e exefs.
+Escolha o destino e clique em Criar.
+Ao terminar, clique em Jogar. Detalhes mostra o registro das etapas.
+
+ATUALIZACAO: extraia o conteudo deste ZIP dentro da pasta que ja possui
+Compilar.cmd e ferramentas. Substitua os arquivos correspondentes.
+O ZIP de atualizacao nao inclui ferramentas; use o pacote Windows completo
+se estiver instalando em uma pasta nova.
+
+O erro Join-Path/Path vazio do Compilar.cmd foi corrigido.
+A interface e os atalhos usam o mesmo fluxo de compilacao.
+
+O executavel da interface foi compilado para Windows x64. A execucao da
+janela e do jogo ainda precisa ser conferida no Windows de destino.
+O perfil 8 GB e experimental; nao garante um teto de memoria nem resolve
+todos os casos de VK_ERROR_DEVICE_LOST.
+
+Leia README.md e docs/validacao.md para os detalhes.

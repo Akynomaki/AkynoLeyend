@@ -1,0 +1,51 @@
+{
+  "version": "0.3.6-dev.1",
+  "host": "Linux",
+  "target": "Windows x64",
+  "compiler": "LLVM-MinGW 20261020 / Clang 23.1.5",
+  "vulkan_translation_units": 182,
+  "vulkan_dll_link": "success",
+  "changed_host_units_cross_compiled": [
+    "gpu_preference.c",
+    "hos_main.c",
+    "pad_sdl.c",
+    "hos_mem.c",
+    "nvn_native.c",
+    "hos_setjmp.c",
+    "nn_vi.c",
+    "nn_applet.c",
+    "nn_hid.c",
+    "nn_video.c",
+    "hos_hostcall.c",
+    "rx_backend.c",
+    "nn_os_sync.c",
+    "hos_thread.c",
+    "display.c"
+  ],
+  "dedicated_gpu_exports": "Verified in the complete generic/synthetic host EXE, plus the isolated generic preference EXE",
+  "tests_discovered": 76,
+  "tests_passed": 69,
+  "tests_skipped": 7,
+  "skip_reason": "PowerShell unavailable",
+  "python_compileall": "passed",
+  "game_executed": false,
+  "physical_gpu_tested": false,
+  "physical_audio_tested": false,
+  "wpf_republished": false,
+  "full_game_link_repeated": false,
+  "inherited_cache_fixture_asan": "0.3.5 ASan/UBSan fixture passed; unchanged transport headers in 0.3.6",
+  "limits": "Native compile/link and generic/synthetic tests only; no measured FPS or visual fix guarantee",
+  "full_synthetic_executable_link": true,
+  "total_units_in_full_synthetic_build": 356,
+  "upstream_final": "foliage-linux-updater / 170ce53",
+  "source_verification": {
+    "commit": "170ce53ca3d69309b3f5151a334136be8b4c38d6",
+    "tree_sha": "170ce53ca3d69309b3f5151a334136be8b4c38d6",
+    "checked_blobs": 951,
+    "mismatches": [],
+    "zip_sha256": "b8ac23a1afaacf5b9d7aaeafc03a0d31cc887f509beeba9769af8d03b7460362",
+    "normalized_line_ending_matches": [
+      "gpu/build-shadertool.bat"
+    ]
+  }
+}

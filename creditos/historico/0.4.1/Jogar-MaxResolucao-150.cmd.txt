@@ -1,0 +1,11 @@
+@echo off
+rem Escala interna experimental via host nativo; NAO e o patch IPS do emulador.
+rem Para jogar com instalacao antiga preservada:
+rem   Jogar-MaxResolucao-150.cmd --out "C:\caminho\instalacao-antiga\jogo"
+echo AkynoLeyend: solicitando escala interna fixa de 150%%.
+echo O menu Insert pode indicar 100%%: a confirmacao do host recompilado aparece em saida.log.
+echo Este recurso nao e o mod Max Resolution do emulador e nao garante 4K.
+"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --resolution 150 --upscaling lanczos --framegen 0 %*
+set "akyno_exit=%errorlevel%"
+if not "%akyno_exit%"=="0" pause
+exit /b %akyno_exit%

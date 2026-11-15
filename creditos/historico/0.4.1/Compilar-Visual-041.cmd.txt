@@ -1,0 +1,16 @@
+@echo off
+chcp 65001 >nul
+setlocal
+cd /d "%~dp0"
+echo AkynoLeyend 0.4.1 Visual: recompilacao NATIVA de host + renderizador.
+echo Os arquivos antigos do jogo e os saves NAO serao substituidos.
+echo.
+echo Destino NOVO: "%~dp0jogo-Visual041"
+echo Area de trabalho NOVA: "%~dp0work-Visual041"
+echo Selecione seu arquivo NUP original na janela que sera aberta.
+echo.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0compilar.ps1" -RenderizadorDosFontes -Destino "%~dp0jogo-Visual041" -Trabalho "%~dp0work-Visual041" %*
+set "akyno_exit=%errorlevel%"
+if not "%akyno_exit%"=="0" echo Falha: consulte a saida acima e nao misture builds.
+pause
+exit /b %akyno_exit%

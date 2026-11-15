@@ -1,0 +1,1475 @@
+--- /dev/null
++++ b/Jogar-Streaming.cmd
+@@ -0,0 +1,5 @@
++@echo off
++"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --cache-mode streaming %*
++set "ocarina_exit=%errorlevel%"
++if not "%ocarina_exit%"=="0" pause
++exit /b %ocarina_exit%
+--- /dev/null
++++ b/LEIA-ME-ATUALIZACAO-0.3.5.txt
+@@ -0,0 +1,51 @@
++OCARINA BUILDER 0.3.5-dev.1 - CACHE COM LIMITES EXPLICITOS
++
++Este ZIP de atualizacao e para quem ja aplicou a versao 0.3.4.
++Nao precisa baixar o ZIP de fontes nem o pacote Windows completo.
++O nome antigo da sua pasta pode permanecer.
++
++1. Feche jogo e Builder. Guarde uma copia de jogo\user\save.
++2. Extraia TODO o ZIP na pasta existente que contem OcarinaBuilder.exe,
++   manage.py, ferramentas e work. Aceite substituir os arquivos.
++3. Preserve work, jogo e suas entradas. Nao apague caches para atualizar.
++4. Abra OcarinaBuilder.exe; use a MESMA entrada, destino e pasta de trabalho.
++   Clique Criar para recompilar o backend. Apenas copiar o ZIP e clicar
++   Jogar executaria o binario antigo. Objetos inalterados podem ser usados
++   novamente; nao ha promessa de duracao fixa para a recompilacao.
++5. Ao terminar, feche o jogo e use Jogar-Streaming.cmd.
++   Para um destino personalizado:
++     Jogar-Streaming.cmd --out "D:\SeuJogo"
++6. Compare com Jogar.cmd na mesma cena, resolucao e opcoes, incluindo uma
++   segunda abertura. O botao Jogar da interface continua no cache Original.
++7. Para comparar com registros detalhados:
++     Jogar-Suporte.cmd --cache-mode streaming
++   Os diagnosticos incluem o modo e os limites realmente enviados ao filho.
++
++IMPLEMENTADO NO BACKEND, NAO APENAS NO ATALHO
++- Leitor em segundo plano com janela compartilhada de 16 MiB para dados
++  brutos antecipados, oito leituras pendentes e descarte LRU dos prontos.
++- Indice limitado a 65536 registros; nenhum preload do banco inteiro.
++- Pre-aquecimento limitado a 64 MiB de registros, 128 variantes e 256 notas
++  graficas; dois workers e ate cinco admissoes de compilacao por segundo
++  por worker. Pipelines ja disponiveis no driver usam consulta sem compilar.
++- I/O dos arquivos em blocos de ate 64 KiB. Snapshot do cache Vulkan limitado
++  a 128 MiB, com cobertura possivelmente parcial e arquivo separado.
++- Menos spam de logs quando o jogo alterna o intervalo de apresentacao.
++  O intervalo solicitado e a sincronizacao de frames nao foram alterados.
++
++LIMITES IMPORTANTES
++Os limites acima sao de partes do cache, NAO de toda a RAM/VRAM do jogo.
++Uma chamada do driver nao pode ser interrompida apos 2 ms por esse sistema.
++O Streaming faz menos trabalho antes de iniciar e pode compilar mais durante
++uma primeira visita. Nao usa um shader generico para substituir desenhos ou
++compute arbitrarios. Esperas necessarias continuam para preservar resultados.
++Nao promete zero stutter, suporte a mesh shaders em RX580, nem corrigir todas
++as luzes, folhas ou sombras. Leia docs/cache-streaming.md.
++
++Drivers enviados como referencia foram documentados; o programa nao instala
++driver, nao altera Registro/BIOS e nao apaga caches globais do Windows.
++O caso externo da RX580 esta em docs/caso-rx580-build-externa.md; nao constitui
++teste desta atualizacao. O relato da RTX4090 precisa do log correspondente.
++
++Validacao de codigo e limites: docs/validacao-0.3.5.json e resultado-testes.txt.
++Sem teste fisico de jogo/GPU, audio ou janela Windows neste ambiente.
+--- a/README.md
++++ b/README.md
+@@ -1,8 +1,16 @@
+ # Ocarina Hookshot — base independente
+ 
+-Versao **0.3.4-dev.1**, construida a partir dos fontes de `Hookshot-Release.zip` enviados pelo usuario. Mantem o lifter ARM64, o runtime e o renderizador Vulkan desse projeto como um conjunto. A orquestracao de compilacao, os perfis e os registros desta versao ficam no pacote Python `ocarina/`.
++Versao **0.3.5-dev.1**, construida a partir dos fontes de `Hookshot-Release.zip` enviados pelo usuario. Mantem o lifter ARM64, o runtime e o renderizador Vulkan desse projeto como um conjunto. A orquestracao de compilacao, os perfis e os registros desta versao ficam no pacote Python `ocarina/`.
+ 
+ Esta e uma base de desenvolvimento experimental. A compilacao do renderizador para Windows foi verificada; o jogo completo ainda precisa ser compilado e testado no PC de destino. Nao ha promessa de FPS, de consumo fixo de VRAM ou de resolucao de todos os crashes. O status do projeto original esta arquivado em `docs/upstream/`.
++
++## Atualizacao 0.3.5: cache Streaming
++
++Para atualizar a 0.3.4, extraia somente o ZIP de atualizacao na pasta existente, preserve `work`/`jogo` e clique **Criar** com a mesma entrada e destino. Depois use **Jogar-Streaming.cmd**. O botao Jogar da interface continua no cache Original; nao ha nova publicacao WPF nesta versao.
++
++O backend agora oferece janela de leitura antecipada de 16 MiB, indice e pre-aquecimento limitados, dois workers, token bucket e I/O de arquivos em ate 64 KiB. O snapshot do cache do driver tem teto de 128 MiB e arquivo separado. Esses limites nao sao um teto global de RAM/VRAM nem promessa de zero stutter. Dados de programas e pipelines continuam compativeis quando GPU/driver/opcoes e identidade do tradutor conferem.
++
++Leia `LEIA-ME-ATUALIZACAO-0.3.5.txt`, [cache-streaming.md](docs/cache-streaming.md), [drivers-amd-nvidia.md](docs/drivers-amd-nvidia.md) e a [analise do log externo RX580](docs/caso-rx580-build-externa.md). Folhagem/iluminacao e suporte completo a placas sem mesh shaders continuam pendentes. Resultados dos testes desta entrega estao em `docs/validacao-0.3.5.json`.
+ 
+ ## Comecar no Windows
+ 
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.3.4-dev.1
++0.3.5-dev.1
+--- a/docs/arquitetura.md
++++ b/docs/arquitetura.md
+@@ -55,3 +55,9 @@
+ ## Correcao 0.3.4
+ 
+ host/win_path.c concentra I/O Win32 com caminhos UTF-16 estendidos; path_join.h recusa truncamento. O filesystem guest usa esses adaptadores com capacidade explicita de 4096 bytes. host/audio_wasapi.c pertence ao thread do mixer: inicializacao/uso/liberacao COM ficam nesse thread; nn_audio.c escolhe WASAPI/waveOut e aplica volume. O lancador preserva snapshots do arquivo de opcoes, e oferece trace de audio/frames separado da validacao Vulkan. O perfil Nitido seleciona uma alternativa de renderizacao ja existente e nao altera Original.
++
++## Cache Streaming 0.3.5
++
++`cache_policy.h` define limites; `cache_stream.h` implementa reservas/LRU/worker; `cache_io.h` limita chamadas de arquivo; `cache_reader.h` valida registros; `cache_rate.h` controla admissao do pre-aquecimento. `vk_shader.cpp` integra o indice/reader e seleciona historico limitado. `vk_draw.cpp` limita aquecimento e snapshots de driver. `vk_jobs.cpp` usa a concorrencia explicita. `ocarina/environment.py` separa modo de cache de perfil visual; CLI/launch registram a configuracao efetiva.
++
++`profiles/shader-cache-compatible.json` registra apenas fontes exatos auditados que preservam ABI/IR/formato. `host/nvn_native.c` limita logs de alternancia do intervalo; nao muda a decisao de pacing. O modo Original preserva o aquecimento completo; o modo Streaming e opt-in via CMD/CLI.
+--- /dev/null
++++ b/docs/cache-streaming.md
+@@ -0,0 +1,65 @@
++# Cache Streaming — 0.3.5-dev.1
++
++O modo `streaming` implementa limites no backend Vulkan e pode ser combinado com os perfis visuais Original, 8gb ou Nitido. O cache Original permanece como comparacao. A janela WPF nao mudou: use `Jogar-Streaming.cmd` para ativar o modo novo.
++
++```powershell
++.\Jogar-Streaming.cmd
++.\Jogar-Streaming.cmd --profile nitido --out "D:\MeuJogo"
++.\Jogar-Suporte.cmd --cache-mode streaming
++```
++
++Recompile pela interface com a mesma entrada/pasta antes de testar. A atualizacao de Python sozinha nao modifica uma DLL ja compilada. Preserve `work` para aproveitar objetos validos; mudancas em headers/flags ainda exigem recompilar os objetos afetados.
++
++## Tres limites separados
++
++| Parte | Padrao Streaming | Alcance real |
++|---|---:|---|
++| Leitura antecipada | 16 MiB | Soma das reservas de registros na fila, em leitura e prontos; nao inclui o registro ja entregue ao consumidor |
++| Fila de leitura | 8 pendentes, 128 entradas | Uma thread, handle de arquivo independente e prioridade abaixo do normal |
++| Taxa de leitura antecipada | 64 MiB/s | Admissao das leituras de fundo, com uma leitura inicial; nao limita leituras urgentes |
++| Indice | 65536 registros | Hashes, offsets e tamanhos; dados excedentes ficam no disco |
++| Pre-aquecimento | 64 MiB de entrada, 128 variantes | Limita os registros selecionados, nao a memoria expandida do driver |
++| Notas graficas | 256 | Notas de estado, que nao equivalem necessariamente a pipelines criadas |
++| Workers | 2 | Limita concorrencia da traducao e do pre-aquecimento no modo Streaming |
++| Admissao de compilacoes no pre-aquecimento | 5/s por worker | Token bucket de capacidade um; nao interrompe uma compilacao ja iniciada |
++| I/O de arquivo | Ate 64 KiB por chamada | Leitura/gravação do cache de programas e dos snapshots de pipeline |
++| Snapshot opaco Vulkan | Ate 128 MiB | Buffer de entrada/saida da aplicacao; nao limita RAM interna do driver |
++
++As variaveis correspondentes estao em `ocarina/environment.py` e seus parsers/limites em `gpu/vk/cache_policy.h`. Um registro de programa individual tem limite defensivo de 64 MiB. Valores invalidos usam padroes; valores numericos sao limitados ao intervalo previsto.
++
++O limite de 16 MiB cobre os bytes reservados de leitura antecipada. Metadados do indice, um registro demandado, SPIR-V desserializado, programas ativos, pipelines, memoria guest, texturas e alocacoes internas do driver estao fora dessa conta. Nao se promete RAM total constante ou soma de todos os buffers igual a 16 MiB.
++
++## Fluxo implementado
++
++O arquivo `hookshot_programs.bin` continua como banco binario indexado por hash. A inicializacao percorre cabecalhos e offsets sem carregar os corpos inteiros. O indice para no limite configurado; registros completos excedentes permanecem no arquivo. Uma cauda gravada pela metade pode ser removida ate o ultimo registro completo, como ja ocorria no backend.
++
++Ao consumir um registro, o renderizador consulta a janela pronta sem esperar pela thread de leitura. Se faltar, mantem a leitura sob demanda e a traducao corretas. Em seguida solicita alguns registros seguintes na ordem do arquivo como heuristica de proximidade. Isso nao conhece antecipadamente todos os shaders da proxima cena e nao garante taxa de acerto. Entradas prontas podem ser descartadas por LRU; reservas em fila/em voo nao sao expulsas.
++
++O leitor de fundo usa seu proprio handle e nao segura o mutex de I/O de demanda durante a leitura ou o throttling. A classe de janela tem encerramento/join testado. A instancia integrada e de vida do processo, assim como outros recursos deste backend, cuja API nao oferece hot-unload/shutdown. Nao adicionar unload da DLL sem encerrar esses recursos primeiro.
++
++O pre-aquecimento seleciona um subconjunto do historico. O Streaming nao carrega/traduz toda a seed bank na inicializacao. Uma consulta com `FAIL_ON_PIPELINE_COMPILE_REQUIRED` e usada somente se `pipelineCreationCacheControl` estiver habilitado: um acerto pronto nao consome token; uma compilacao real aguarda admissao. Ha ate duas admissoes imediatas, uma por worker. Cinco admissoes/s nao significa cinco conclusoes/s, nem limite de 2 ms por frame.
++
++## Dados do driver e compatibilidade
++
++O cache opaco de pipeline recebe validacao de cabecalho, vendor, device e UUID antes da grande alocacao. Streaming grava `mkw_vk_pipelines_stream.bin`; o arquivo Original `mkw_vk_pipelines.bin` permanece separado. Se o arquivo Streaming nao existir, o Original pode servir de entrada quando cabe no teto. Um arquivo maior nao e cortado manualmente nem carregado inteiro nesse modo.
++
++`vkGetPipelineCacheData` aceita um buffer menor e pode retornar `VK_INCOMPLETE` com dados validos, reutilizaveis como `pInitialData`. O backend aceita esse snapshot limitado, que pode cobrir menos pipelines. A API nao oferece um offset para concatenar supostos pedaços de um cache opaco. Os blocos de 64 KiB sao I/O de arquivo; o buffer requerido pela API continua alocado, ate 128 MiB.
++
++O formato gravado de programas, o IR e o ABI dos shaders foram preservados. Um registro de compatibilidade reconhece apenas o fingerprint SHA-256 exato dos fontes auditados e mantem o stamp da 0.3.4. Alterar o tradutor ou os headers do ABI sai desse registro e recebe nova identidade. A chave de programas tambem continua dependente de dispositivo, driver e opcoes relevantes; nao compartilhar binarios de driver entre GPUs diferentes.
++
++## Limites de desempenho e imagem
++
++Menos pre-aquecimento troca trabalho inicial por possiveis pausas durante uma primeira visita. Mantenha mesma cena/configuracao e compare primeira e segunda abertura; use logs, picos de memoria do processo e frametimes. Um cache em disco de varios GiB nao prova que esses GiB estejam residentes na RAM.
++
++Nao foi adicionado um placeholder generico para renderizacao arbitraria: compute pode produzir dados que os proximos passes exigem, e um shader substituto incompatível pode apagar geometria ou piorar a imagem. As esperas necessarias permanecem. O patch nao resolve por si so texturas/folhas faltando, iluminacao incorreta, ghosting temporal, recursos ausentes da GPU, audio ou corrupcao de imagem.
++
++Nao foram implementados nesta entrega uma nova integracao de graphics pipeline libraries, pipeline binaries, deferred host operations ou NVAPI. O backend ja usa seus caminhos de extensao existentes conforme suporte consultado; isso e diferente de ativar recursos por marca de placa.
++
++## Referencias primarias
++
++- [Vulkan: vkGetPipelineCacheData](https://docs.vulkan.org/refpages/latest/refpages/source/vkGetPipelineCacheData.html).
++- [Vulkan: pipeline creation flags](https://docs.vulkan.org/refpages/latest/refpages/source/VkPipelineCreateFlagBits.html).
++- [Vulkan: graphics pipeline library](https://docs.vulkan.org/features/latest/features/proposals/VK_EXT_graphics_pipeline_library.html).
++- [Vulkan: deferred host operations](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_deferred_host_operations.html).
++
++Conferidas em 07/11/2026. Codigo e testes em `cache_*.h`, `vk_shader.cpp`, `vk_draw.cpp`, `vk_jobs.cpp` e `tests/test_shader_cache.py`.
+--- /dev/null
++++ b/docs/caso-rx580-build-externa.md
+@@ -0,0 +1,40 @@
++# RX580: analise de uma build externa
++
++O usuario informou que este teste foi feito em outra build do Hookshot, recebida de uma terceira pessoa. O arquivo analisado foi `hookshot_log(1).txt`, com 534925 bytes. Nao ha identidade/hash suficientes para identifica-la como nossa 0.3.4 ou 0.3.5. O relato de RTX4090 a 30–40 FPS e outro caso, sem log correspondente. As duas imagens mostram folhagem muito clara e corrupcao multicolorida; nao foi demonstrado qual GPU produziu cada imagem.
++
++## Evidencias do log
++
++| Registro | Observado | Interpretacao sustentada |
++|---|---|---|
++| Dispositivo | AMD Radeon RX580 2048SP, Vulkan 1.3, driver 0x800117 | Nao deduzir a versao comercial Adrenalin apenas desse hexadecimal |
++| Recursos | Mesh shaders: nao; pipeline libraries: nao; subgrupo 64; sem cooperativa de matrizes | Recursos importantes do caminho graﬁco estao ausentes; software MMA nao substitui todos eles |
++| Inicializacao | 740 programas, 918 pipelines graficas e 109 compute em 183422 ms | Cerca de tres minutos apenas nesse pre-aquecimento |
++| Cache de programas | 21930 chaves, 3706813 KB | Cerca de 3.5 GiB no arquivo; nao e medicao de RAM residente |
++| Cache de pipelines | 17651 KB | Cache de driver em disco, separado do banco de programas |
++| VRAM reportada | Aproximadamente 994–1118 MB usados, 7402 MB permitidos | Nao registra esgotamento de VRAM nessa tentativa |
++| Texturas | Cerca de 91 MB no trecho final | Nao prova que toda a cena esteja desenhada corretamente |
++| Renderizacao | Cerca de 19 draws e 12 omitidos por frame no trecho jogavel | Investigar os motivos das omissoes; FPS sozinho pode ocultar imagem incompleta |
++| Programas | Dez falhas registradas, com mensagens de rede omitida nessa placa | Caminho neural/compute sem suporte; nao sao dez crashes demonstrados |
++| Picos | Dispatch com 990.5 ms e outro com 3920.8 ms na selecao de programa | Ha pausas graves na CPU/caminho de selecao, nao so custo de desenho da GPU |
++| Trecho final | 4560 presents, 38.7 FPS; contador VI proximo de 39 FPS | Medicoes locais; o inicio tambem mostra 60 FPS em outros trechos |
++| GPU no trecho final | Cerca de 4.1 ms por frame; espera GPU-bound perto de 0.1 ms | Nao basta para concluir GPU saturada; refere-se ao trabalho efetivamente submetido |
++| Resolucao | Texturas de janela 2560x1440; swapchain 1280x720; crop 1536x864 | Resolucao de saida nao equivale a todo o custo interno |
++| Encerramento | Janela fechada, saindo | Nao ha DEVICE_LOST/crash fatal demonstrado no fim desse arquivo |
++
++O boot declara 9809 MB de memoria para o guest e heap de 6894 MB; esses numeros nao medem diretamente a RAM fisica residente do processo. O primeiro contador de 0.6 FPS inclui o longo startup e nao representa desempenho constante da cena.
++
++## O que isso muda no nosso trabalho
++
++A RX580 deste log nao oferece mesh shaders, exigidos por partes da base atual. Compatibilidade completa nessa placa precisaria de um caminho alternativo de geometria e verificacao de imagem; reduzir o cache nao cria esse recurso. Nao habilitar Wave32 ou pipeline libraries a forca.
++
++O pre-aquecimento longo sustenta testar a nova politica limitada. O log tambem alterna continuamente o intervalo de apresentacao 1/4 com backtraces. No nosso codigo o registro foi limitado em execucao normal; o trace explicito continua disponivel. O intervalo pedido pelo jogo e a chamada de pacing permanecem iguais. Nao inferir 15 FPS apenas do numero 4: o runtime tem sua propria implementacao de sincronizacao.
++
++As cores anormais, luzes saturadas e folhas faltando exigem investigar traducao de shaders, formatos, descritores, recursos omitidos e sincronizacao. Nao foi aplicada uma reducao arbitraria de gamma/exposicao para mascarar esses sintomas. O relato semelhante numa RTX4090 torna uma causa compartilhada do backend uma hipotese util, mas nao confirma que seja exatamente o mesmo defeito da RX580.
++
++Para a RTX4090 faltam: hash/versao da build, CPU, driver, resolucao interna, opcoes e logs da tentativa. Uma GPU mais forte nao elimina automaticamente trabalho serial de CPU, compilacao ou erro de renderizacao.
++
++## Comparacao necessaria
++
++Na mesma maquina e build identificada, comparar Original e Streaming na mesma cena e resolucao, primeira e segunda abertura. Registrar frametimes, cache hits/misses, tempo de precompile, memoria do processo e draws omitidos. Manter os logs de cada GPU separados. Resultados desta outra build nao validam a correcao ou o FPS da nossa.
++
++O pacote nao inclui o log original, imagens, dados do jogo ou caminhos pessoais do teste.
+--- /dev/null
++++ b/docs/drivers-amd-nvidia.md
+@@ -0,0 +1,40 @@
++# Drivers e ajustes: referencias para 0.3.5
++
++As capturas enviadas foram tratadas como referencias de compatibilidade, nao como codigo-fonte de driver ou prova de ganho no Hookshot. Nenhum driver foi instalado ou embutido nesta entrega. Nao houve teste fisico AMD/NVIDIA.
++
++| Referencia | O que foi conferido | Limite |
++|---|---|---|
++| NVIDIA Studio 621.14 WHQL | Pagina oficial, lancamento em 04/11/2026, variante para notebooks | Certificacao WHQL e fixes de outros programas nao comprovam estabilidade deste backend |
++| AMD Adrenalin 26.10.1 WHQL | Notas oficiais de 20/10/2026; familias RDNA listadas, incluindo RX 9060 | RX580/Polaris nao aparece na lista de compatibilidade desse pacote |
++
++As notas AMD registram crash/timeout em alguns jogos ao alternar outros overlays com o Performance Metrics Overlay ativo. Isso justifica uma comparacao controlada sem overlays no caso de troca de foco, mas nao prova a causa do nosso antigo acesso invalido `0xC0000005` nem do caso RTX4090.
++
++## Ajustes que nao foram automatizados
++
++- `DisableAsyncShaderCompile = 0`: nao foi encontrado contrato oficial suficiente para usar essa chave como controle geral de compilacao Vulkan. Nao escrever no Registro com essa suposicao.
++- SAM/Resizable BAR: recurso da plataforma/driver, nao substitui gerencia de recursos ou sincronizacao. O programa nao altera BIOS nem garante ausencia de stutter por ativa-lo.
++- Limpeza de DxCache/GLCache: apagar tudo provoca recompilacao; nao executar a cada inicio ou atualizacao deste projeto. `DxCache`/`DXCache` e documentacao de OpenGL ES no DRIVE OS nao definem o armazenamento interno do driver Vulkan Windows em todos os sistemas.
++- Shader Cache Size NVIDIA: cota de disco, nao cota de RAM. Nao se afirma que 10 GB ou Unlimited resolva qualquer pausa.
++- Threaded Optimization: a configuracao aparece como controle OpenGL no header oficial NVAPI; nao e um seletor geral para nosso backend Vulkan.
++- Reflex/Low Latency: exigem caminhos e suporte apropriados; nao concluem compilacoes de shaders nem garantem alinhamento com um deadline de frame. Nenhum perfil global foi alterado.
++
++## Correcoes de arquitetura relevantes
++
++RDNA suporta Wave32 e Wave64; GCN/Polaris nao deve receber uma exigencia Wave32 por simples variavel. Infinity Cache foi introduzido em RDNA2, nao em toda a familia RDNA1. Recursos RT/IA e caches das GPUs mais recentes nao removem o custo de compilar uma pipeline na CPU/driver. NVIDIA tambem possui agendamento de warps em hardware; nao e correto tratar sua GPU como agendada majoritariamente pelo sistema operacional.
++
++`VK_KHR_pipeline_library` fornece infraestrutura; `VK_EXT_graphics_pipeline_library` define a separacao de partes graficas. Nao sao alternativas exclusivas AMD/NVIDIA. O suporte deve ser consultado no dispositivo. `VK_KHR_deferred_host_operations` nao torna `vkCreateGraphicsPipelines` e `vkCreateComputePipelines` automaticamente diferiveis; comandos precisam de permissao especifica em outra extensao.
++
++NVAPI pode manipular certos perfis documentados, mas nao oferece a equivalencia presumida entre cota de cache em disco, buffer de I/O da aplicacao e RAM interna do driver. Os limites desta versao sao implementados dentro do backend, de forma explicita e por processo.
++
++## Referencias oficiais
++
++- [NVIDIA Studio 621.14, notebooks](https://www.nvidia.com/en-us/drivers/details/283967/).
++- [AMD Adrenalin 26.10.1: notas e produtos compativeis](https://www.amd.com/en/resources/support-articles/release-notes/RN-RAD-WIN-26-10-1.html).
++- [AMD RDNA: comparacao entre geracoes](https://www.amd.com/en/technologies/rdna.html).
++- [GPUOpen: RDNA performance guide](https://gpuopen.com/learn/rdna-performance-guide/).
++- [NVAPI: Driver Settings header](https://docs.nvidia.com/nvapi/_nv_api_driver_settings_8h_source.html).
++- [NVIDIA Control Panel: Manage 3D Settings](https://www.nvidia.com/content/Control-Panel-Help/vLatest/en-gb/mergedProjects/nv3dENG/Manage_3D_Settings_%28reference%29.htm).
++- [NVIDIA DRIVE OS: Automatic Shader Cache](https://developer.nvidia.com/docs/drive/drive-os/6.0.8/public/drive-os-linux-sdk/common/topics/graphics_content/AutomaticShaderCache8.html).
++- [Khronos: deferred host operations](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_deferred_host_operations.html).
++
++Conferidas em 07/11/2026. Sao referencias de contratos e limitacoes; nao sao benchmarks deste pacote.
+--- a/docs/origem.md
++++ b/docs/origem.md
+@@ -53,3 +53,9 @@
+ Adaptadores Win32 UTF-16/caminhos estendidos, backend de audio WASAPI compartilhado, recuperacao waveOut e HLE de volume foram escritos para esta base a partir dos diagnosticos recebidos. Nao vieram de outro emulador nem de uma nova release Hookshot. As APIs de som/caminhos foram conferidas na documentacao Microsoft; a interface de volume tambem foi conferida nas referencias de audio NXNative/Switchbrew.
+ 
+ O perfil Nitido apenas seleciona o stand-in espacial preexistente de gpu/vk/vk_draw.cpp. O registro de frames lentos foi corrigido sem trocar a traducao de shaders ou os defaults visuais. O patch local, os componentes mantidos e os hashes estao registrados em upstream.json. Nao foram incorporados jogo, saves, caches ou simbolos do jogo nos pacotes.
++
++## Alteracoes locais 0.3.5
++
++Politica limitada de cache, leitor de fundo, parser defensivo, token bucket e teste nativo foram escritos para esta base. Nao sao um novo driver nem codigo de outra release Hookshot. Mantida a base verificada pointer-lighting-2 e os avisos anteriores. Comparadas 244 entradas de Eden/Sirit/compat e headers ABI com a 0.3.4, sem diferencas; o transporte de cache mudou sem alterar o wire format do writer ou a semantica do IR. O registro por fingerprint exato preserva o stamp anterior para essa combinacao auditada.
++
++O log externo da RX580 motivou limites de pre-aquecimento e a reducao de backtraces repetidos de apresentacao. Nao foi incorporada uma correcao visual deduzida somente das imagens. NVIDIA 621.14 e AMD26.10.1 foram consultados em documentacao oficial; nenhum binario de driver foi incorporado. Delta em `patches/0.3.5-cache-streaming.patch`; limites e origem em `cache-streaming.md` e `drivers-amd-nvidia.md`.
+--- /dev/null
++++ b/docs/validacao-0.3.5.json
+@@ -0,0 +1,33 @@
++{
++  "version": "0.3.5-dev.1",
++  "host": "Linux",
++  "target": "Windows x64",
++  "compiler": "LLVM-MinGW 20261020 / Clang 23.1.5",
++  "vulkan_translation_units": 181,
++  "vulkan_dll_link": "success",
++  "export_verified": "mkwvk_init",
++  "changed_host_units_cross_compiled": [
++    "host/nvn_native.c"
++  ],
++  "host_fixture": "Generated generic a64 runtime header and empty suyu/fpx declarations; no game",
++  "current_game_executable_linked": false,
++  "game_executed": false,
++  "gpu_tested": false,
++  "audio_tested": false,
++  "wpf_republished": false,
++  "tests_discovered": 70,
++  "tests_passed": 63,
++  "tests_skipped": 7,
++  "tests_skip_reason": "PowerShell runtime absent on this Linux host",
++  "native_test": "Real disk/background I/O, hard byte/queue bounds, deduplication, LRU, cancellation, corrupted records, chunk I/O and token admission",
++  "sanitizers": "AddressSanitizer and UBSan passed; LeakSanitizer unavailable under ptrace, leak detection disabled",
++  "cache_identity": {
++    "unchanged_files": 244,
++    "old_stamp": "234d9fba458b54ba",
++    "current_source_sha256": "e4b25bfe3f6ab6074c10739a3ce69aecdf1c957e33ac90d09b13518ad1deab6a",
++    "current_fresh_stamp": "1ee438e80cb2c092"
++  },
++  "driver_versions": "Documentation references only: NVIDIA Studio 621.14 WHQL and AMD26.10.1 WHQL; neither installed nor tested",
++  "external_rx580_log": "Analysis only; not our build and not a validation of this version",
++  "packaged_game_data": false
++}
+--- a/docs/validacao.json
++++ b/docs/validacao.json
+@@ -1,21 +1,33 @@
+ {
+-  "compiler": "Clang 23.1.5 / LLVM-MinGW",
++  "version": "0.3.5-dev.1",
+   "host": "Linux",
+   "target": "Windows x64",
+-  "translation_units": 208,
+-  "failures": 0,
+-  "kinds": {
+-    "host": 27,
+-    "vulkan": 181
+-  },
++  "compiler": "LLVM-MinGW 20261020 / Clang 23.1.5",
++  "vulkan_translation_units": 181,
+   "vulkan_dll_link": "success",
+-  "game_executable_linked": false,
++  "export_verified": "mkwvk_init",
++  "changed_host_units_cross_compiled": [
++    "host/nvn_native.c"
++  ],
++  "host_fixture": "Generated generic a64 runtime header and empty suyu/fpx declarations; no game",
++  "current_game_executable_linked": false,
+   "game_executed": false,
+   "gpu_tested": false,
+-  "unit_tests": 15,
+-  "powershell_parser": "7.4.6: passed",
+-  "generic_helpers_linked": [
+-    "a64emit.dll",
+-    "zbic.dll"
+-  ]
++  "audio_tested": false,
++  "wpf_republished": false,
++  "tests_discovered": 70,
++  "tests_passed": 63,
++  "tests_skipped": 7,
++  "tests_skip_reason": "PowerShell runtime absent on this Linux host",
++  "native_test": "Real disk/background I/O, hard byte/queue bounds, deduplication, LRU, cancellation, corrupted records, chunk I/O and token admission",
++  "sanitizers": "AddressSanitizer and UBSan passed; LeakSanitizer unavailable under ptrace, leak detection disabled",
++  "cache_identity": {
++    "unchanged_files": 244,
++    "old_stamp": "234d9fba458b54ba",
++    "current_source_sha256": "e4b25bfe3f6ab6074c10739a3ce69aecdf1c957e33ac90d09b13518ad1deab6a",
++    "current_fresh_stamp": "1ee438e80cb2c092"
++  },
++  "driver_versions": "Documentation references only: NVIDIA Studio 621.14 WHQL and AMD26.10.1 WHQL; neither installed nor tested",
++  "external_rx580_log": "Analysis only; not our build and not a validation of this version",
++  "packaged_game_data": false
+ }
+--- a/docs/validacao.md
++++ b/docs/validacao.md
+@@ -68,3 +68,13 @@
+ - Comparadas 244 entradas que formam a identidade do tradutor com o pacote Windows 0.3.3: stamp 234d9fba458b54ba nas duas versoes. O cache de programas nao e invalidado por essas alteracoes de host/diagnostico ou pelo perfil Nitido.
+ - Python validado com compileall. Registros em resultado-testes.txt e resultado-native-0.3.4.txt. O arquivo de teste Windows pode ser recompilado e executado pelo unittest no computador de destino.
+ - A comparacao de caminhos/logs e o video do usuario sustentam os defeitos e os testes de comparacao, mas nao comprovam o resultado desta correcao. Nao houve execucao de audio fisico, jogo, GPU AMD/NVIDIA ou janela WPF neste ambiente. Folhagem, escuridao, sombras e pausas em novas areas continuam pendentes.
++
++## Cache 0.3.5
++
++- 70 testes descobertos: 63 passaram, sete checks PowerShell ignorados pela ausencia desse runtime. Inclui C++ executado com arquivo real, leitor em segundo plano, limites de bytes/fila, deduplicacao/LRU, encerramento, falha de leitura, registros truncados/contagens invalidas, token bucket e I/O em blocos. Teste por processo filho confere o modo Streaming e o limite efetivo nos logs.
++- Fixture C++ tambem executado com AddressSanitizer/UBSan. LeakSanitizer nao opera sob o ptrace deste ambiente; essa parte foi desativada, sem alegar verificacao de vazamentos.
++- 181 unidades do backend Vulkan configuradas para Windows x64, zero falhas no fechamento incremental e DLL completa ligada; export mkwvk_init conferido no PE. A primeira rodada compilou os objetos e a repeticao incremental confirmou o conjunto completo/link. Runtime alterado host/nvn_native.c compilado separadamente com header generico a64 e declaracoes sinteticas. Nao se repetiu o link do EXE sintetico completo nesta versao.
++- 244 entradas do tradutor/ABI comparadas byte a byte com 0.3.4, sem diferencas. Cache stamp anterior reutilizado somente para o fingerprint SHA-256 exato auditado. O writer mantem o formato anterior; parser e transporte passaram a validar limites.
++- Python validado com compileall; CLI registra --cache-mode e seu ambiente. A janela WPF e o executavel de interface continuam da publicacao 0.3.2, sem republicacao nesta versao.
++- Nenhuma execucao do jogo, teste de driver AMD/NVIDIA, som fisico, frametime real ou comparacao visual foi feita neste ambiente. O novo log RX580 veio de outra build; o relato RTX4090 nao inclui log. Nao sao benchmarks da 0.3.5.
++- Registros: resultado-testes.txt, resultado-native-0.3.5.txt, validacao-0.3.5.json. Detalhes de escopo: cache-streaming.md; caso externo: caso-rx580-build-externa.md.
+--- /dev/null
++++ b/gpu/vk/cache_io.h
+@@ -0,0 +1,27 @@
++// File chunks are separate from the contiguous Vulkan snapshot buffer.
++#pragma once
++#include <algorithm>
++#include <cstddef>
++#include <cstdint>
++#include <cstdio>
++namespace mkwvk::cache {
++inline constexpr size_t io_chunk = 64u << 10;
++inline bool read_chunks(FILE* file, void* destination, size_t size) {
++    auto* p = (uint8_t*)destination;
++    for (size_t at = 0; at < size;) {
++        const size_t n = std::min(io_chunk, size-at);
++        if (std::fread(p+at, 1, n, file) != n) return false;
++        at += n;
++    }
++    return true;
++}
++inline bool write_chunks(FILE* file, const void* source, size_t size) {
++    const auto* p = (const uint8_t*)source;
++    for (size_t at = 0; at < size;) {
++        const size_t n = std::min(io_chunk, size-at);
++        if (std::fwrite(p+at, 1, n, file) != n) return false;
++        at += n;
++    }
++    return true;
++}
++}
+--- /dev/null
++++ b/gpu/vk/cache_policy.h
+@@ -0,0 +1,40 @@
++#pragma once
++#include <algorithm>
++#include <cerrno>
++#include <cstddef>
++#include <cstdlib>
++#include <limits>
++namespace mkwvk::cache {
++inline size_t setting(const char* name, size_t fallback, size_t lo, size_t hi) {
++    const char* text = std::getenv(name);
++    if (!text || !*text || *text == '-') return fallback;
++    char* end = nullptr; errno = 0;
++    const auto n = std::strtoull(text, &end, 10);
++    return errno || !end || *end ? fallback : (size_t)std::clamp<unsigned long long>(n, lo, hi);
++}
++struct Policy {
++    bool streaming = false;
++    size_t stream_bytes = 0, stream_entries = 128, queue = 8, read_bytes_per_second = 64u << 20;
++    size_t index_records = std::numeric_limits<size_t>::max();
++    size_t warm_bytes = std::numeric_limits<size_t>::max(), warm_programs = std::numeric_limits<size_t>::max();
++    size_t warm_pipelines = std::numeric_limits<size_t>::max(), driver_io_bytes = std::numeric_limits<size_t>::max();
++    size_t workers = 0, warm_per_second = 0;
++    static constexpr size_t max_record = 64u << 20;
++};
++inline Policy read_policy() {
++    Policy p; p.streaming = setting("RX_VK_CACHE_STREAM", 0, 0, 1) != 0;
++    if (!p.streaming) return p;
++    p.stream_bytes = setting("RX_VK_CACHE_READ_MB", 16, 0, 256) << 20;
++    p.queue = setting("RX_VK_CACHE_QUEUE", 8, 1, 32);
++    p.index_records = setting("RX_VK_CACHE_INDEX_RECORDS", 65536, 1024, 262144);
++    p.read_bytes_per_second = setting("RX_VK_CACHE_READ_MBPS", 64, 1, 1024) << 20;
++    p.warm_bytes = setting("RX_VK_PREWARM_MB", 64, 0, 512) << 20;
++    p.warm_programs = setting("RX_VK_PREWARM_PROGRAMS", 128, 0, 2048);
++    p.warm_pipelines = setting("RX_VK_PREWARM_PIPELINES", 256, 0, 4096);
++    p.driver_io_bytes = setting("RX_VK_PIPE_CACHE_IO_MB", 128, 0, 1024) << 20;
++    p.workers = setting("RX_VK_COMPILE_THREADS", 2, 1, 4);
++    p.warm_per_second = setting("RX_VK_PREWARM_PER_SECOND", 5, 1, 100);
++    return p;
++}
++inline const Policy& policy() { static const Policy p = read_policy(); return p; }
++} // namespace mkwvk::cache
+--- /dev/null
++++ b/gpu/vk/cache_rate.h
+@@ -0,0 +1,27 @@
++// Admission only: an in-progress driver call cannot be preempted to fit 2 ms.
++#pragma once
++#include <algorithm>
++#include <chrono>
++#include <thread>
++namespace mkwvk::cache {
++class TokenBucket {
++public: using Clock = std::chrono::steady_clock;
++private:
++    double rate, tokens = 1.0;
++    Clock::time_point previous;
++public:
++    explicit TokenBucket(double per_second, Clock::time_point now = Clock::now()) : rate(per_second), previous(now) {}
++    bool try_take(Clock::time_point now) {
++        if (rate <= 0) return true;
++        if (now > previous) {
++            tokens = std::min(1.0, tokens + std::chrono::duration<double>(now-previous).count()*rate);
++            previous = now;
++        }
++        if (tokens < 1.0) return false;
++        tokens -= 1.0; return true;
++    }
++    void take() {
++        while (!try_take(Clock::now())) std::this_thread::sleep_for(std::chrono::duration<double>((1.0-tokens)/rate));
++    }
++};
++}
+--- /dev/null
++++ b/gpu/vk/cache_reader.h
+@@ -0,0 +1,29 @@
++#pragma once
++#include <cstdint>
++#include <cstddef>
++#include <cstring>
++#include <stdexcept>
++namespace mkwvk::cache {
++class Reader {
++    const uint8_t* cursor;
++    const uint8_t* end;
++public:
++    Reader(const uint8_t* data, size_t size) : cursor(data), end(data+size) {}
++    size_t remaining() const { return (size_t)(end-cursor); }
++    void copy(void* out, size_t size) {
++        if (size > remaining()) throw std::runtime_error("truncated cache record");
++        std::memcpy(out, cursor, size); cursor += size;
++    }
++    template<class T> T get() { T value{}; copy(&value, sizeof value); return value; }
++    uint64_t count(size_t minimum) {
++        const auto n = get<uint64_t>();
++        if (!minimum || n > remaining()/minimum) throw std::runtime_error("invalid cache count");
++        return n;
++    }
++    template<class V> void list(V& out) {
++        using T = typename V::value_type;
++        const auto n = count(sizeof(T)); out.clear();
++        for (uint64_t i = 0; i < n; ++i) out.push_back(get<T>());
++    }
++};
++}
+--- /dev/null
++++ b/gpu/vk/cache_stream.h
+@@ -0,0 +1,105 @@
++// A single background reader with byte reservations shared by queued,
++// in-flight and ready payloads. Metadata and demand/driver allocations differ.
++#pragma once
++#include <algorithm>
++#include <chrono>
++#include <condition_variable>
++#include <cstdint>
++#include <deque>
++#include <functional>
++#include <list>
++#include <memory>
++#include <mutex>
++#include <thread>
++#include <unordered_map>
++#include <utility>
++#include <vector>
++namespace mkwvk::cache {
++struct Range { uint64_t offset; size_t size; };
++class Stream {
++public:
++    using Read = std::function<bool(Range,uint8_t*)>;
++    struct Stats { size_t reserved=0, peak=0, pending=0, ready=0; uint64_t hits=0, misses=0, reads=0, dropped=0; };
++private:
++    struct Entry { Range range; bool ready=false; std::vector<uint8_t> bytes; std::list<uint64_t>::iterator lru; };
++    const size_t budget, queue_limit, entry_limit, rate;
++    Read read;
++    std::function<void()> on_start;
++    mutable std::mutex mu;
++    std::condition_variable changed;
++    std::deque<std::shared_ptr<Entry>> queue;
++    std::unordered_map<uint64_t,std::shared_ptr<Entry>> entries;
++    std::list<uint64_t> lru;
++    Stats counters;
++    bool stopping=false;
++    std::thread worker;
++    bool evict() {
++        if (lru.empty()) return false;
++        auto it=entries.find(lru.back());
++        counters.reserved-=it->second->range.size;
++        entries.erase(it); lru.pop_back(); return true;
++    }
++    void run() {
++        if (on_start) on_start();
++        auto next=std::chrono::steady_clock::now();
++        for (;;) {
++            std::shared_ptr<Entry> entry;
++            {
++                std::unique_lock lock(mu);
++                changed.wait(lock,[&]{return stopping || !queue.empty();});
++                if (stopping || changed.wait_until(lock,next,[&]{return stopping;})) return;
++                entry=queue.front(); queue.pop_front();
++            }
++            std::vector<uint8_t> data;
++            bool ok=false;
++            try { data.resize(entry->range.size); ok=read(entry->range,data.data()); } catch (...) { ok=false; }
++            if (rate) next=std::chrono::steady_clock::now()+std::chrono::duration_cast<std::chrono::steady_clock::duration>(
++                std::chrono::duration<double>((double)entry->range.size/rate));
++            {
++                std::lock_guard lock(mu); --counters.pending;
++                if (ok) {
++                    entry->bytes=std::move(data); entry->ready=true;
++                    lru.push_front(entry->range.offset); entry->lru=lru.begin(); ++counters.reads;
++                } else {
++                    counters.reserved-=entry->range.size; entries.erase(entry->range.offset); ++counters.dropped;
++                }
++                changed.notify_all();
++            }
++        }
++    }
++public:
++    Stream(size_t bytes,size_t pending,size_t count,size_t bytes_per_second,Read reader,std::function<void()> started={})
++        : budget(bytes),queue_limit(pending),entry_limit(count),rate(bytes_per_second),read(std::move(reader)),
++          on_start(std::move(started)),worker([this]{run();}) {}
++    Stream(const Stream&)=delete;
++    Stream& operator=(const Stream&)=delete;
++    ~Stream(){stop();}
++    void stop() {
++        { std::lock_guard lock(mu); stopping=true; changed.notify_all(); }
++        if (worker.joinable()) worker.join();
++        std::lock_guard lock(mu); queue.clear(); entries.clear(); lru.clear(); counters.reserved=counters.pending=0;
++    }
++    bool request(Range range) {
++        std::lock_guard lock(mu);
++        if (stopping || !range.size || range.size>budget) {++counters.dropped;return false;}
++        if (auto it=entries.find(range.offset);it!=entries.end()) return it->second->range.size==range.size;
++        if (counters.pending>=queue_limit || !entry_limit) {++counters.dropped;return false;}
++        while (range.size>budget-counters.reserved || entries.size()>=entry_limit)
++            if (!evict()) {++counters.dropped;return false;}
++        auto e=std::make_shared<Entry>(); e->range=range;
++        entries.emplace(range.offset,e); queue.push_back(e);
++        counters.reserved+=range.size; counters.peak=std::max(counters.peak,counters.reserved); ++counters.pending;
++        changed.notify_all(); return true;
++    }
++    std::vector<uint8_t> take(Range range) {
++        std::lock_guard lock(mu);
++        auto it=entries.find(range.offset);
++        if (it==entries.end() || !it->second->ready || it->second->range.size!=range.size) {++counters.misses;return {};}
++        auto data=std::move(it->second->bytes);
++        counters.reserved-=it->second->range.size; lru.erase(it->second->lru); entries.erase(it); ++counters.hits;
++        return data;
++    }
++    Stats stats() const {std::lock_guard lock(mu);auto s=counters;s.ready=lru.size();return s;}
++    bool wait_idle(std::chrono::milliseconds timeout) {std::unique_lock lock(mu);return changed.wait_for(lock,timeout,[&]{return !counters.pending || stopping;});}
++};
++}
+--- a/gpu/vk/vk_draw.cpp
++++ b/gpu/vk/vk_draw.cpp
+@@ -30,6 +30,9 @@
+ #include "vk_jobs.h"
+ #include "vk_shader.h"
+ #include "vk_texture.h"
++#include "cache_policy.h"
++#include "cache_rate.h"
++#include "cache_io.h"
+ 
+ #include "shaders/clear_f_frag_spv.h"
+ #include "shaders/clear_i_frag_spv.h"
+@@ -329,14 +332,24 @@
+     std::string dir(exe, n);
+     dir = dir.substr(0, dir.find_last_of("\\/") + 1);
+     pcache_path = dir + "mkw_vk_pipelines.bin";
++    std::string source_path=pcache_path;
++    if (cache::policy().streaming) {
++        pcache_path=dir+"mkw_vk_pipelines_stream.bin";
++        if (GetFileAttributesA(pcache_path.c_str())!=INVALID_FILE_ATTRIBUTES) source_path=pcache_path;
++    }
+     std::vector<uint8_t> data;
+-    if (FILE* f = fopen(pcache_path.c_str(), "rb")) {
+-        fseek(f, 0, SEEK_END);
+-        const long sz = ftell(f);
+-        fseek(f, 0, SEEK_SET);
+-        if (sz > 32) {
++    if (FILE* f = fopen(source_path.c_str(), "rb")) {
++        _fseeki64(f,0,SEEK_END); const int64_t sz=_ftelli64(f); _fseeki64(f,0,SEEK_SET);
++        uint32_t h[8]{};
++        const bool header=sz>=32 && fread(h,1,32,f)==32 && h[0]>=32 && h[0]<=(uint64_t)sz &&
++            h[1]==VK_PIPELINE_CACHE_HEADER_VERSION_ONE && h[2]==dev.props.vendorID && h[3]==dev.props.deviceID &&
++            !std::memcmp(h+4,dev.props.pipelineCacheUUID,VK_UUID_SIZE);
++        if (header && (uint64_t)sz<=cache::policy().driver_io_bytes) {
+             data.resize((size_t)sz);
+-            if (fread(data.data(), 1, data.size(), f) != data.size()) data.clear();
++            _fseeki64(f,0,SEEK_SET);
++            if (!cache::read_chunks(f,data.data(),data.size())) data.clear();
++        } else if (header && cache::policy().streaming) {
++            logf("vk: driver cache exceeds %zu MiB I/O budget; kept on disk",cache::policy().driver_io_bytes>>20);
+         }
+         fclose(f);
+     }
+@@ -430,7 +443,7 @@
+         return (VkResult)-77;   // (a fault in the driver, told apart from what it returns)
+     }
+ }
+-VkPipeline build_graphics(const Program& p, const NvnState& s, const Targets& at, VkPrimitiveTopology topo, int part = -1);
++VkPipeline build_graphics(const Program& p, const NvnState& s, const Targets& at, VkPrimitiveTopology topo, int part = -1, bool cache_only = false);
+ 
+ /// A target's write mask: the state's channel mask, nothing for a target the fragment shader leaves unwritten
+ /// (Maxwell keeps its texels; Vulkan writes undefined values: TOTK's maxwell.md 1.1)
+@@ -630,7 +643,8 @@
+ 
+ /// part: -1 the whole pipeline, or the graphics pipeline library it stands for: 0 vertex input, 1 pre-rasterization, 2 fragment
+ /// shader, 3 fragment output
+-VkPipeline build_graphics(const Program& p, const NvnState& s, const Targets& at, VkPrimitiveTopology topo, int part) {
++VkPipeline build_graphics(const Program& p, const NvnState& s, const Targets& at, VkPrimitiveTopology topo, int part, bool cache_only) {
++    if (cache_only && !dev.vk13.pipelineCreationCacheControl) return VK_NULL_HANDLE;
+     const Shader::Info& vs = p.stages[0].info;
+     const auto t0 = std::chrono::steady_clock::now();
+     std::vector<VkPipelineShaderStageCreateInfo> stages;
+@@ -796,7 +810,9 @@
+         }
+     }
+     VkPipeline pl = VK_NULL_HANDLE;
++    if (cache_only) ci.flags|=VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT;
+     const VkResult r = guarded_graphics(part >= 0 ? VK_NULL_HANDLE : pcache, &ci, &pl);
++    if (cache_only && r!=VK_SUCCESS) return VK_NULL_HANDLE;
+     if (part >= 0) {
+         if (r != VK_SUCCESS) {
+             static std::atomic<int> logged;
+@@ -3445,6 +3461,7 @@
+ }
+ /// Every shader of the game, before its first start (vk_shader.cpp, the seed): once for this translator
+ void prepare_run(void (*progress)(size_t done, size_t total)) {
++    if (cache::policy().streaming) {logf("vk: streaming: full seed bank stays on disk; bounded history warmup follows");return;}
+     const auto t0 = std::chrono::steady_clock::now();
+     char exe[MAX_PATH];
+     const DWORD exe_n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+@@ -3506,7 +3523,8 @@
+     };
+     std::vector<std::thread> threads;
+     const unsigned cpus = std::max(1u, std::thread::hardware_concurrency());
+-    for (unsigned i = 0; i < std::clamp(cpus / 2, 1u, 32u); i++) threads.emplace_back(worker);
++    const unsigned workers=cache::policy().streaming ? (unsigned)cache::policy().workers : std::clamp(cpus/2,1u,32u);
++    for (unsigned i=0;i<workers;i++) threads.emplace_back(worker);
+     while (done.load() < total) {
+         if (progress) progress(done.load(), total);
+         Sleep(100);
+@@ -3544,6 +3562,7 @@
+         if (fread(head, 8, 2, f) == 2 && head[0] == program_cache_stamp() && head[1] == sizeof(PipeNote)) {
+             std::unordered_set<uint64_t> seen;
+             for (;;) {
++                if (notes.size()>=cache::policy().warm_pipelines) break;
+                 auto rec = std::make_unique<PipeNote>();
+                 if (fread(rec.get(), sizeof(PipeNote), 1, f) != 1) break;
+                 wanted.insert(rec->prog);
+@@ -3555,11 +3574,13 @@
+     std::vector<Program*> computes;
+     const size_t programs_n = program_cache_load_some(wanted, [&](Program& p) {
+         ensure_layout(p);
+-        if (p.compute) computes.push_back(&p);
++        if (p.compute && !taau_key(p.key)) computes.push_back(&p);
+     });
+     const size_t total = notes.size() + computes.size();
+-    std::atomic<size_t> next{0}, done{0};
++    std::atomic<size_t> next{0}, done{0}, graphics_made{0}, compute_made{0};
+     const auto worker = [&] {
++        SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);
++        cache::TokenBucket admission((double)cache::policy().warm_per_second);
+         for (;;) {
+             const size_t i = next++;
+             if (i >= total) return;
+@@ -3572,7 +3593,17 @@
+                 ci.stage.pName = "main";
+                 pin_subgroup(ci.stage, p.workgroup[0]);
+                 ci.layout = p.layout;
+-                if (vkCreateComputePipelines(dev.device, pcache, 1, &ci, nullptr, &p.compute_pipeline) != VK_SUCCESS) p.compute_pipeline = VK_NULL_HANDLE;
++                const bool probe=cache::policy().streaming && dev.vk13.pipelineCreationCacheControl;
++                VkResult result=VK_PIPELINE_COMPILE_REQUIRED;
++                if (probe) {
++                    ci.flags|=VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT;
++                    result=vkCreateComputePipelines(dev.device,pcache,1,&ci,nullptr,&p.compute_pipeline);
++                }
++                if (!probe || result==VK_PIPELINE_COMPILE_REQUIRED) {
++                    admission.take(); ci.flags&=~VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT;
++                    result=vkCreateComputePipelines(dev.device,pcache,1,&ci,nullptr,&p.compute_pipeline);
++                }
++                if (result!=VK_SUCCESS) p.compute_pipeline=VK_NULL_HANDLE; else compute_made++;
+             } else {
+                 PipeNote& n = *notes[i - computes.size()];
+                 const Program* p = program_find(n.prog, n.variant);
+@@ -3583,7 +3614,11 @@
+                     at.depth_format = (VkFormat)n.depth_format;
+                     at.depth = n.has_depth ? (Texture*)1 : nullptr;   // (never read through: whether there is one)
+                     for (int k = 0; k < 8; k++) at.color_format[k] = (VkFormat)n.color_format[k];
+-                    const VkPipeline made = build_graphics(*p, n.s, at, (VkPrimitiveTopology)n.topo);
++                    VkPipeline made=VK_NULL_HANDLE;
++                    if (cache::policy().streaming && dev.vk13.pipelineCreationCacheControl)
++                        made=build_graphics(*p,n.s,at,(VkPrimitiveTopology)n.topo,-1,true);
++                    if (!made) {admission.take();made=build_graphics(*p,n.s,at,(VkPrimitiveTopology)n.topo);}
++                    if (made) graphics_made++;
+                     std::lock_guard lk(note_mu);
+                     auto it = pipelines.find(n.key);
+                     if (it == pipelines.end()) {
+@@ -3599,14 +3634,16 @@
+     };
+     std::vector<std::thread> threads;
+     const unsigned cpus = std::max(1u, std::thread::hardware_concurrency());
+-    for (unsigned i = 0; i < std::min(cpus, 64u); i++) threads.emplace_back(worker);
++    const unsigned workers=cache::policy().streaming ? (unsigned)cache::policy().workers : std::min(cpus,64u);
++    for (unsigned i=0;i<workers;i++) threads.emplace_back(worker);
+     while (done.load() < total) {
+         if (progress) progress(done.load(), total);
+         Sleep(100);
+         if (next.load() >= total + threads.size()) break;
+     }
+     for (std::thread& t : threads) t.join();
+-    logf("vk: precompile: %zu programs, %zu graphics and %zu compute pipelines in %.0f ms", programs_n, notes.size(), computes.size(),
++    logf("vk: precompile: %zu programs, %zu graphics notes, %zu graphics and %zu compute pipelines built in %.0f ms",
++         programs_n, notes.size(), graphics_made.load(), compute_made.load(),
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+ }
+ 
+@@ -3933,11 +3970,16 @@
+     auto save = [] {
+         size_t n = 0;
+         if (vkGetPipelineCacheData(dev.device, pcache, &n, nullptr) == VK_SUCCESS && n) {
+-            std::vector<uint8_t> data(n);
+-            if (vkGetPipelineCacheData(dev.device, pcache, &n, data.data()) == VK_SUCCESS) {
++            const size_t capacity=std::min(n,cache::policy().driver_io_bytes);
++            if (capacity<32) {busy=false;return;}
++            std::vector<uint8_t> data(capacity); n=capacity;
++            const VkResult result=vkGetPipelineCacheData(dev.device,pcache,&n,data.data());
++            // VK_INCOMPLETE exports valid, bounded cache data, not offset chunks.
++            if ((result==VK_SUCCESS || result==VK_INCOMPLETE) && n>=32 && n<=capacity) {
++                if (result==VK_INCOMPLETE) {static std::atomic<unsigned> told{0};if (told++<3) logf("vk: bounded driver snapshot: %zu MiB, partial coverage",n>>20);}
+                 const std::string tmp = pcache_path + ".tmp";
+                 if (FILE* f = fopen(tmp.c_str(), "wb")) {
+-                    const bool ok = fwrite(data.data(), 1, n, f) == n;
++                    const bool ok=cache::write_chunks(f,data.data(),n);
+                     fclose(f);
+                     if (ok) MoveFileExA(tmp.c_str(), pcache_path.c_str(), MOVEFILE_REPLACE_EXISTING);
+                 }
+--- a/gpu/vk/vk_jobs.cpp
++++ b/gpu/vk/vk_jobs.cpp
+@@ -9,6 +9,7 @@
+ 
+ #include "vk_jobs.h"
+ #include "vk_internal.h"
++#include "cache_policy.h"
+ 
+ namespace mkwvk {
+ namespace {
+@@ -37,7 +38,7 @@
+ }
+ 
+ void start() {
+-    const unsigned n = std::clamp(std::thread::hardware_concurrency() / 3, 2u, 4u);
++    const unsigned n=cache::policy().streaming ? (unsigned)cache::policy().workers : std::clamp(std::thread::hardware_concurrency()/3,2u,4u);
+     for (unsigned i = 0; i < n; i++) std::thread(worker).detach();
+     started = true;
+     logf("vk: %u background workers (shader translation, pipelines)", n);
+--- a/gpu/vk/vk_shader.cpp
++++ b/gpu/vk/vk_shader.cpp
+@@ -44,6 +44,10 @@
+ #include "vk_internal.h"
+ #include "vk_jobs.h"
+ #include "vk_shader.h"
++#include "cache_policy.h"
++#include "cache_reader.h"
++#include "cache_stream.h"
++#include "cache_io.h"
+ 
+ namespace mkwvk {
+ namespace {
+@@ -743,6 +747,15 @@
+ bool disk_on = false;
+ std::atomic<int64_t> st_cache_hits{0};
+ constexpr uint32_t kDiskMagic = 0x31505348;
++std::vector<cache::Range> disk_order;
++// Same process lifetime as the renderer API (no GPU unload/shutdown callback).
++cache::Stream* disk_stream = nullptr;
++void prefetch_after(const DiskRecord& record) {
++    if (!disk_stream) return;
++    auto next = std::upper_bound(disk_order.begin(),disk_order.end(),(uint64_t)record.at,
++        [](uint64_t at,const cache::Range& r){return at<r.offset;});
++    for (size_t n=0;next!=disk_order.end() && n<cache::policy().queue;++next,++n) disk_stream->request(*next);
++}
+ 
+ uint64_t disk_stamp() {
+     uint64_t h = 0xCBF29CE484222325ull;
+@@ -775,6 +788,7 @@
+         path = path.substr(0, path.find_last_of("\\/") + 1) + "hookshot_programs.bin";
+         const uint64_t stamp = disk_stamp();
+         int64_t good = 0, whole = 0;
++        size_t indexed=0, unindexed=0;
+         if (FILE* f = fopen(path.c_str(), "rb")) {
+             _fseeki64(f, 0, SEEK_END);
+             whole = _ftelli64(f);
+@@ -787,9 +801,14 @@
+                     uint64_t rec[2];
+                     uint32_t kind = 0;
+                     _fseeki64(f, good, SEEK_SET);
+-                    if (fread(rec, 8, 2, f) != 2 || fread(&kind, 4, 1, f) != 1) break;
+-                    if (good + 16 + (int64_t)rec[1] > whole) break;   // (the run stopped while writing it)
+-                    disk_records[rec[0]].push_back({good + 16, (size_t)rec[1], kind});
++                    if (fread(rec,8,2,f)!=2 || rec[1]<4 || rec[1]>(uint64_t)(whole-good-16) || fread(&kind,4,1,f)!=1) break;
++                    // Unknown/oversized complete records stay in the file.
++                    if (rec[1]<=cache::Policy::max_record && !(kind&~3u)) {
++                        if (indexed<cache::policy().index_records) {
++                            disk_records[rec[0]].push_back({good+16,(size_t)rec[1],kind}); ++indexed;
++                            if (cache::policy().streaming) disk_order.push_back({(uint64_t)good+16,(size_t)rec[1]});
++                        } else ++unindexed;
++                    }
+                     good += 16 + (int64_t)rec[1];
+                 }
+             }
+@@ -812,6 +831,20 @@
+         disk_in = disk_out ? fopen(path.c_str(), "rb") : nullptr;
+         disk_on = disk_out != nullptr && disk_in != nullptr;
+         logf("vk: program cache %s: %zu program keys kept, %lld KB", path.c_str(), disk_records.size(), (long long)(good >> 10));
++        if (unindexed) logf("vk: cache index: %zu records indexed, %zu left on disk",indexed,unindexed);
++        const auto& policy=cache::policy();
++        if (disk_on && policy.streaming && policy.stream_bytes) {
++            if (FILE* reader=fopen(path.c_str(),"rb")) {
++                auto file=std::shared_ptr<FILE>(reader,fclose);
++                try {
++                    disk_stream=new cache::Stream(policy.stream_bytes,policy.queue,policy.stream_entries,policy.read_bytes_per_second,
++                        [file](cache::Range r,uint8_t* out){return !_fseeki64(file.get(),(int64_t)r.offset,SEEK_SET) && cache::read_chunks(file.get(),out,r.size);},
++                        []{SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);SetThreadDescription(GetCurrentThread(),L"Hookshot cache reader");});
++                    logf("vk: cache streaming: %zu MiB reservations, %zu pending reads, %zu MiB/s, %zu compile workers",
++                         policy.stream_bytes>>20,policy.queue,policy.read_bytes_per_second>>20,policy.workers);
++                } catch (const std::exception& e) { logf("vk: cache streaming unavailable: %s",e.what()); }
++            }
++        }
+     });
+ }
+ 
+@@ -823,20 +856,7 @@
+     put(o, (uint64_t)v.size());
+     for (const auto& e : v) put(o, e);
+ }
+-struct Reader {
+-    const uint8_t* p;
+-    template <class T> T get() {
+-        alignas(T) uint8_t b[sizeof(T)];
+-        std::memcpy(b, p, sizeof(T));
+-        p += sizeof(T);
+-        return *(T*)b;
+-    }
+-    template <class V> void list(V& v) {
+-        const uint64_t n = get<uint64_t>();
+-        v.clear();
+-        for (uint64_t i = 0; i < n; i++) v.push_back(get<typename V::value_type>());
+-    }
+-};
++using Reader=cache::Reader;
+ 
+ /// Shader::Info is plain data but for these members (the boost containers are heap vectors here, static_vector too);
+ /// they go on their own, the rest as it lies
+@@ -856,8 +876,7 @@
+ void get_info(Reader& r, Shader::Info& i) {
+     alignas(Shader::Info) static thread_local uint8_t fresh[sizeof(Shader::Info)];
+     std::memcpy(fresh, (const void*)&i, sizeof i);   // (those members as constructed, here)
+-    std::memcpy((void*)&i, r.p, sizeof i);
+-    r.p += sizeof i;
++    r.copy((void*)&i,sizeof i);
+ #define KEEP(m) std::memcpy((void*)&i.m, fresh + ((const uint8_t*)&i.m - (const uint8_t*)&i), sizeof i.m)
+     KEEP(constant_buffer_descriptors);
+     KEEP(storage_buffers_descriptors);
+@@ -874,11 +893,11 @@
+     r.list(i.image_buffer_descriptors);
+     r.list(i.texture_descriptors);
+     r.list(i.image_descriptors);
+-    for (uint64_t n = r.get<uint64_t>(); n; n--) {
++    for (uint64_t n = r.count(2*sizeof(Shader::IR::Attribute)); n; n--) {
+         const auto k = r.get<Shader::IR::Attribute>();
+         i.legacy_stores_mapping[k] = r.get<Shader::IR::Attribute>();
+     }
+-    i.handle_programs.resize((size_t)r.get<uint64_t>());
++    i.handle_programs.resize((size_t)r.count(sizeof(uint64_t)));
+     for (auto& h : i.handle_programs) r.list(h);
+ }
+ 
+@@ -900,19 +919,23 @@
+         put_list(o, st.c1);
+         put_info(o, st.info);
+     }
++    if (o.size()>cache::Policy::max_record) return;
+     const uint64_t head[2] = {p.key, o.size()};
+     std::lock_guard lk(disk_mu);
+-    _fseeki64(disk_out, 0, SEEK_END);
++    if (_fseeki64(disk_out,0,SEEK_END)) return;
+     const int64_t at = _ftelli64(disk_out);
+-    fwrite(head, 8, 2, disk_out);
+-    fwrite(o.data(), 1, o.size(), disk_out);
+-    fflush(disk_out);
++    if (at<0) return;
++    if (fwrite(head,8,2,disk_out)!=2 || !cache::write_chunks(disk_out,o.data(),o.size()) || fflush(disk_out)) {
++        clearerr(disk_out); _chsize_s(_fileno(disk_out),at);
++        static int warned; if (warned++<3) logf("vk: cache append failed; complete prefix retained");
++        return;
++    }
+     // (the precompile's: nothing holds them but the file, and the game starts on them at once)
+     if (disk_listing) disk_records[p.key].push_back({at + 16, o.size(), (uint32_t)((p.compute ? 1 : 0) | (p.mesh ? 2 : 0))});
+ }
+ 
+ /// (shader_mu held) the kept variants of key go to its list, ready, once
+-void program_cache_load(uint64_t key, std::vector<std::unique_ptr<Program>>& variants) {
++void program_cache_load(uint64_t key, std::vector<std::unique_ptr<Program>>& variants, bool read_ahead=true) {
+     disk_init();
+     if (!disk_on) return;
+     std::vector<DiskRecord> recs;
+@@ -924,23 +947,26 @@
+         disk_records.erase(it);
+     }
+     for (const DiskRecord& d : recs) {
+-        std::vector<uint8_t> data(d.size);
+-        {
++        std::vector<uint8_t> data=disk_stream ? disk_stream->take({(uint64_t)d.at,d.size}) : std::vector<uint8_t>{};
++        if (data.empty()) {
++            data.resize(d.size);
+             std::lock_guard lk(disk_mu);
+-            _fseeki64(disk_in, d.at, SEEK_SET);
+-            if (fread(data.data(), 1, d.size, disk_in) != d.size) continue;
+-        }
+-        Reader r{data.data()};
++            if (_fseeki64(disk_in,d.at,SEEK_SET) || !cache::read_chunks(disk_in,data.data(),d.size)) continue;
++        }
++        if (read_ahead) prefetch_after(d);
++        Reader r{data.data(),data.size()};
+         auto p = std::make_unique<Program>();
++        try {
+         p->key = key;
+         const uint32_t kind = r.get<uint32_t>();
++        if (kind&~3u) throw std::runtime_error("invalid cached kind");
+         p->compute = (kind & 1) != 0, p->mesh = (kind & 2) != 0;
+         r.list(p->answers);
+         p->variant = answers_hash(*p);
+         p->workgroup = r.get<std::array<uint32_t, 3>>();
+         p->shared_memory = r.get<uint32_t>();
+         const uint64_t n = r.get<uint64_t>();
+-        bool ok = true;
++        if (!n || n>8) throw std::runtime_error("invalid cached stage count");
+         for (uint64_t k = 0; k < n; k++) {
+             p->stages.emplace_back();
+             Stage& st = p->stages.back();
+@@ -950,13 +976,34 @@
+             r.list(spirv);
+             r.list(st.c1);
+             get_info(r, st.info);
++            // NVN banks and Vulkan stages are different namespaces. In particular,
++            // a mesh program may use bank 0 through bank_stage's legacy fallback.
++            const bool allowed=st.vk_stage==VK_SHADER_STAGE_VERTEX_BIT || st.vk_stage==VK_SHADER_STAGE_FRAGMENT_BIT ||
++                st.vk_stage==VK_SHADER_STAGE_COMPUTE_BIT || st.vk_stage==VK_SHADER_STAGE_TASK_BIT_EXT || st.vk_stage==VK_SHADER_STAGE_MESH_BIT_EXT;
++            if (spirv.empty() || spirv[0]!=0x07230203u || st.nvn_stage<0 || st.nvn_stage>=kNvnStages || !allowed)
++                throw std::runtime_error("invalid cached SPIR-V stage");
+             st.module = make_module(spirv);
+-            ok = ok && st.module;
+-        }
+-        if (!ok) continue;
++            if (!st.module) throw std::runtime_error("cached shader module creation failed");
++        }
++        for (const auto& a:p->answers)
++            if (a.stage>=p->stages.size() || a.desc>=(a.image ? p->stages[a.stage].info.image_descriptors.size() :
++                p->stages[a.stage].info.texture_descriptors.size())) throw std::runtime_error("invalid cached descriptor answer");
++        if (r.remaining()) throw std::runtime_error("trailing cache data");
+         p->ready.store(true, std::memory_order_release);
+         variants.push_back(std::move(p));
+         st_cache_hits++;
++        } catch (const std::exception& e) {
++            if (p) for (const Stage& st:p->stages) if (st.module) vkDestroyShaderModule(dev.device,st.module,nullptr);
++            static int warned; if (warned++<12) logf("vk: cache record %016llx ignored: %s",(unsigned long long)key,e.what());
++        }
++    }
++    if (disk_stream) {
++        static unsigned requests;
++        if (++requests%128==0) {
++            const auto s=disk_stream->stats();
++            logf("vk: cache read-ahead: %llu hits, %llu misses, %zu KiB reserved, %zu KiB peak, %zu pending",
++                 (unsigned long long)s.hits,(unsigned long long)s.misses,s.reserved>>10,s.peak>>10,s.pending);
++        }
+     }
+ }
+ 
+@@ -1445,14 +1492,24 @@
+     std::vector<uint64_t> keys;
+     {
+         std::lock_guard lk(disk_mu);
+-        for (const auto& kv : disk_records)
+-            if (wanted.count(kv.first) || (!kv.second.empty() && (kv.second[0].kind & 1))) keys.push_back(kv.first);
++        std::vector<std::pair<uint64_t,uint64_t>> order;
++        for (const auto& kv:disk_records)
++            if (!kv.second.empty() && (wanted.count(kv.first) || (kv.second[0].kind&1))) order.push_back({kv.second.front().at,kv.first});
++        std::sort(order.begin(),order.end());
++        size_t bytes=0,count=0; const auto& limit=cache::policy();
++        for (const auto& [offset,key]:order) {
++            const auto& records=disk_records.at(key); size_t size=0;
++            for (const auto& rec:records) size+=rec.size;
++            if (size>limit.warm_bytes-bytes || records.size()>limit.warm_programs-count) continue;
++            bytes+=size; count+=records.size(); keys.push_back(key);
++        }
++        if (limit.streaming) logf("vk: bounded warmup: %zu variants, %zu MiB input (limits %zu / %zu MiB)",count,bytes>>20,limit.warm_programs,limit.warm_bytes>>20);
+     }
+     std::lock_guard lk(shader_mu);
+     size_t n = 0;
+     for (const uint64_t key : keys) {
+         auto& variants = programs[key];
+-        program_cache_load(key, variants);
++        program_cache_load(key, variants, false);
+         for (auto& p : variants) n++, fn(*p);
+     }
+     return n;
+--- a/host/nvn_native.c
++++ b/host/nvn_native.c
+@@ -2173,7 +2173,17 @@
+ /* the game picks its interval from its frame time; in real-time mode (nn_vi.c) frames are paced by our limiter */
+ NV(nvnWindowSetPresentInterval) {
+     nvn_win *o = (nvn_win *)P(0);
+-    if (o->interval != I(1)) hos_log("nvn: the game sets present interval %d -> %d", o->interval, I(1)), hos_backtrace();
++    if (o->interval != I(1)) {
++        static _Thread_local ULONGLONG last_report;
++        static _Thread_local unsigned changes;
++        const ULONGLONG now=GetTickCount64();
++        ++changes;
++        if (hos_trace || !last_report || now-last_report>=1000) {
++            hos_log("nvn: present interval %d -> %d (%u changes since last report)",o->interval,I(1),changes);
++            changes=0; last_report=now;
++            if (hos_trace) hos_backtrace();
++        }
++    }
+     extern volatile uint64_t hos_mkw_pacer;   /* (nn_vi.c: its frame pacer, which calls this from 0x806bce24) */
+     if (hos_game_is_mkw() && c->x[30] == 0x806bce28) hos_mkw_pacer = c->x[19];
+     int hos_vi_native_interval(Ctx *c, int requested);
+--- a/nx2/build.py
++++ b/nx2/build.py
+@@ -35,7 +35,7 @@
+ import kit
+ import rtgen
+ import toolchain
+-from ocarina.build_support import object_key, link_options, video_libraries, is_mingw
++from ocarina.build_support import object_key, link_options, video_libraries, is_mingw, shader_cache_stamp
+ from ocarina.config import compile_jobs
+ from ocarina.power import no_throttle
+ 
+@@ -256,13 +256,9 @@
+         vk = os.path.join(GPU, "vk")
+         # (what the shader caches are good for: what translates shaders, not the whole DLL, so a build that changes something else
+         # keeps them)
+-        stamp = hashlib.sha1()
+-        translator = [os.path.join(d, f) for top in ("eden", "sirit", "compat") for d, _, fs in os.walk(os.path.join(vk, top)) for f in fs]
+-        for f in sorted(translator) + [os.path.join(vk, n) for n in ("vk_shader.cpp", "vk_state.h", "vk_api.h")]:
+-            with open(f, "rb") as src:
+-                stamp.update(os.path.relpath(f, vk).replace("\\", "/").encode() + src.read().replace(bytes((13, 10)), bytes((10,))))
++        stamp = shader_cache_stamp(Path(vk))
+         vflags = toolchain.native_target() + CPU + [   # (hookshot: the replay is the frame's limit now)
+-            "-DHOOKSHOT_SHADER_STAMP=0x%sull" % stamp.hexdigest()[:16],
++            "-DHOOKSHOT_SHADER_STAMP=0x%sull" % stamp,
+             "-std=c++20", "-O2", "-g0", "-DNDEBUG", "-Wno-everything", "-DVK_NO_PROTOTYPES", "-DMKWVK_BUILDING",
+             *(["-DHOOKSHOT_RELEASE"] if os.environ.get("RX_RELEASE") == "1" else []),   # (the shaders precompiled before the game)
+             # (Eden's recompiler before suyu's root: suyu has its own shader_recompiler/ headers, and a Shader::Info
+--- a/ocarina/__init__.py
++++ b/ocarina/__init__.py
+@@ -1,3 +1,3 @@
+ """Build and diagnostic tools for the Hookshot-based Ocarina fork."""
+ 
+-__version__ = "0.3.4-dev.1"
++__version__ = "0.3.5-dev.1"
+--- a/ocarina/build.py
++++ b/ocarina/build.py
+@@ -36,6 +36,7 @@
+                 ".inc",
+                 ".py",
+                 ".txt",
++                ".json",
+             }:
+                 digest.update(path.relative_to(root).as_posix().encode() + b"\0")
+                 digest.update(path.read_bytes())
+--- a/ocarina/build_support.py
++++ b/ocarina/build_support.py
+@@ -4,7 +4,33 @@
+ import hashlib
+ import json
+ import os
++import re
+ from pathlib import Path
++
++
++def shader_source_identity(vk: Path) -> tuple[str, str]:
++    paths = sorted(p for name in ("eden", "sirit", "compat") for p in (vk/name).rglob("*") if p.is_file())
++    paths += [vk/name for name in ("vk_shader.cpp", "vk_state.h", "vk_api.h", "vk_shader.h")]
++    short, full = hashlib.sha1(), hashlib.sha256()
++    for path in paths:
++        data = path.relative_to(vk).as_posix().encode() + path.read_bytes().replace(b"\r\n", b"\n")
++        short.update(data)
++        full.update(data)
++    return short.hexdigest()[:16], full.hexdigest()
++
++
++def shader_cache_stamp(vk: Path, compatibility: Path | None = None) -> str:
++    """Reuse only a registered exact source fingerprint, including the ABI header."""
++    current, fingerprint = shader_source_identity(vk)
++    path = compatibility or Path(__file__).resolve().parent.parent / "profiles/shader-cache-compatible.json"
++    try:
++        registry = json.loads(path.read_text(encoding="utf-8"))
++        kept = registry.get("source_sets", {}).get(fingerprint, {}).get("stamp", "")
++        if registry.get("schema") == 1 and isinstance(kept, str) and re.fullmatch(r"[0-9a-f]{16}", kept):
++            return kept
++    except (OSError, ValueError, TypeError, AttributeError):
++        pass
++    return current
+ 
+ 
+ @functools.lru_cache(maxsize=8)
+--- a/ocarina/cli.py
++++ b/ocarina/cli.py
+@@ -7,7 +7,7 @@
+ from .build import build
+ from .game import verify_version, verify_nup
+ from .config import ROOT, BuildRequest, compile_jobs
+-from .environment import PROFILES
++from .environment import CACHE_MODES, PROFILES
+ from .errors import ProjectError
+ from .launch import launch
+ from .crash_report import collect_run
+@@ -53,6 +53,7 @@
+     player = commands.add_parser("run", help="Inicia um build validado e registra os resultados.")
+     player.add_argument("--out", type=absolute, default=ROOT / "jogo")
+     player.add_argument("--profile", choices=tuple(PROFILES), default="original")
++    player.add_argument("--cache-mode", choices=tuple(CACHE_MODES), default="original", help="Streaming: leitura e pre-aquecimento limitados.")
+     player.add_argument("--diagnostic", action="store_true")
+     player.add_argument("--dry-run", action="store_true")
+     player.add_argument("--short-romfs", action="store_true", help="Testa o runtime com um alias curto de RomFS.")
+@@ -115,6 +116,7 @@
+         return launch(args.out, args.profile, args.diagnostic, args.dry_run,
+                       short_paths=args.short_romfs, trace_files=args.trace_files,
+                       trace_runtime=args.trace_runtime, audio_backend=args.audio_backend,
++                      cache_mode=args.cache_mode,
+                       collect_crash=args.collect_crash, work=args.work)
+     except ProjectError as error:
+         print("@@error " + str(error), flush=True)
+--- a/ocarina/environment.py
++++ b/ocarina/environment.py
+@@ -21,6 +21,15 @@
+         "HOS_DYNRES": "0",  # The menu's 100% resolution option.
+     },
+ }
++CACHE_MODES = {
++    "original": {},
++    "streaming": {
++        "RX_VK_CACHE_STREAM": "1", "RX_VK_CACHE_READ_MB": "16", "RX_VK_CACHE_QUEUE": "8",
++        "RX_VK_CACHE_INDEX_RECORDS": "65536", "RX_VK_CACHE_READ_MBPS": "64",
++        "RX_VK_PREWARM_MB": "64", "RX_VK_PREWARM_PROGRAMS": "128", "RX_VK_PREWARM_PIPELINES": "256",
++        "RX_VK_COMPILE_THREADS": "2", "RX_VK_PREWARM_PER_SECOND": "5", "RX_VK_PIPE_CACHE_IO_MB": "128",
++    },
++}
+ 
+ 
+ def clean_environment(parent: Mapping[str, str]) -> dict[str, str]:
+@@ -33,14 +42,19 @@
+ 
+ 
+ def runtime_environment(
+-    parent: Mapping[str, str], profile: str, diagnostic: bool = False
++    parent: Mapping[str, str], profile: str, diagnostic: bool = False, *, cache_mode: str = "original"
+ ) -> dict[str, str]:
+     try:
+         selected = PROFILES[profile]
+     except KeyError as error:
+         raise ProjectError(f"Perfil desconhecido: {profile}") from error
++    try:
++        cache_settings = CACHE_MODES[cache_mode]
++    except KeyError as error:
++        raise ProjectError(f"Modo de cache desconhecido: {cache_mode}") from error
+     result = clean_environment(parent)
+     result.update(selected)
++    result.update(cache_settings)
+     result["RX_BACKEND"] = "vulkan"
+     if diagnostic:
+         result["RX_VK_VALIDATION"] = "1"
+--- a/ocarina/launch.py
++++ b/ocarina/launch.py
+@@ -10,7 +10,7 @@
+ from .config import MANIFEST, ROOT
+ from .crash_report import collect_run
+ from .windows_paths import short_romfs
+-from .environment import PROFILES, runtime_environment
++from .environment import CACHE_MODES, PROFILES, runtime_environment
+ from .errors import ProjectError
+ from .files import read_json, sha256, write_json
+ 
+@@ -70,13 +70,14 @@
+     trace_files: bool = False,
+     trace_runtime: bool = False,
+     audio_backend: str = "auto",
++    cache_mode: str = "original",
+     collect_crash: bool = False,
+     work: Path | None = None,
+ ) -> int:
+     manifest = verify_build(folder)
+     if audio_backend not in {"auto", "wasapi", "waveout"}:
+         raise ProjectError(f"Saida de audio desconhecida: {audio_backend}")
+-    environment = runtime_environment(os.environ, profile, diagnostic)
++    environment = runtime_environment(os.environ, profile, diagnostic, cache_mode=cache_mode)
+     if audio_backend != "auto":
+         environment["HOS_AUDIO_BACKEND"] = audio_backend
+     if trace_files:
+@@ -93,12 +94,15 @@
+         str(folder / "user"),
+     ]
+     print("Perfil:", profile, "(validacao ativa)" if diagnostic else "")
++    print("Modo de cache:", cache_mode)
+     print("Executavel SHA-256:", manifest["files"]["hookshot.exe"])
+     built_version = manifest.get("version")
+     if built_version and built_version != __version__:
+         print(f"Motor compilado: {built_version}; lancador: {__version__}. "
+               "Para aplicar as correcoes nativas desta atualizacao, repita Criar com a mesma entrada/destino.", flush=True)
+     for key, value in PROFILES[profile].items():
++        print(f"  {key}={value}")
++    for key, value in CACHE_MODES[cache_mode].items():
+         print(f"  {key}={value}")
+     if dry_run:
+         print("Verificacao concluida; o jogo nao foi iniciado.")
+@@ -111,6 +115,7 @@
+     metadata = {
+         "launcher_version": __version__,
+         "profile": profile,
++        "cache_mode": cache_mode,
+         "diagnostic": diagnostic,
+         "trace_files": trace_files,
+         "trace_runtime": trace_runtime,
+--- /dev/null
++++ b/profiles/shader-cache-compatible.json
+@@ -0,0 +1,10 @@
++{
++  "schema": 1,
++  "source_sets": {
++    "e4b25bfe3f6ab6074c10739a3ce69aecdf1c957e33ac90d09b13518ad1deab6a": {
++      "stamp": "234d9fba458b54ba",
++      "version": "0.3.5-dev.1",
++      "reason": "Cache transport/bounds only; Eden/Sirit/compat and ABI headers byte-identical to 0.3.4. Writer and disk_stamp inputs retain their wire format and semantics."
++    }
++  }
++}
+--- /dev/null
++++ b/tests/native/test_cache_stream.cpp
+@@ -0,0 +1,69 @@
++#include "cache_stream.h"
++#include "cache_reader.h"
++#include "cache_policy.h"
++#include "cache_rate.h"
++#include "cache_io.h"
++#include <atomic>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <future>
++#include <limits>
++using namespace mkwvk::cache;
++using namespace std::chrono_literals;
++#define CHECK(x) do {if (!(x)) {std::fprintf(stderr,"cache check failed at %d: %s\n",__LINE__,#x);std::abort();}} while (0)
++int main(int argc,char**) {
++    if (argc>1) {
++        auto p=read_policy();
++        CHECK(p.streaming && p.stream_bytes==(16u<<20) && p.workers==4 && p.queue==8);
++        CHECK(p.warm_bytes==0 && p.driver_io_bytes==(128u<<20) && p.warm_per_second==5 && p.index_records==65536);
++        puts("cache policy checks passed");return 0;
++    }
++    FILE* file=std::tmpfile();CHECK(file);
++    for (int i=0;i<256;++i) std::fputc(i,file);
++    std::fflush(file);std::atomic<unsigned> reads{0};const auto main_id=std::this_thread::get_id();
++    {
++        Stream s(80,2,2,0,[&](Range r,uint8_t* out){CHECK(std::this_thread::get_id()!=main_id);++reads;
++            return !std::fseek(file,(long)r.offset,SEEK_SET) && read_chunks(file,out,r.size);});
++        CHECK(s.request({0,40}) && s.request({40,40}) && s.wait_idle(2s));
++        CHECK(s.request({40,40}) && s.request({80,40}) && s.wait_idle(2s));
++        CHECK(reads==3 && s.take({0,40}).empty());
++        auto a=s.take({40,40}),b=s.take({80,40});CHECK(a.size()==40 && b.size()==40);
++        for (unsigned i=0;i<40;++i) CHECK(a[i]==i+40 && b[i]==i+80);
++        CHECK(!s.request({1,81}));auto stats=s.stats();CHECK(stats.hits==2 && stats.misses==1 && stats.peak<=80 && !stats.reserved);
++    }
++    std::fclose(file);
++    {
++        std::promise<void> started,release;auto go=release.get_future().share();
++        Stream s(64,1,2,0,[&](Range r,uint8_t* out){started.set_value();go.wait();std::memset(out,9,r.size);return true;});
++        CHECK(s.request({1,64}) && started.get_future().wait_for(2s)==std::future_status::ready);
++        CHECK(s.request({1,64}) && !s.request({2,1}));
++        CHECK(s.take({1,64}).empty()); // cannot wait for the blocked reader
++        CHECK(s.stats().reserved==64 && s.stats().pending==1);
++        release.set_value();CHECK(s.wait_idle(2s) && s.take({1,64}).size()==64);
++        s.stop();CHECK(!s.request({3,1}));
++    }
++    {
++        Stream bad(64,2,2,0,[](Range,uint8_t*){return false;});
++        CHECK(bad.request({1,32}) && bad.wait_idle(2s) && !bad.stats().reserved && bad.stats().dropped==1);
++        std::promise<void> started;std::atomic<int> calls{0};
++        Stream slow(64,2,2,1,[&](Range r,uint8_t* out){std::memset(out,1,r.size);if (calls++==0) started.set_value();return true;});
++        CHECK(slow.request({1,32}) && slow.request({40,32}));
++        CHECK(started.get_future().wait_for(2s)==std::future_status::ready);
++        auto now=std::chrono::steady_clock::now();slow.stop();CHECK(std::chrono::steady_clock::now()-now<2s && calls==1);
++    }
++    uint8_t wire[16]{};uint64_t count=2;uint32_t values[2]={42,73};
++    std::memcpy(wire,&count,8);std::memcpy(wire+8,values,8);
++    Reader reader(wire,16);std::vector<uint32_t> items;reader.list(items);CHECK(items.size()==2 && items[1]==73 && !reader.remaining());
++    for (size_t n=0;n<16;++n) {bool rejected=false;try {Reader r(wire,n);r.list(items);}catch(const std::runtime_error&){rejected=true;}CHECK(rejected);}
++    count=std::numeric_limits<uint64_t>::max();std::memcpy(wire,&count,8);bool rejected=false;
++    try {Reader r(wire,16);r.list(items);}catch(const std::runtime_error&){rejected=true;}CHECK(rejected);
++    auto now=TokenBucket::Clock::now();TokenBucket bucket(5,now);
++    CHECK(bucket.try_take(now) && !bucket.try_take(now) && !bucket.try_take(now+199ms));
++    CHECK(bucket.try_take(now+201ms) && bucket.try_take(now+10s) && !bucket.try_take(now+10s));
++    std::vector<uint8_t> source(io_chunk*3+17),out(source.size());
++    for(size_t i=0;i<source.size();++i) source[i]=(uint8_t)(i*17);
++    file=std::tmpfile();CHECK(file && write_chunks(file,source.data(),source.size()));std::rewind(file);
++    CHECK(read_chunks(file,out.data(),out.size()) && out==source && !read_chunks(file,out.data(),1));std::fclose(file);
++    puts("cache stream checks passed: real disk I/O, eviction, byte/queue bounds, pending lookup, failures, throttle stop, reader, tokens, chunked files");
++}
+--- a/tests/test_crash_recovery.py
++++ b/tests/test_crash_recovery.py
+@@ -177,7 +177,8 @@
+                            "print(json.dumps({'args':sys.argv[1:],'trace':os.environ.get('HOS_FS_TRACE'),"
+                            "'validation':os.environ.get('RX_VK_VALIDATION'),"
+                            "'audio':os.environ.get('HOS_AUDIO_STATS'),'slow':os.environ.get('RX_VK_SLOW_LOG'),"
+-                           "'backend':os.environ.get('HOS_AUDIO_BACKEND')}))\n"
++                           "'backend':os.environ.get('HOS_AUDIO_BACKEND'),"
++                           "'cache':os.environ.get('RX_VK_CACHE_READ_MB')}))\n"
+                            "Path('hookshot_options.ini').write_text('resolution=1\\n')\n")
+             exe.chmod(0o755)
+             for name in ("hookshot_vk.dll", "image.bin"):
+@@ -190,7 +191,7 @@
+             with patch.object(launcher, "os", fake_os), patch.object(launcher, "short_romfs",
+                     side_effect=lambda path: short_romfs(r"C:\synthetic\romfs", api=api)), contextlib.redirect_stdout(io.StringIO()):
+                 self.assertEqual(launcher.launch(root, short_paths=True, trace_files=True,
+-                                                trace_runtime=True, audio_backend="wasapi", collect_crash=True), 0)
++                                                trace_runtime=True, audio_backend="wasapi", cache_mode="streaming", collect_crash=True), 0)
+             self.assertFalse(marker.exists())
+             self.assertEqual(api.removed, api.created)
+             logs = next(path for path in (root / "diagnosticos").iterdir() if path.is_dir())
+@@ -201,6 +202,8 @@
+             self.assertEqual(child["audio"], "1")
+             self.assertEqual(child["slow"], "25")
+             self.assertEqual(child["backend"], "wasapi")
++            self.assertEqual(child["cache"], "16")
++            self.assertEqual(json.loads((logs / "execucao.json").read_text())["cache_mode"], "streaming")
+             self.assertEqual(json.loads((logs / "execucao.json").read_text())["exit_code"], 0)
+             self.assertTrue(logs.with_suffix(".zip").is_file())
+             with zipfile.ZipFile(logs.with_suffix(".zip")) as bundle:
+--- /dev/null
++++ b/tests/test_shader_cache.py
+@@ -0,0 +1,74 @@
++"""Real background I/O, bounded allocations and exact cache identity guards."""
++import json
++import os
++from pathlib import Path
++import shutil
++import subprocess
++import tempfile
++import unittest
++from ocarina.build_support import shader_cache_stamp, shader_source_identity
++from ocarina.environment import runtime_environment
++from ocarina.errors import ProjectError
++
++ROOT = Path(__file__).resolve().parent.parent
++
++
++class ShaderCacheTests(unittest.TestCase):
++    def test_real_cpp_stream_and_reader(self):
++        compiler = os.environ.get("OCARINA_TEST_CXX") or shutil.which("c++") or shutil.which("clang++")
++        if not compiler and os.name == "nt":
++            local = ROOT / "ferramentas/llvm/bin/clang++.exe"
++            compiler = str(local) if local.is_file() else None
++        if not compiler:
++            self.skipTest("A C++ compiler is needed for the native cache checks")
++        with tempfile.TemporaryDirectory(prefix="cache test ") as directory:
++            exe = Path(directory) / ("stream.exe" if os.name == "nt" else "stream")
++            args = [compiler, "-std=c++20", "-O1", "-pthread", "-Wall", "-Wextra", "-Werror", "-I" + str(ROOT / "gpu/vk"), str(ROOT / "tests/native/test_cache_stream.cpp"), "-o", str(exe)]
++            if os.name == "nt":
++                args.append("-static")
++            built = subprocess.run(args, capture_output=True, text=True, timeout=60)
++            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
++            child = subprocess.run([str(exe)], capture_output=True, text=True, timeout=20)
++            self.assertEqual(child.returncode, 0, child.stdout + child.stderr)
++            self.assertIn("cache stream checks passed", child.stdout)
++            env = dict(os.environ, RX_VK_CACHE_STREAM="1", RX_VK_COMPILE_THREADS="999", RX_VK_CACHE_QUEUE="bad", RX_VK_CACHE_READ_MB="-1", RX_VK_PREWARM_MB="0")
++            for key in ("RX_VK_PIPE_CACHE_IO_MB", "RX_VK_PREWARM_PER_SECOND", "RX_VK_CACHE_INDEX_RECORDS"):
++                env.pop(key, None)
++            child = subprocess.run([str(exe), "policy"], env=env, capture_output=True, text=True, timeout=20)
++            self.assertEqual(child.returncode, 0, child.stdout + child.stderr)
++
++    def test_exact_source_and_schema_control_compatibility(self):
++        with tempfile.TemporaryDirectory() as directory:
++            vk = Path(directory)
++            for name in ("eden/a.cpp", "sirit/a.cpp", "compat/a.h", "vk_shader.cpp", "vk_shader.h", "vk_api.h", "vk_state.h"):
++                p = vk / name
++                p.parent.mkdir(exist_ok=True)
++                p.write_text("// " + name + "\n")
++            fresh, fp = shader_source_identity(vk)
++            config = vk / "known.json"
++            config.write_text(json.dumps({"schema": 1, "source_sets": {fp: {"stamp": "234d9fba458b54ba"}}}))
++            self.assertEqual(shader_cache_stamp(vk, config), "234d9fba458b54ba")
++            header = vk / "vk_shader.h"
++            before = header.read_bytes()
++            header.write_bytes(before.replace(b"\n", b"\r\n"))
++            self.assertEqual(shader_cache_stamp(vk, config), "234d9fba458b54ba")
++            header.write_bytes(before + b"// schema changed\n")
++            self.assertNotEqual(shader_cache_stamp(vk, config), fresh)
++            self.assertNotEqual(shader_cache_stamp(vk, config), "234d9fba458b54ba")
++            header.write_bytes(before)
++            (vk / "eden/a.cpp").write_text("// emitter changed\n")
++            self.assertNotEqual(shader_cache_stamp(vk, config), "234d9fba458b54ba")
++            config.write_text("invalid json")
++            self.assertEqual(shader_cache_stamp(vk, config), shader_source_identity(vk)[0])
++
++    def test_streaming_is_explicit_and_independent_of_visual_profile(self):
++        parent = {"PATH": "tools", "RX_VK_CACHE_STREAM": "1", "RX_VK_PIPE_SKIP": "1"}
++        self.assertEqual(runtime_environment(parent, "original"), {"PATH": "tools", "RX_BACKEND": "vulkan"})
++        for profile in ("original", "8gb", "nitido"):
++            env = runtime_environment(parent, profile, cache_mode="streaming")
++            self.assertEqual(env["RX_VK_CACHE_READ_MB"], "16")
++            self.assertEqual(env["RX_VK_COMPILE_THREADS"], "2")
++            self.assertNotIn("RX_VK_PIPE_SKIP", env)
++            self.assertNotIn("RX_VK_VALIDATION", env)
++        with self.assertRaises(ProjectError):
++            runtime_environment({}, "original", cache_mode="bad")

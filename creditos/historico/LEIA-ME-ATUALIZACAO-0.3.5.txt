@@ -1,0 +1,51 @@
+OCARINA BUILDER 0.3.5-dev.1 - CACHE COM LIMITES EXPLICITOS
+
+Este ZIP de atualizacao e para quem ja aplicou a versao 0.3.4.
+Nao precisa baixar o ZIP de fontes nem o pacote Windows completo.
+O nome antigo da sua pasta pode permanecer.
+
+1. Feche jogo e Builder. Guarde uma copia de jogo\user\save.
+2. Extraia TODO o ZIP na pasta existente que contem OcarinaBuilder.exe,
+   manage.py, ferramentas e work. Aceite substituir os arquivos.
+3. Preserve work, jogo e suas entradas. Nao apague caches para atualizar.
+4. Abra OcarinaBuilder.exe; use a MESMA entrada, destino e pasta de trabalho.
+   Clique Criar para recompilar o backend. Apenas copiar o ZIP e clicar
+   Jogar executaria o binario antigo. Objetos inalterados podem ser usados
+   novamente; nao ha promessa de duracao fixa para a recompilacao.
+5. Ao terminar, feche o jogo e use Jogar-Streaming.cmd.
+   Para um destino personalizado:
+     Jogar-Streaming.cmd --out "D:\SeuJogo"
+6. Compare com Jogar.cmd na mesma cena, resolucao e opcoes, incluindo uma
+   segunda abertura. O botao Jogar da interface continua no cache Original.
+7. Para comparar com registros detalhados:
+     Jogar-Suporte.cmd --cache-mode streaming
+   Os diagnosticos incluem o modo e os limites realmente enviados ao filho.
+
+IMPLEMENTADO NO BACKEND, NAO APENAS NO ATALHO
+- Leitor em segundo plano com janela compartilhada de 16 MiB para dados
+  brutos antecipados, oito leituras pendentes e descarte LRU dos prontos.
+- Indice limitado a 65536 registros; nenhum preload do banco inteiro.
+- Pre-aquecimento limitado a 64 MiB de registros, 128 variantes e 256 notas
+  graficas; dois workers e ate cinco admissoes de compilacao por segundo
+  por worker. Pipelines ja disponiveis no driver usam consulta sem compilar.
+- I/O dos arquivos em blocos de ate 64 KiB. Snapshot do cache Vulkan limitado
+  a 128 MiB, com cobertura possivelmente parcial e arquivo separado.
+- Menos spam de logs quando o jogo alterna o intervalo de apresentacao.
+  O intervalo solicitado e a sincronizacao de frames nao foram alterados.
+
+LIMITES IMPORTANTES
+Os limites acima sao de partes do cache, NAO de toda a RAM/VRAM do jogo.
+Uma chamada do driver nao pode ser interrompida apos 2 ms por esse sistema.
+O Streaming faz menos trabalho antes de iniciar e pode compilar mais durante
+uma primeira visita. Nao usa um shader generico para substituir desenhos ou
+compute arbitrarios. Esperas necessarias continuam para preservar resultados.
+Nao promete zero stutter, suporte a mesh shaders em RX580, nem corrigir todas
+as luzes, folhas ou sombras. Leia docs/cache-streaming.md.
+
+Drivers enviados como referencia foram documentados; o programa nao instala
+driver, nao altera Registro/BIOS e nao apaga caches globais do Windows.
+O caso externo da RX580 esta em docs/caso-rx580-build-externa.md; nao constitui
+teste desta atualizacao. O relato da RTX4090 precisa do log correspondente.
+
+Validacao de codigo e limites: docs/validacao-0.3.5.json e resultado-testes.txt.
+Sem teste fisico de jogo/GPU, audio ou janela Windows neste ambiente.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "version": "0.3.9-dev.1",
+  "tests_discovered": 112,
+  "passed": 103,
+  "skipped": 9,
+  "failed": 0,
+  "native_units": 182,
+  "native_failed": 0,
+  "native_first_compile_seconds": 47.863,
+  "renderer_source_sha256": "b5e9d61ecfd48d3996aab1a8668b49ae6acd814154e853f116c5fe4e2578238b",
+  "renderer_binary_sha256": "8e440ce8cbf3a061c63f90e646693678b5f65946641c4680870fb39904f11f58",
+  "shader_cache_stamp": "2fd6984aaeff3c88",
+  "api_unchanged": true,
+  "real_game_gpu_tested_here": false,
+  "user_runs_analyzed": 14,
+  "user_runs_device_lost": 11
+}

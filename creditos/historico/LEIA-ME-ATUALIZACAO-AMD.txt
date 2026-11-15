@@ -1,0 +1,24 @@
+OCARINA BUILDER 0.3.2-dev.1 - ATUALIZACAO AMD / ILUMINACAO
+
+1. Feche o Ocarina Builder e o jogo.
+2. Extraia TODO o conteudo deste ZIP na pasta existente que contem
+   OcarinaBuilder.exe, manage.py e ferramentas. Substitua os arquivos.
+3. Preserve work e jogo. Nao e necessario renomear a pasta 0.3.1.
+4. Abra OcarinaBuilder.exe. Use a mesma entrada e o mesmo destino.
+5. Clique Criar. O host e o renderizador serao atualizados; objetos de jogo
+   inalterados podem ser reutilizados. Nao ha promessa de recompilacao instantanea.
+6. Ao terminar, teste o perfil Original primeiro.
+
+Inclui as correcoes de iluminacao, neblina e filmes do HookshotBuilder (2)
+fornecido, as mudancas AMD anteriores e a correcao dos quatro simbolos rx_*
+que impediam o link. Esta e uma atualizacao do motor, nao apenas da interface.
+O modo automatico pode usar ate oito compiladores quando houver RAM livre,
+com a mesma reserva de memoria; nao altera a otimizacao O1/O2 do jogo.
+O cache de shaders e invalidado quando muda o tradutor ou a GPU/driver.
+
+A ampliacao de determinados filmes passa a ser linear para evitar as redes
+neurais lentas na AMD. O ajuste de neblina e um workaround visual herdado.
+
+Compilacao e link Windows verificados com entrada sintetica. Nao houve
+execucao do jogo ou teste fisico AMD neste ambiente. Detalhes e limites em
+ docs/atualizacao-amd.md.

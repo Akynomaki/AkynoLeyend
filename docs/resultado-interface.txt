@@ -1,0 +1,6 @@
+Ocarina Builder 0.3.1-dev.1
+SDK .NET: 8.0.427
+Runtime incluido: Microsoft.NETCore.App e Microsoft.WindowsDesktop.App 8.0.33, win-x64
+Alvo: net8.0-windows, WPF, Release, self-contained, single-file
+Resultado: publish concluido, sem erros ou avisos.
+Host de compilacao: Linux. A janela WPF nao foi executada neste host.

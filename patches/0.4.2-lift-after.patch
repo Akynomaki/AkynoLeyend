@@ -1,0 +1,52 @@
+--- a/third_party/a64-kit/lift/a64_lift.py
++++ b/third_party/a64-kit/lift/a64_lift.py
+@@ -703,6 +703,7 @@
+         self.img = img
+         self.entries = set(img.entries) | set(img.hooks)
+         self.hooks = dict(img.hooks)
++        self.after = {}       # pc -> inline C after that ordinary instruction; included in register/flag analysis
+         self.names = getattr(img, "names", {}) or {}
+         self.comments = comments
+         self.funcs = {}       # entry -> (body {pc: kind}, labels set)
+@@ -1229,6 +1230,14 @@
+         self.stats["bad_target"] += 1
+         return SYNC_TAIL % self.cur_i + "a64_trap(c, 0x%xULL, 0); return;" % t
+ 
++    def op_text(self, pc, word, texts):
++        """Site-specific additions must not modify the shared translation of the same instruction word."""
++        text, flags = texts[(word, pc) if pc_relative(word) else word]
++        extra = self.after.get(pc)
++        if extra:
++            text = text.rstrip("\n") + "\n" + extra
++        return text, flags
++
+     def dead_flags(self, body, pcs, texts):
+         """pc -> the flags an instruction stores that nothing reads (FLAG_BIT bits; see FLAG_WRITE)"""
+         e = self.cur
+@@ -1243,7 +1252,7 @@
+             kind = k[0]
+             targets, falls = [], True
+             if kind == "op":
+-                text, fl = texts[(w, pc) if pc_relative(w) else w]
++                text, fl = self.op_text(pc, w, texts)
+                 if fl & a64emit.UNHANDLED:
+                     reads[i], falls = 15, False
+                 else:
+@@ -1314,7 +1323,7 @@
+             kind = k[0]
+             targets, falls = [], True
+             if kind == "op":
+-                text, fl = texts[(w, pc) if pc_relative(w) else w]
++                text, fl = self.op_text(pc, w, texts)
+                 if fl & a64emit.UNHANDLED:
+                     falls = False
+                 else:
+@@ -1374,7 +1383,7 @@
+             nxt = pc + 4
+             falls = True
+             if kind == "op":
+-                text, flags = texts[(w, pc) if pc_relative(w) else w]
++                text, flags = self.op_text(pc, w, texts)
+                 if flags & a64emit.UNHANDLED:
+                     self.unhandled[w] += 1
+                     out.append(SYNC_ALL % i + "a64_trap(c, 0x%xULL, 0x%08xu); return;" % (pc, w))

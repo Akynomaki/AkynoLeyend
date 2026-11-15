@@ -1,0 +1,268 @@
+test_audit_is_independent_of_manifest_parsing_and_hash_success (test_access.AccessTests.test_audit_is_independent_of_manifest_parsing_and_hash_success) ... ok
+test_denied_hash_becomes_actionable_error_and_never_starts_the_game (test_access.AccessTests.test_denied_hash_becomes_actionable_error_and_never_starts_the_game) ... ok
+test_directory_misnamed_exe_is_not_treated_as_a_security_block (test_access.AccessTests.test_directory_misnamed_exe_is_not_treated_as_a_security_block) ... ok
+test_file_open_and_stat_errors_are_distinct_from_a_missing_file (test_access.AccessTests.test_file_open_and_stat_errors_are_distinct_from_a_missing_file) ... ok
+test_real_hash_verification_still_accepts_matches_and_rejects_changes (test_access.AccessTests.test_real_hash_verification_still_accepts_matches_and_rejects_changes) ... ok
+test_texture_modes_are_explicit_clean_and_recorded (test_access.AccessTests.test_texture_modes_are_explicit_clean_and_recorded) ... ok
+test_winerror_sharing_is_reported_without_claiming_an_antivirus_detection (test_access.AccessTests.test_winerror_sharing_is_reported_without_claiming_an_antivirus_detection) ... ok
+test_pipeline_and_seed_share_bounded_worker_helper (test_akyno_cache042.CacheBuildAuditTests.test_pipeline_and_seed_share_bounded_worker_helper) ... ok
+test_real_native_ampere_lowering_depbar (test_akyno_cache042.CacheBuildAuditTests.test_real_native_ampere_lowering_depbar) ... ok
+test_summary_follows_log_without_claiming_zero_jit (test_akyno_cache042.CacheBuildAuditTests.test_summary_follows_log_without_claiming_zero_jit) ... ok
+test_retry_and_restore_do_not_launch_compiler_but_changed_flags_do (test_cache_reuse.RetryCacheTests.test_retry_and_restore_do_not_launch_compiler_but_changed_flags_do) ...   iniciando source.c (PID 12)
+  iniciando source.c (PID 13)
+ok
+test_first_standalone_write_preserves_image_and_resumes_boundaries (test_chunks.ChunksTests.test_first_standalone_write_preserves_image_and_resumes_boundaries) ... ok
+test_old_normal_chunk_is_removed_when_hot_file_is_also_emitted (test_chunks.ChunksTests.test_old_normal_chunk_is_removed_when_hot_file_is_also_emitted) ... ok
+test_retry_seeds_boundaries_from_text_written_before_failure (test_chunks.ChunksTests.test_retry_seeds_boundaries_from_text_written_before_failure) ... ok
+test_save_creates_shared_metadata_directory (test_chunks.ChunksTests.test_save_creates_shared_metadata_directory) ... ok
+test_failed_recompile_preserves_previous_object_and_cache (test_compile_cache.CompileCacheTests.test_failed_recompile_preserves_previous_object_and_cache) ...   iniciando source.c (PID 14)
+  iniciando source.c (PID 15)
+ok
+test_bundle_contains_only_logs_and_matching_map_never_game_or_saves (test_crash_recovery.CrashReportTests.test_bundle_contains_only_logs_and_matching_map_never_game_or_saves) ... ok
+test_graphics_options_are_snapshotted_without_editing_or_unbounded_reads (test_crash_recovery.CrashReportTests.test_graphics_options_are_snapshotted_without_editing_or_unbounded_reads) ... ok
+test_path_audit_reports_overflow_and_ignores_traversal (test_crash_recovery.CrashReportTests.test_path_audit_reports_overflow_and_ignores_traversal) ... ok
+test_pe_base_and_both_map_formats_resolve_the_same_symbols (test_crash_recovery.CrashReportTests.test_pe_base_and_both_map_formats_resolve_the_same_symbols) ... ok
+test_real_child_runs_with_alias_and_trace_and_parent_collects_after_cleanup (test_crash_recovery.RecoveryLaunchTests.test_real_child_runs_with_alias_and_trace_and_parent_collects_after_cleanup) ... ok
+test_no_free_letter_does_not_remove_existing_mapping (test_crash_recovery.ShortPathsTests.test_no_free_letter_does_not_remove_existing_mapping) ... ok
+test_normalizes_unc_and_extended_paths_without_accepting_relative_input (test_crash_recovery.ShortPathsTests.test_normalizes_unc_and_extended_paths_without_accepting_relative_input) ... ok
+test_raced_creation_tries_another_free_letter (test_crash_recovery.ShortPathsTests.test_raced_creation_tries_another_free_letter) ... ok
+test_skips_occupied_drive_and_removes_only_own_exact_target_after_exception (test_crash_recovery.ShortPathsTests.test_skips_occupied_drive_and_removes_only_own_exact_target_after_exception) ... ok
+test_guest_layout_is_verified_by_compiled_c_helper (test_directory_entry_041.DirectoryEntry041Tests.test_guest_layout_is_verified_by_compiled_c_helper) ... ok
+test_regular_and_mod_entries_use_the_same_wire_serializer (test_directory_entry_041.DirectoryEntry041Tests.test_regular_and_mod_entries_use_the_same_wire_serializer) ... ok
+test_cli_accepts_exefs_and_reports_missing_file (test_gui_bridge.GuiInputTests.test_cli_accepts_exefs_and_reports_missing_file) ... ok
+test_cli_accepts_nup_without_tools_or_compilation (test_gui_bridge.GuiInputTests.test_cli_accepts_nup_without_tools_or_compilation) ... ok
+test_cli_rejects_wrong_version_with_actionable_error (test_gui_bridge.GuiInputTests.test_cli_rejects_wrong_version_with_actionable_error) ... ok
+test_malformed_archives_return_project_error_and_close_files (test_gui_bridge.GuiInputTests.test_malformed_archives_return_project_error_and_close_files) ... ok
+test_nup_check_does_not_extract_or_change_input (test_gui_bridge.GuiInputTests.test_nup_check_does_not_extract_or_change_input) ... ok
+test_progress_counts_only_actual_compiler_completions (test_gui_bridge.ProgressTests.test_progress_counts_only_actual_compiler_completions) ... ok
+test_progress_never_divides_by_zero_and_resets_for_new_batch (test_gui_bridge.ProgressTests.test_progress_never_divides_by_zero_and_resets_for_new_batch) ... ok
+test_audio_volume_import_uses_host_implementation_instead_of_duplicate_stub (test_host_paths.HostPathTests.test_audio_volume_import_uses_host_implementation_instead_of_duplicate_stub) ... /workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/rx_backend.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_fs.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/gpu_preference.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/hos_setjmp.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/hos_thread.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/hos_main.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_vi.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/win_path.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_hid.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/hos_svc.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_diag.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/pgo_rt.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nvn_layout.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/hos_hostcall.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_video.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/mf_av1.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_syncpt.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/audio_wasapi.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nvdrv.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nvn_native.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_applet.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_os_sync.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/rx_webgpu_unavailable.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_audio.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/mkw_glue.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_libc.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_codec.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/hos_mem.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/display.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/nn_gs.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/../host/pad_sdl.c' mode='r' encoding='UTF-8'>
+  src = open(os.path.join(host, f), errors="replace").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/workspace/scratch/36e73b9fbe85/project/AkynoLeyend-0.4.2/nx2/standalone.py:138: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpdn41ob6m/a64_stubs.c' mode='w' encoding='UTF-8'>
+  open(path, "w", newline="\n").write(text)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_lighting_path_is_whole_and_overflow_is_rejected (test_host_paths.HostPathTests.test_lighting_path_is_whole_and_overflow_is_rejected) ... ok
+test_hot_profile_produces_split_units_and_publishes (test_hot_pipeline.HotPipelineTests.test_hot_profile_produces_split_units_and_publishes) ... ok
+test_normal_sources_are_preserved_when_stale_hot_files_are_removed (test_hot_pipeline.HotPipelineTests.test_normal_sources_are_preserved_when_stale_hot_files_are_removed) ... ok
+test_profile_missing_clears_old_environment (test_hot_pipeline.HotPipelineTests.test_profile_missing_clears_old_environment) ... ok
+test_without_hot_matches_discards_stale_pieces_and_compiles (test_hot_pipeline.HotPipelineTests.test_without_hot_matches_discards_stale_pieces_and_compiles) ... ok
+test_without_profile_reaches_compilation_and_publication (test_hot_pipeline.HotPipelineTests.test_without_profile_reaches_compilation_and_publication) ... ok
+test_amd_mesh_workaround_is_targeted_with_opt_out (test_integracao_041.Integrated041Tests.test_amd_mesh_workaround_is_targeted_with_opt_out) ... ok
+test_repeat_prep_avoids_publishing_identical_bank (test_integracao_041.Integrated041Tests.test_repeat_prep_avoids_publishing_identical_bank) ... ok
+test_resolution_over_100_uses_existing_native_fixed_scale (test_integracao_041.Integrated041Tests.test_resolution_over_100_uses_existing_native_fixed_scale) ... ok
+test_shader_workers_and_bounded_cache_are_optional (test_integracao_041.Integrated041Tests.test_shader_workers_and_bounded_cache_are_optional) ... ok
+test_defaults_are_relative_to_script_from_another_working_directory (test_launcher_ps.LauncherExecutionTests.test_defaults_are_relative_to_script_from_another_working_directory) ... skipped 'Requires PowerShell and the POSIX recording-process fixture'
+test_explicit_paths_and_job_count_are_preserved (test_launcher_ps.LauncherExecutionTests.test_explicit_paths_and_job_count_are_preserved) ... skipped 'Requires PowerShell and the POSIX recording-process fixture'
+test_folder_inputs_are_passed_separately (test_launcher_ps.LauncherExecutionTests.test_folder_inputs_are_passed_separately) ... skipped 'Requires PowerShell and the POSIX recording-process fixture'
+test_incomplete_folder_input_is_rejected (test_launcher_ps.LauncherExecutionTests.test_incomplete_folder_input_is_rejected) ... skipped 'Requires PowerShell and the POSIX recording-process fixture'
+test_invalid_job_count_is_rejected_before_starting (test_launcher_ps.LauncherExecutionTests.test_invalid_job_count_is_rejected_before_starting) ... skipped 'Requires PowerShell and the POSIX recording-process fixture'
+test_mixed_input_modes_are_rejected (test_launcher_ps.LauncherExecutionTests.test_mixed_input_modes_are_rejected) ... skipped 'Requires PowerShell and the POSIX recording-process fixture'
+test_native_build_failure_exit_code_is_propagated (test_launcher_ps.LauncherExecutionTests.test_native_build_failure_exit_code_is_propagated) ... skipped 'Requires PowerShell and the POSIX recording-process fixture'
+test_failed_repair_does_not_mark_cache_as_upgraded (test_nup_cache_upgrade.NupCacheUpgradeTests.test_failed_repair_does_not_mark_cache_as_upgraded) ... ok
+test_fresh_packed_archive_is_extracted_and_marked_with_reader_identity (test_nup_cache_upgrade.NupCacheUpgradeTests.test_fresh_packed_archive_is_extracted_and_marked_with_reader_identity) ... ok
+test_legacy_cache_is_repaired_in_place_without_removing_other_work (test_nup_cache_upgrade.NupCacheUpgradeTests.test_legacy_cache_is_repaired_in_place_without_removing_other_work) ... ok
+test_cache_file_with_right_size_but_old_compressed_bytes_is_repaired (test_nup_packed.PackedNupTests.test_cache_file_with_right_size_but_old_compressed_bytes_is_repaired) ... ok
+test_module_fallback_uses_a_complete_nso_from_another_title (test_nup_packed.PackedNupTests.test_module_fallback_uses_a_complete_nso_from_another_title) ... ok
+test_native_zs_frame_is_not_decompressed (test_nup_packed.PackedNupTests.test_native_zs_frame_is_not_decompressed) ... ok
+test_outer_wrapper_is_removed_but_inner_zs_is_preserved (test_nup_packed.PackedNupTests.test_outer_wrapper_is_removed_but_inner_zs_is_preserved) ... ok
+test_plain_files_remain_byte_identical (test_nup_packed.PackedNupTests.test_plain_files_remain_byte_identical) ... ok
+test_read_returns_decompressed_nso_header (test_nup_packed.PackedNupTests.test_read_returns_decompressed_nso_header) ... ok
+test_small_incompressible_wrapper_larger_than_plain_file (test_nup_packed.PackedNupTests.test_small_incompressible_wrapper_larger_than_plain_file) ... ok
+test_truncated_wrapper_does_not_replace_an_existing_target (test_nup_packed.PackedNupTests.test_truncated_wrapper_does_not_replace_an_existing_target) ... ok
+test_wrapped_files_with_and_without_frame_size_are_decoded (test_nup_packed.PackedNupTests.test_wrapped_files_with_and_without_frame_size_are_decoded) ... ok
+test_build_exception_restores_previous_execution_state (test_power.PowerTests.test_build_exception_restores_previous_execution_state) ... ok
+test_failed_power_request_does_not_change_restore_state (test_power.PowerTests.test_failed_power_request_does_not_change_restore_state) ... ok
+test_throttling_request_uses_only_the_supplied_child_handle (test_power.PowerTests.test_throttling_request_uses_only_the_supplied_child_handle) ... ok
+test_crash_with_missing_exit_status_is_explicitly_partial (test_release036.Release036Tests.test_crash_with_missing_exit_status_is_explicitly_partial) ... ok
+test_isolated_child_writes_unicode_and_records_utf8_mode (test_release036.Release036Tests.test_isolated_child_writes_unicode_and_records_utf8_mode) ... ok
+test_real_import_retry_backoff_and_bounded_metadata (test_release036.Release036Tests.test_real_import_retry_backoff_and_bounded_metadata) ... ok
+test_romfs_probe_distinguishes_missing_empty_and_readable (test_release036.Release036Tests.test_romfs_probe_distinguishes_missing_empty_and_readable) ... ok
+test_unfinished_noncrash_run_is_not_published_as_crash (test_release036.Release036Tests.test_unfinished_noncrash_run_is_not_published_as_crash) ... ok
+test_wrong_or_nested_romfs_is_reported_without_modifying_files (test_release036.Release036Tests.test_wrong_or_nested_romfs_is_reported_without_modifying_files) ... ok
+test_access_denied_is_not_reported_as_missing (test_release037.Release037Tests.test_access_denied_is_not_reported_as_missing) ... ok
+test_inaccessible_extraction_marker_does_not_become_a_cache_miss (test_release037.Release037Tests.test_inaccessible_extraction_marker_does_not_become_a_cache_miss) ... ok
+test_incomplete_input_is_rejected_before_a_second_large_extraction (test_release037.Release037Tests.test_incomplete_input_is_rejected_before_a_second_large_extraction) ... ok
+test_new_smaller_chunks_preserve_bodies_and_saved_boundaries (test_release037.Release037Tests.test_new_smaller_chunks_preserve_bodies_and_saved_boundaries) ... ok
+test_observed_times_include_a_failed_phase_and_keep_original_error (test_release037.Release037Tests.test_observed_times_include_a_failed_phase_and_keep_original_error) ... ok
+test_prebuilt_malformed_manifest_falls_back_without_loading_it (test_release037.Release037Tests.test_prebuilt_malformed_manifest_falls_back_without_loading_it) ... ok
+test_prebuilt_renderer_requires_matching_sources_config_and_binary (test_release037.Release037Tests.test_prebuilt_renderer_requires_matching_sources_config_and_binary) ... ok
+test_real_native_mirror_policy (test_release037.Release037Tests.test_real_native_mirror_policy) ... ok
+test_saved_single_chunk_is_not_implicitly_repartitioned (test_release037.Release037Tests.test_saved_single_chunk_is_not_implicitly_repartitioned) ... ok
+test_actual_device_lost_handler_stops_with_nonzero_before_atexit (test_release039.NativeBackportTests.test_actual_device_lost_handler_stops_with_nonzero_before_atexit) ... ok
+test_actual_narrow_emitters_match_signed_and_unsigned_memory_reads (test_release039.NativeBackportTests.test_actual_narrow_emitters_match_signed_and_unsigned_memory_reads) ... ok
+test_actual_prepare_path_saves_cache_and_never_enters_gameplay (test_release039.NativeBackportTests.test_actual_prepare_path_saves_cache_and_never_enters_gameplay) ... ok
+test_real_page_table_code_defers_last_write_wins_and_chunks_updates (test_release039.NativeBackportTests.test_real_page_table_code_defers_last_write_wins_and_chunks_updates) ... ok
+test_real_writeback_code_preserves_cpu_counter_words (test_release039.NativeBackportTests.test_real_writeback_code_preserves_cpu_counter_words) ... ok
+test_uniform_gap_cache_avoids_scans_and_invalidates_on_changes (test_release039.NativeBackportTests.test_uniform_gap_cache_avoids_scans_and_invalidates_on_changes) ... ok
+test_bounded_scanner_finds_markers_split_across_reads (test_release039.RuntimeFailureTests.test_bounded_scanner_finds_markers_split_across_reads) ... ok
+test_notes_and_normal_close_are_not_misclassified (test_release039.RuntimeFailureTests.test_notes_and_normal_close_are_not_misclassified) ... ok
+test_real_child_exit_zero_cannot_hide_device_loss (test_release039.RuntimeFailureTests.test_real_child_exit_zero_cannot_hide_device_loss) ... ok
+test_invalid_controls_and_opengl_are_refused (test_release040.ControlsTests.test_invalid_controls_and_opengl_are_refused) ... ok
+test_real_child_receives_graphics_controls_and_amd_diagnostics (test_release040.ControlsTests.test_real_child_receives_graphics_controls_and_amd_diagnostics) ... ok
+test_access_diagnostic_still_finds_blocked_legacy_exe_before_migration (test_release040.MigrationTests.test_access_diagnostic_still_finds_blocked_legacy_exe_before_migration) ... ok
+test_migration_is_idempotent_and_preserves_image_save_options_and_backup (test_release040.MigrationTests.test_migration_is_idempotent_and_preserves_image_save_options_and_backup) ... ok
+test_pe_replaces_only_complete_readonly_literals_without_changing_length (test_release040.MigrationTests.test_pe_replaces_only_complete_readonly_literals_without_changing_length) ... ok
+test_signed_writable_duplicate_truncated_and_foreign_exes_are_refused (test_release040.MigrationTests.test_signed_writable_duplicate_truncated_and_foreign_exes_are_refused) ... ok
+test_tampering_or_failed_manifest_publication_preserves_original_build (test_release040.MigrationTests.test_tampering_or_failed_manifest_publication_preserves_original_build) ... ok
+test_actual_captured_reads_match_reference_across_40000_changes_and_host_errors (test_release040.Native040Tests.test_actual_captured_reads_match_reference_across_40000_changes_and_host_errors) ... ok
+test_actual_menu_initialization_applies_explicit_options_after_saved_values (test_release040.Native040Tests.test_actual_menu_initialization_applies_explicit_options_after_saved_values) ... ok
+test_actual_readback_wait_rechecks_timeline_after_queue_catchup (test_release040.Native040Tests.test_actual_readback_wait_rechecks_timeline_after_queue_catchup) ... ok
+test_cpu_breadcrumb_ring_is_bounded_ordered_and_safe_between_threads (test_release040.Native040Tests.test_cpu_breadcrumb_ring_is_bounded_ordered_and_safe_between_threads) ... ok
+test_upstream_regressions_execute_with_real_source (test_release040.Native040Tests.test_upstream_regressions_execute_with_real_source) ... ok
+test_launcher_receipt_rejects_old_binary_and_changed_source (test_release042.CoherenceTests.test_launcher_receipt_rejects_old_binary_and_changed_source) ... ok
+test_old_host_cannot_receive_new_visual_dll (test_release042.CoherenceTests.test_old_host_cannot_receive_new_visual_dll) ... ok
+test_public_run_defaults_to_current_revision_and_never_starts_old_host (test_release042.CoherenceTests.test_public_run_defaults_to_current_revision_and_never_starts_old_host) ... ok
+test_actual_resolution_menu_and_runtime_agree_on_experimental_scales (test_release042.NativeReleaseTests.test_actual_resolution_menu_and_runtime_agree_on_experimental_scales) ... ok
+test_precompile_rate_is_shared_across_eight_workers (test_release042.NativeReleaseTests.test_precompile_rate_is_shared_across_eight_workers) ... ok
+test_read_ahead_counts_borrowed_bytes_and_payload_outlives_reader (test_release042.NativeReleaseTests.test_read_ahead_counts_borrowed_bytes_and_payload_outlives_reader) ... ok
+test_binary_marker_and_chunk_boundary (test_resolution_override.ResolutionOverrideTests.test_binary_marker_and_chunk_boundary) ... ok
+test_env_wires_requested_scale (test_resolution_override.ResolutionOverrideTests.test_env_wires_requested_scale) ... ok
+test_missing_host_switch_is_not_silently_applied (test_resolution_override.ResolutionOverrideTests.test_missing_host_switch_is_not_silently_applied) ... ok
+test_native_source_has_cpu_side_active_log (test_resolution_override.ResolutionOverrideTests.test_native_source_has_cpu_side_active_log) ... ok
+test_exact_source_and_schema_control_compatibility (test_shader_cache.ShaderCacheTests.test_exact_source_and_schema_control_compatibility) ... ok
+test_real_cpp_stream_and_reader (test_shader_cache.ShaderCacheTests.test_real_cpp_stream_and_reader) ... ok
+test_streaming_is_explicit_and_independent_of_visual_profile (test_shader_cache.ShaderCacheTests.test_streaming_is_explicit_and_independent_of_visual_profile) ... ok
+test_real_census_subprocess_is_cached_and_input_files_are_preserved (test_shader_prepare.RendererUpdateTests.test_real_census_subprocess_is_cached_and_input_files_are_preserved) ... ok
+test_renderer_only_update_keeps_game_exe_image_save_and_their_hashes (test_shader_prepare.RendererUpdateTests.test_renderer_only_update_keeps_game_exe_image_save_and_their_hashes) ... ok
+test_census_bounds_reject_truncated_headers_before_publishing (test_shader_prepare.SeedTests.test_census_bounds_reject_truncated_headers_before_publishing) ... ok
+test_spooled_python_format_interoperates_with_real_bounded_cpp_reader (test_shader_prepare.SeedTests.test_spooled_python_format_interoperates_with_real_bounded_cpp_reader) ... ok
+test_writer_deduplicates_on_disk_and_failed_publication_keeps_previous_bank (test_shader_prepare.SeedTests.test_writer_deduplicates_on_disk_and_failed_publication_keeps_previous_bank) ... ok
+test_early_texel_writes_are_copied_and_replayed (test_visual_backports_041.VisualBackportTests.test_early_texel_writes_are_copied_and_replayed) ... ok
+test_gpu_created_ground_maps_kept_with_bounded_lru (test_visual_backports_041.VisualBackportTests.test_gpu_created_ground_maps_kept_with_bounded_lru) ... ok
+test_lifted_occlusion_patch_only_when_opcode_matches (test_visual_backports_041.VisualBackportTests.test_lifted_occlusion_patch_only_when_opcode_matches) ... ok
+test_mesh_grid_is_copied_on_gpu_before_indirect_dispatch (test_visual_backports_041.VisualBackportTests.test_mesh_grid_is_copied_on_gpu_before_indirect_dispatch) ... ok
+test_no_false_writes_for_bare_read_ranges (test_visual_backports_041.VisualBackportTests.test_no_false_writes_for_bare_read_ranges) ... ok
+test_cli_defaults_and_choices (test_visual_cli_041.VisualControlTests.test_cli_defaults_and_choices) ... ok
+test_strict_gate_rejects_old_version (test_visual_cli_041.VisualControlTests.test_strict_gate_rejects_old_version) ... ok
+test_strict_gate_rejects_stale_sources (test_visual_cli_041.VisualControlTests.test_strict_gate_rejects_stale_sources) ... ok
+test_visual_controls_applied_after_sanitization (test_visual_cli_041.VisualControlTests.test_visual_controls_applied_after_sanitization) ... ok
+test_acl_failure_does_not_publish_from_a_restricted_folder (test_windows_acl.StagingAclTests.test_acl_failure_does_not_publish_from_a_restricted_folder) ... ok
+test_acl_is_applied_before_writing_and_moving_the_published_file (test_windows_acl.StagingAclTests.test_acl_is_applied_before_writing_and_moving_the_published_file) ... ok
+test_all_publishing_contexts_use_user_named_staging (test_windows_acl.StagingAclTests.test_all_publishing_contexts_use_user_named_staging) ... ok
+test_descriptor_grants_the_actual_user_instead_of_the_default_owner (test_windows_acl.StagingAclTests.test_descriptor_grants_the_actual_user_instead_of_the_default_owner) ... ok
+test_real_windows_descriptor_contains_token_user_after_creation (test_windows_acl.StagingAclTests.test_real_windows_descriptor_contains_token_user_after_creation) ... skipped 'Windows token/DACL APIs unavailable on this host'
+test_repair_script_parses_without_executing_it (test_windows_acl.StagingAclTests.test_repair_script_parses_without_executing_it) ... skipped 'Windows PowerShell parser unavailable on this host'
+test_archive_path_cannot_escape_destination (test_workflow.ArchiveTests.test_archive_path_cannot_escape_destination) ... ok
+test_8gb_profile_preserves_compression_and_mirrors (test_workflow.WorkflowTests.test_8gb_profile_preserves_compression_and_mirrors) ... ok
+test_build_lock_is_exclusive_and_reusable (test_workflow.WorkflowTests.test_build_lock_is_exclusive_and_reusable) ... ok
+test_compiler_and_include_changes_invalidate_cached_object (test_workflow.WorkflowTests.test_compiler_and_include_changes_invalidate_cached_object) ... ok
+test_diagnostic_validation_is_separate (test_workflow.WorkflowTests.test_diagnostic_validation_is_separate) ... ok
+test_incomplete_build_does_not_publish_a_manifest (test_workflow.WorkflowTests.test_incomplete_build_does_not_publish_a_manifest) ... ok
+test_launch_before_first_build_has_actionable_error (test_workflow.WorkflowTests.test_launch_before_first_build_has_actionable_error) ... ok
+test_low_memory_allows_one_compile (test_workflow.WorkflowTests.test_low_memory_allows_one_compile) ... ok
+test_module_preparation_uses_a_private_copy (test_workflow.WorkflowTests.test_module_preparation_uses_a_private_copy) ... ok
+test_motion_comparison_keeps_pipeline_wait_and_temporal_clamp_off (test_workflow.WorkflowTests.test_motion_comparison_keeps_pipeline_wait_and_temporal_clamp_off) ... ok
+test_original_profile_does_not_inherit_experiments (test_workflow.WorkflowTests.test_original_profile_does_not_inherit_experiments) ... ok
+test_output_cannot_cover_input_data (test_workflow.WorkflowTests.test_output_cannot_cover_input_data) ... ok
+test_publish_and_tamper_detection (test_workflow.WorkflowTests.test_publish_and_tamper_detection) ... ok
+test_subprocess_preserves_spaces_and_reports_failure (test_workflow.WorkflowTests.test_subprocess_preserves_spaces_and_reports_failure) ... ok
+test_unowned_output_is_preserved (test_workflow.WorkflowTests.test_unowned_output_is_preserved) ... ok
+test_wrong_and_truncated_game_versions_fail_early (test_workflow.WorkflowTests.test_wrong_and_truncated_game_versions_fail_early) ... ok
+
+----------------------------------------------------------------------
+Ran 152 tests in 10.332s
+
+OK (skipped=9)
+  rtld: taken from title 0 (v1)
+occlusion off: 6 of 6 sites
+occlusion off: main+0x11ace68 holds 00000000, not 39400008: left out
+occlusion off: 5 of 6 sites
+Perfil: original 
+Modo de cache: original
+Modo de texturas: auto
+Modo visual: patched 
+Renderizador: vulkan | opcoes graficas: salvas no jogo
+Executavel SHA-256: b6267737f212a6e0045bbdce0da114876d1f9dc6cb6f572623ce6c76f4705f1f
+Verificacao concluida; o jogo nao foi iniciado.

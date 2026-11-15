@@ -1,0 +1,108 @@
+{
+  "status": "TEST_BUILD_AWAITING_PHYSICAL_GPU_VALIDATION",
+  "version": "0.4.3-test.3",
+  "python_tests": {
+    "total": 205,
+    "passed": 196,
+    "skipped": 9,
+    "failed": 0
+  },
+  "runner_checks": 12,
+  "cas_spirv": {
+    "production_units": 70,
+    "modules_validated": 6,
+    "tracked_global_to_storage_regression_reproduced": true,
+    "gpu_executed": false
+  },
+  "native_renderer": {
+    "schema": 1,
+    "units": 182,
+    "jobs": 4,
+    "renderer_prebuilt": false,
+    "compile_seconds": 67.235,
+    "local_hits": 0,
+    "shared_hits": 0,
+    "compiled": 182,
+    "failed": 0
+  },
+  "renderer_exports": [
+    "mkwvk_init"
+  ],
+  "launcher": {
+    "schema": 1,
+    "version": "0.4.3-test.3",
+    "pe_product_version": "0.4.3-test.3",
+    "source_sha256": "1adaf5529625d6805eaa0f211d4690918770b10c2983f58c06bddbc4723a4eff",
+    "binary_sha256": "52cb8154358cd39b47cf1f0166dc6842234cbb893dea0e4e51668cd0d5407f10",
+    "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
+    "wpf_window_executed": false
+  },
+  "renderer": {
+    "schema": 1,
+    "release": "0.4.3-test.3",
+    "config": {
+      "target": "windows-gnu",
+      "march": "x86-64-v3",
+      "release": "1"
+    },
+    "source_sha256": "4554b3a3baa766eedcf8a6471bb8773a93d4d3803b59523c1cfe725a687f110c",
+    "binary_sha256": "cdb5306d7ac90524c0d9295aa09892e756991920220cde1951776d85a1d202bc",
+    "compiler": "LLVM-MinGW 20261020",
+    "generic": true,
+    "game_executed": false,
+    "physical_gpu_tested": false
+  },
+  "host_compile": [
+    {
+      "file": "nn_video.c",
+      "exit": 0,
+      "synthetic_instruction_helper_headers": true
+    },
+    {
+      "file": "nn_applet.c",
+      "exit": 0,
+      "synthetic_instruction_helper_headers": true
+    },
+    {
+      "file": "display.c",
+      "exit": 0,
+      "synthetic_instruction_helper_headers": true
+    }
+  ],
+  "shader_stamp": "ad137a62c8c44901",
+  "shader_source_sha256": "438d77a10b6dab559b213a27025fa45583403f06957732cf612b48e026778193",
+  "shader_stamp_prefix_found_in_dll": true,
+  "shader_translator_cache_changed": true,
+  "generated_game_retranslation_required": false,
+  "generated_game_object_recompile_required": false,
+  "host_objects_updated_and_exe_relinked_on_user_pc": true,
+  "maintenance_uses_existing_work": true,
+  "automatic_shader_preparation": true,
+  "source_sha256_posix": "6c67d2ebcd8918a39253aacaf9421cb36661076a814e787847c5ec42ae886384",
+  "source_sha256_windows": "9b71fcc98444139a9c1388ca6d575ef5fa8cd1083693a450142e2a09b40c1e7a",
+  "full_game_executed_here": false,
+  "physical_gpu_tested_here": false,
+  "fps_gain_measured": false,
+  "rainbow_image_fixed_on_rx6600_confirmed": false,
+  "audio_sync_on_user_pc_confirmed": false,
+  "zip_update_in_launcher": true,
+  "online_update_feed_configured": false,
+  "upstream": {
+    "tag": "v2.0.10",
+    "commit": "7f9daf06d902588476102d6650c600bb84f02ce5",
+    "selected_backports": [
+      "single-layer ASTC-to-BC3 runs (#956)",
+      "lazy RGBA conversion for NV12 video",
+      "EOS processing while pictures remain queued"
+    ],
+    "local_changes": [
+      "tracked global-to-storage CAS operand preservation",
+      "bounded catch-up between decoder calls",
+      "1920x1080 output including handheld profile",
+      "mouse/WASD/Ctrl+M overlay controls",
+      "automatic preparation with launcher progress",
+      "pinned runtime update with reuse-only guard",
+      "ZIP update transaction and rollback"
+    ]
+  }
+}

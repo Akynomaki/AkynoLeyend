@@ -1,0 +1,40 @@
+{
+  "version": "0.3.8-dev.1",
+  "tests_discovered": 97,
+  "passed": 90,
+  "skipped": 7,
+  "skip_reason": "PowerShell unavailable",
+  "native_units": 182,
+  "native_compiled_first": 182,
+  "native_failed_first": 0,
+  "native_final_changed_units": 1,
+  "native_final_cached_units": 181,
+  "vulkan_windows_dll_link": "passed",
+  "pe_export": "mkwvk_init",
+  "native_seed_reader_and_budget": "executed on Linux with real Python writer and C++ reader",
+  "sanitizers": "ASan + UBSan passed; LeakSanitizer disabled in this environment",
+  "shader_translator_stamp": "7d16d3d712a683ce",
+  "shader_translation_semantics_changed": false,
+  "file_access_tests": "simulated denied reads/stat, directory, missing file, hash mismatch and no child launch",
+  "preparation_test": "real census subprocess, private synthetic BNSH/zstd, cache reuse, denied index, renderer swap and rollback",
+  "game_executed_here": false,
+  "windows_permission_error_reproduced_on_user_pc": false,
+  "physical_gpu_tested_here": false,
+  "lighting_flicker_fixed_confirmed": false,
+  "wpf_republished": false,
+  "wpf_version": "0.3.2-dev.1",
+  "prebuilt_renderer": {
+    "schema": 1,
+    "config": {
+      "target": "windows-gnu",
+      "march": "x86-64-v3",
+      "release": "1"
+    },
+    "source_sha256": "247b4a795e43d4a51502882d8f7927773aeb0070d25ef9d2f4eef6e05696db4f",
+    "binary_sha256": "664e28e2be7d38887abb472df940c0a8c9a76d5dfff9068dc4c3d9c9d439941c",
+    "compiler": "LLVM-MinGW 20261020 / Clang 23.1.5, Linux host, Windows x64 target",
+    "game_data": false,
+    "translation_units": 182,
+    "physical_gpu_tested": false
+  }
+}

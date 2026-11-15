@@ -1,0 +1,16 @@
+{
+  "tests_discovered": 230,
+  "passed": 221,
+  "skipped": 9,
+  "failed": 0,
+  "renderer_units": 182,
+  "renderer_link": 0,
+  "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project.git 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+  "validation_dll_not_shipped": {
+    "size": 5890048,
+    "sha256": "a91fbcea24c32ab7c4dbb3423f2cfcf066967981feb954ae6baa985696266b5e"
+  },
+  "host_thread_compile": 0,
+  "physical_game_test": false,
+  "physical_fps_benchmark": false
+}

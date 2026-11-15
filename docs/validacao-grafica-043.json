@@ -1,0 +1,405 @@
+{
+  "status": "TEST_BUILD_AWAITING_USER_VALIDATION",
+  "baseline_sha256": "29860725112075b4bc9d6501d366678991063485ca0e0c36e5a1b0f629304278",
+  "reference": {
+    "repository": "https://github.com/NotRexed/Hookshot",
+    "tag": "v2.0.6",
+    "commit": "fa439391aae6f3bf104340ea36c6ea993b38534e",
+    "source_fingerprint": "9b541c9c",
+    "archive_sha256": "f224995053ba7fe5a828e2917fdf234f510ebc5335e8771a53951db55415b5b6",
+    "pr759_merge": "deaf4ff59c36b49d0e539084701151cb1858a07d",
+    "uploaded_builder_sha256": "f65e898c6049c0913f7f7d9f7f50fc9740362912a0a9727e51194afdac6d7a49",
+    "builder_matches_official_asset": true,
+    "observed_log_version": "v2.0.7",
+    "observed_log_source_fingerprint": "9b541c9c"
+  },
+  "private_seed": {
+    "sha256": "0630d6b2c6e63e1ff6aabe6b9b9dfab40d3257c964fa4d89e0b7b9a168011dbb",
+    "bytes": 302583236,
+    "programs": 14179,
+    "stages": 13773,
+    "stages_by_type": {
+      "vertex": 3061,
+      "fragment": 10204,
+      "task": 17,
+      "mesh": 491,
+      "compute": 0
+    },
+    "all_lower_before_and_after": true,
+    "regmap_conflicts_before": 313,
+    "regmap_conflicts_after": 0,
+    "affected_stages_with_conflicts": 43,
+    "output_changed_stages": 50,
+    "changed_vertex": 31,
+    "changed_mesh": 19,
+    "rejected_before": 0,
+    "rejected_after": 0
+  },
+  "synthetic_regmap": {
+    "cases": 89,
+    "before_failures": 11,
+    "after_failures": 0
+  },
+  "python_suite": {
+    "total": 186,
+    "passed": 177,
+    "skipped": 9,
+    "failed": 0,
+    "log": "verification/tests-test1.log"
+  },
+  "runner_checks_passed": 9,
+  "windows_renderer": {
+    "units": 182,
+    "compiled_from_source": 182,
+    "failures": 0,
+    "build_seconds": 97.84,
+    "dll_sha256": "13ca5f44aafdf8a0cebed48c7491fc86b3dd92bcaf86c84a6ac9f3fcffa3d37e",
+    "dll_bytes": 5746176,
+    "pe_machine": "0x8664",
+    "log": "verification/native-cas043.log",
+    "summary": "verification/native-cas043-summary.json",
+    "includes_point_sprite_backport": true,
+    "includes_cas_chain": true,
+    "includes_binding_and_barrier_work": true,
+    "binary_in_source_checkpoint": false
+  },
+  "windows_host_units_compiled": [
+    "nn_vi.c",
+    "nn_applet.c"
+  ],
+  "wpf_published": true,
+  "wpf_sha256": "9eb308771625ba239c407837a097ca9ab9cca6f713663e19fa733788ed9b8075",
+  "fsr": {
+    "version": "1",
+    "implementation": "official AMD EASU / separate RCAS",
+    "official_source_commit": "a21ffb8f6c13233ba336352bdff293894c706575",
+    "license": "MIT",
+    "header_sha256": {
+      "ffx_fsr1.h": "93c3922362ea7fc99cbcc698ca30c98de4f8c246d1fbb0b09e015ddef38ce3a5",
+      "LICENSE.txt": "db089274ce766da70f5b7d791029c3486f9f9e27c8c79c652689603d3192e802",
+      "ffx_a.h": "f60e2722fcd13989523b9164d776ab382b3692791767f3bf8bb19967f763f3fb"
+    },
+    "spirv_validation": "vulkan1.3 passed",
+    "actual_embedded_spirv_executed": true,
+    "test_device": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "cases": [
+      "48x32 to 113x71 edge pattern",
+      "640x360 to 3840x2160 constant colors"
+    ],
+    "production_present_path": {
+      "functions_extracted_from_production": true,
+      "groups_passed": 11,
+      "vulkan_validation_layer": "Khronos 1.3.275",
+      "synchronization_validation_enabled": true,
+      "validation_errors": 0,
+      "synchronization_hazards": 0,
+      "warnings": 0,
+      "direct_present_view_forwarding_fixed": true,
+      "independent_from_fg_initialization": true,
+      "zero_live_resources_after_cleanup": true,
+      "window_swapchain_executed": false,
+      "log": "verification/fsr-work043-final.log",
+      "barrier_deduplication_modes_validated": [
+        "enabled",
+        "disabled"
+      ],
+      "dedupe_off_log": "verification/fsr-work043-dedupe-off.log",
+      "command_buffer_reuse_and_cross_thread_work_validated": true
+    }
+  },
+  "verified_synthetic_output_pool_sites": 8,
+  "host_revision": "directory304-early-texels-regmap759-output849-v2",
+  "source_sha256": {
+    "akynoleyend/access.py": "0e04961a650ed7d74b1b90c2aba641f1cbf61f0436b93c37c44ba743d19129a9",
+    "akynoleyend/coherence.py": "d2b48470661758174752c7effbb10358e62a7146277f11e37ffb2cc1ff4259ee",
+    "akynoleyend/launch.py": "0a478c3c30822784c91d475bece821a71137d57ee8a67c4333f97581fd512c93",
+    "gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv_atomic.cpp": "48e5b5e634996afee02dbd6d7cacba7583e51e2e7b660caebad1c78036364655",
+    "gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp": "4be46cff009b0c071a9d94c3d6ef4f2ad1e192cce4c159042cc697071dd35ba3",
+    "gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv_instructions.h": "1ab4a86505e29f244e3e3ffd44e1bca525c9d4aa4f5cc0eacf438d4af0015b6b",
+    "gpu/vk/eden/shader_recompiler/backend/spirv/spirv_emit_context.cpp": "a1c89649e4635b7023986fc40d5aab713821555394703914ea05ce0151df8c6e",
+    "gpu/vk/eden/shader_recompiler/backend/spirv/spirv_emit_context.h": "523d643f863cd93ca1d03b5848f463448d646e0c5c7c70041cd001ba7a2489de",
+    "gpu/vk/eden/shader_recompiler/frontend/ampere/lower_to_maxwell.h": "cb93af2ba5a4f5a7e38c78251b463b1f84092170a8e6010a263f301cae252f60",
+    "gpu/vk/eden/shader_recompiler/frontend/ir/ir_emitter.cpp": "8b700bf480725d5289bacad861cf7c1407096945f928fb0d561f916e83e23a4b",
+    "gpu/vk/eden/shader_recompiler/frontend/ir/ir_emitter.h": "174bd500c708225b7c612e5a2e38dc5505898e05b2fdb0f97dba906b30394c4b",
+    "gpu/vk/eden/shader_recompiler/frontend/ir/microinstruction.cpp": "0bfe2429556d06ba8179307a9710553fb3d9024f68be53f96a0dbc4e147f0afa",
+    "gpu/vk/eden/shader_recompiler/frontend/ir/opcodes.cpp": "40629798aacf399ae4cafa7a7643b8e8a3474b9ab32f33098b0287d10eaf5320",
+    "gpu/vk/eden/shader_recompiler/frontend/ir/opcodes.h": "af182c0c34c97241f29416bf2e0e25081e44c6a3869cd3ca1eb45ac5176b7097",
+    "gpu/vk/eden/shader_recompiler/frontend/ir/opcodes.inc": "2f856e73b7fbff2d2f8498b82bd226e44bb9677e177aa5320c498a61131db066",
+    "gpu/vk/eden/shader_recompiler/frontend/maxwell/translate/impl/atomic_operations_global_memory.cpp": "8d0afc1db998ae19484218ea97cab1325babadde9d310cf813991ca49eb8c2ef",
+    "gpu/vk/eden/shader_recompiler/frontend/maxwell/translate/impl/not_implemented.cpp": "a511784ef226ab09c468712727b1f6608255b89086b5d7a049ab584de045946d",
+    "gpu/vk/eden/shader_recompiler/ir_opt/collect_shader_info_pass.cpp": "a9d96ad18ec06925fda34acc59b333f528bc42d91b4a7e92a70d1f7399fc72ba",
+    "gpu/vk/eden/shader_recompiler/ir_opt/global_memory_to_storage_buffer_pass.cpp": "d0186b6b2b67ffab50850732fc4ee857c86ae1a5a6c04963b6b7eff09f8777af",
+    "gpu/vk/eden/shader_recompiler/runtime_info.h": "cda51601327ee7e56e5b62440de831cac3bed89394b065c6e26f9fce38254c4f",
+    "gpu/vk/present_crop.h": "007ba5d081ce00b32a5e610258977ae556e2d455c03eb38a647d11c912e67835",
+    "gpu/vk/vk_bank.cpp": "214e58b6327bf2c4eefe7d4b47cbb88ab2706fdac12abfb0a5b48ac1fc80ac52",
+    "gpu/vk/vk_coopmat.cpp": "9bc3d5474f865b5ca526da557ceca5531b6a6a2ef6e1d52836e5545973f7d688",
+    "gpu/vk/vk_draw.cpp": "d35549996d4607841e69722023de7302c44c48f95ba0d06716e3666a62729b1c",
+    "gpu/vk/vk_dump.cpp": "a9c7d9d5f2945e3b10b962b628a3eed513210b35e63a69c5c2537e4569f00869",
+    "gpu/vk/vk_framegen.cpp": "e170eb80bb8bf8a0ce773da6cdd99f33ea35d3b743eb9f188e1024edffcc4eea",
+    "gpu/vk/vk_framegen.h": "8eebcba9e5d2b9dc3e5c398071fff752ccfafa451368f506edb2d8b3d2f9664a",
+    "gpu/vk/vk_gprof.cpp": "3f1362a967844e094c3a55ff893f9543112e68c1cc42c6ea0d81aa61dcbfb458",
+    "gpu/vk/vk_memory.cpp": "da580fa3b54cdfceb58b59b51cbc30736f96115cf7d737250bf6826d9f3e0722",
+    "gpu/vk/vk_menu.cpp": "3ec8b236a5711ca768b244004141a3120424af1713e95d617e0386e053f8c9d0",
+    "gpu/vk/vk_menu.h": "80bd36540ec92105c6f65aa2b43271f917e8a720de8c13f1b2e451caf535fcf2",
+    "gpu/vk/vk_replay.cpp": "6ef8730536a4a685f7e65cfc85db06e9e38b935fa50a1372e46aa9222b8d010d",
+    "gpu/vk/vk_shader.cpp": "0b6a39b2f5c159dab10279aeeb225ed5f0344d63e10e6b795abf2f89614a8d01",
+    "gpu/vk/vk_state.h": "7dc01393e11d04919d9e5070f7b1f9b758b2435a89e9a9419cc879b2efb3dbc0",
+    "gpu/vk/vk_texture.cpp": "ca7e65e95c1ff08fe9c1732ccbc1372c0c6c6c770d7b5e0447d6f4406508b208",
+    "gpu/vk/vk_texture.h": "cfff9b9086ab63226ef02c4202748f714931cd99fbf85dd79c1d613581bf48a9",
+    "gpu/vk/vk_work.h": "20c4ea2c4278030f4eb10887f7515e7f5052ed90bf008b48aba421b118fef93f",
+    "gpu/vk/vk_xfer.cpp": "6d977bd7b44254c2c493cfb24f9769c02b83387103419f97fbe2a313233609d2",
+    "host/nn_applet.c": "fd050b1deda1c1c72b8f24ee0ef9850a518887cb9c56889846380ac2a033c83f",
+    "host/nn_vi.c": "3eddccb37677d9410dd93756e29f18013d509957975b8f6e47ad3928248f855c",
+    "nx2/oot_output_size.py": "112539645134fc23001964d222c9518a421c7e9a41c3866b9a3fc22db37503df",
+    "nx2/oot_patches.py": "b0ab7414afe146c9ed17ee2e107df47b62c2a58d3ed551ab3d6dc8e4fdd8bf11",
+    "nx2/shader_census.py": "e34860c10dd03462213ca3a4589e799ae00c11493e58158a129c8cfb8d3b9a88",
+    "nx2/shader_containers.py": "358c17ebadcace364b2cf130aabd1df40c9860e8828ef8a8ee3c65093be716f8",
+    "tests/native/lower_cas_test.cpp": "467e745cb99a77d069a8b399d062e492785107c84cf55be4d799112af558345b",
+    "tests/native/test_cas_spirv.cpp": "c1c5fa7a7ed016f9e4810af8c4dd3da4fe47258a6e6a9e50bef115ab29c46ab4",
+    "tests/native/test_fsr_present.cpp": "7d5d1014327a46bf29de6874a115e2bb6bdde6743c87d2047b7ec3204c7f03cf",
+    "tests/test_cas_043.py": "e566eaec29f57386e0feae3eacd6f5a0ffe1ff69a59b1f393554843ca6100ef0",
+    "tests/test_distribution_layout_043.py": "2466a85d847a1cb21dc3fc47f279c192c01c27edc05041aa9880d0799448d17c",
+    "tests/test_mesh_points_043.py": "c7cca0d2280f2aa1ade6d17561199de8b5b91ec4ad0fcc8c5336c40fa1aed39c",
+    "tests/test_present_crop_043.py": "918ca751332a20fef4b6d25418f459be68dc0533e2e5603750a57c3937ad2d57",
+    "tests/test_replay_performance_043.py": "5e2793a52d200abf6152ebc62e55ccea6402ee206757818ddfacfcf99ec7a8fc",
+    "tools/make_distribution.py": "7995f51e694fd06168fb855a205608cdb3be8613e87f9e3eaef894e7a039efc3",
+    "tools/test_cas_spirv.py": "c1e3e88aec306129ea22be67ee4dfbc4779d8029f35f45d67e96d898583898ec",
+    "tools/test_fsr_present.py": "755db2dc81396921aa7d0531b294200499a4f50f67295c8ee49c3cfbcbf7aee8",
+    "VERSION": "284d0f3b14dad3a0297de8da144876dbee713888a8c12b67205ff8adf96fb3bf",
+    "akynoleyend/__init__.py": "08668f2671e539c5f2c25404aef30110f23285a8963f75b1293d78ad8367cc66",
+    "builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj": "f12bfe1c62b41ce76a0862eb6388c5a2f3e96b001503cc776b48b424bc16bf5d",
+    "builder/AkynoLeyendBuilder/MainWindow.xaml": "4a81a00d2c6afb44fc7761d042e30a8bd2a4a3fa08ea67546cc5375402573809",
+    "tests/test_lift_repair.py": "96f44e376a27dd63eda1aa51714be783d841e0185d5a53c5d4a7b0d7d8e67a19"
+  },
+  "whole_game_built": false,
+  "game_executed": false,
+  "physical_gpu_tested": false,
+  "complete_vegetation_confirmed": false,
+  "in_game_fsr_confirmed": false,
+  "in_game_native_4k_confirmed": false,
+  "fps_gain_measured": false,
+  "report": "docs/ESTUDO-GRAFICO-20261109.md",
+  "point_mesh_shadow": {
+    "reference_issue": "https://github.com/NotRexed/Hookshot/issues/302",
+    "mapping": {
+      "NVN2_1": "SPIRV_points_0",
+      "NVN2_3": "SPIRV_triangles_4"
+    },
+    "point_coord_generics": true,
+    "private_bank_point_stages": 4,
+    "private_bank_point_program_groups": 4,
+    "synthetic_setup_and_attribute_emission_tests": 2,
+    "audit": "verification/mesh-points-bank043.json",
+    "real_affected_programs_spirv_validated": false,
+    "game_rendered": false
+  },
+  "previous_step_checks": {
+    "runner_checks_passed": 9,
+    "windows_host_units_compiled": [
+      "nn_vi.c",
+      "nn_applet.c"
+    ],
+    "wpf_published": true,
+    "new_windows_interaction_tested": false
+  },
+  "new_private_seed": {
+    "sha256": "413cc8fb8b438419bfc3aac98bdac7fe351af2243926c5805d69e46f58b864a3",
+    "bytes": 539080716,
+    "programs": 38809,
+    "stages": 42856,
+    "stages_by_type": {
+      "vertex": 15852,
+      "fragment": 22356,
+      "compute": 4128,
+      "task": 20,
+      "mesh": 500
+    },
+    "reference_preparation": {
+      "programs": 38809,
+      "new_variants": 46570,
+      "failed": 97,
+      "stage_libraries": 10316,
+      "compute_variants": 10316,
+      "seconds": 252.4,
+      "attribute_attempt_total": 116427
+    },
+    "lowering_comparison": {
+      "stages": 42856,
+      "accepted_current": 42771,
+      "accepted_reference": 42771,
+      "status_mismatches": 0,
+      "lowered_output_mismatches": 0,
+      "regmap_conflicts": 0,
+      "rejection_reasons": {
+        "native stage buffer access mode": 1,
+        "native program uses lowering scratch registers": 3,
+        "native program has no unconditional EXIT": 2,
+        "native integer min/max mode": 3,
+        "unsupported native opcode": 14,
+        "native formatted surface load mode": 17,
+        "native texel fetch mode or descriptor binding": 3,
+        "native constant LEA carry mode": 40,
+        "native global load uniform addressing mode": 2
+      },
+      "tensor_emulation_enabled": true,
+      "native_matrix_enabled": false,
+      "spirv_emitted_for_real_bank": false,
+      "game_rendered": false
+    },
+    "real_stages_emitted_to_spirv": false,
+    "bank_in_source_checkpoint": false
+  },
+  "census_subset": {
+    "input": "six Shader files plus Pack dictionary",
+    "programs_current": 15504,
+    "programs_reference": 15504,
+    "unique_stages_current": 14726,
+    "unique_stages_reference": 14726,
+    "compute_programs_current": 251,
+    "compute_programs_reference": 251,
+    "counts_match": true,
+    "full_romfs_received": false,
+    "full_seed_regenerated": false,
+    "private_data_in_source_checkpoint": false
+  },
+  "cas_chain": {
+    "files": 15,
+    "opcodes_before": 539,
+    "opcodes_after": 541,
+    "native_opcode": "0x3a9",
+    "word_bits": 32,
+    "newly_accepted_real_compute_stages": 6,
+    "complete_ir_backend_chain": true,
+    "production_units_linked_in_fixture": 70,
+    "synthetic_spirv_modules_validated": 4,
+    "page_table_store_modes": [
+      "off",
+      "on"
+    ],
+    "side_effect_preserved": true,
+    "comparator_and_value_order_checked": true,
+    "old_word_returned_each_branch": true,
+    "atomic_once_per_execution_branch": true,
+    "spirv_target": "vulkan1.3",
+    "gpu_executed": false,
+    "log": "verification/cas-spirv043.log"
+  },
+  "performance_changes": {
+    "identical_bindings_preserve_generation": true,
+    "graphics_driver_banks_use_stage_generation": true,
+    "compute_task_mesh_use_global_generation": true,
+    "empty_barrier_reuse_with_atomic_work_epoch": true,
+    "parallel_replay_keeps_barriers": true,
+    "compute_seed_control_tls": true,
+    "binding_native_tests": 3,
+    "reference_log_only": {
+      "file": "hookshot_log.txt",
+      "reference": "v2.0.7 source 9b541c9c",
+      "device": "RTX 5070 Ti Laptop",
+      "sample_filter": "reported average draws >= 1000",
+      "samples": 132,
+      "fps_median": 40.7,
+      "gpu_ms_median": 14.3,
+      "draws_median": 2147.0,
+      "gpu_wait_ms_median": 0.1,
+      "replay_ms_medians": {
+        "submit": 12.67,
+        "draw": 7.525,
+        "descriptors": 2.665,
+        "programs": 1.5
+      },
+      "cpu_timers_overlap": true,
+      "paired_akynoleyend_benchmark": false
+    },
+    "fps_gain_measured": false
+  },
+  "real_exefs_selected_function_guards": {
+    "input_files": {
+      "subsdk0": "0d32c4bdbcfcfa1c4110c37eff18eaf70061a55090b7fedc741a2e37224065ba",
+      "sdk": "3ae3cd4cf340d72bdaba9e6f66016a74c1eae13737a5f7299375ed6654b9b1c5",
+      "rtld": "219f25ef4a64a704e86dacfeb25d9e8977045f2145e629268b94baf34d5e0bbe",
+      "main.npdm": "94c154d83cbaca00d092958cc2b3a0494d7308fe49de8cb33ece7e9e67303ea7",
+      "main": "2591fb99008d0814f8056c3f36b36790048ed857ff0ae2bb3a4c1e37b960a4de"
+    },
+    "functions_checked": [
+      "0x80825bd0",
+      "0x80b72340",
+      "0x80ea2f30",
+      "0x810a7b70",
+      "0x81202b30",
+      "0x81222ce0",
+      "0x831f3200",
+      "0x836ce9d0",
+      "0x83b7b340"
+    ],
+    "output_pool_guards": 8,
+    "dynamic_guard": true,
+    "cached_scale_guard": true,
+    "generated_code_in_source_checkpoint": false,
+    "game_built": false,
+    "game_executed": false
+  },
+  "culling_inputs": {
+    "box_records": 35313,
+    "unique_box_ids": 35313,
+    "runtime_files": 35313,
+    "identical_duplicates": 2,
+    "missing_runtime_ids": [],
+    "extra_runtime_ids": [],
+    "non_data_entries": [],
+    "parts": [
+      {
+        "name": "parte 1.zip",
+        "runtime_files": 6978
+      },
+      {
+        "name": "parte 2.zip",
+        "runtime_files": 9494
+      },
+      {
+        "name": "parte3.zip",
+        "runtime_files": 8163
+      },
+      {
+        "name": "parte4.zip",
+        "runtime_files": 6959
+      },
+      {
+        "name": "ultimaparte.zip",
+        "runtime_files": 3721
+      }
+    ],
+    "assets_modified": false,
+    "all_box_ids_have_runtime": true,
+    "all_runtime_ids_have_box": true,
+    "game_rendered": false
+  },
+  "cleanup": {
+    "deleted_files": 250,
+    "removed_bytes": 2824542,
+    "root_commands": [
+      "Compilar.cmd",
+      "Jogar.cmd",
+      "Preparar-Shaders.cmd",
+      "Verificar.cmd"
+    ],
+    "moved_commands": 22,
+    "checked_cmd_paths": 46,
+    "invalid_cmd_paths": 0,
+    "manifest": "docs/limpeza-043.json"
+  },
+  "test_version": "0.4.3-test.1",
+  "user_test_package_authorized": true,
+  "wpf_product_version": "0.4.3-test.1",
+  "wpf_window_executed": false,
+  "test_guide": "docs/TESTE-0.4.3.md",
+  "runner_log": "verification/runner-test1.log",
+  "test_package_coherence": {
+    "launcher_source_and_binary_match": true,
+    "launcher_native_pe_product_version": "0.4.3-test.1",
+    "renderer_source_and_binary_match": true,
+    "renderer_init_export_checked": true,
+    "required_dependencies_present": true,
+    "game_execution_pending": true
+  }
+}

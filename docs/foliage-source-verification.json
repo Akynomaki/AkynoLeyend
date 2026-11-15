@@ -1,0 +1,10 @@
+{
+  "commit": "170ce53ca3d69309b3f5151a334136be8b4c38d6",
+  "tree_sha": "170ce53ca3d69309b3f5151a334136be8b4c38d6",
+  "checked_blobs": 951,
+  "mismatches": [],
+  "zip_sha256": "b8ac23a1afaacf5b9d7aaeafc03a0d31cc887f509beeba9769af8d03b7460362",
+  "normalized_line_ending_matches": [
+    "gpu/build-shadertool.bat"
+  ]
+}

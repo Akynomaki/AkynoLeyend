@@ -1,0 +1,2351 @@
+--- a/.gitignore
++++ b/.gitignore
+@@ -30,3 +30,7 @@
+ *.ilk
+ *.sha1
+ *.log
++
++# Frontend intermediates
++builder/**/bin/
++builder/**/obj/
+--- a/gpu/compat/fmt/format.h
++++ b/gpu/compat/fmt/format.h
+@@ -23,21 +23,26 @@
+ };
+ inline runtime_format_string runtime(std::string_view s) { return {s}; }
+ 
++// (hookshot) Formats read as they run, not checked at compile time: std::format_string is missing from Visual Studio's
++// C++ library before 17.5, and a player's build stopped on it with 303 files failed (Hookshot issue 39)
+ template <typename... Args>
+-std::string format(std::format_string<Args...> f, Args&&... args) {
+-    return std::format(f, std::forward<Args>(args)...);
++std::string format(std::string_view f, Args&&... args) {
++    return std::vformat(f, std::make_format_args(args...));
+ }
+ template <typename... Args>
+ std::string format(runtime_format_string f, Args&&... args) {
+     return std::vformat(f.str, std::make_format_args(args...));
+ }
+ template <typename Out, typename... Args>
+-Out format_to(Out out, std::format_string<Args...> f, Args&&... args) {
+-    return std::format_to(std::move(out), f, std::forward<Args>(args)...);
++Out format_to(Out out, std::string_view f, Args&&... args) {
++    return std::vformat_to(std::move(out), f, std::make_format_args(args...));
+ }
+ template <typename Out, typename... Args>
+-auto format_to_n(Out out, std::iter_difference_t<Out> n, std::format_string<Args...> f, Args&&... args) {   // (mkw-recomp: Eden's SPIR-V backend)
+-    return std::format_to_n(std::move(out), n, f, std::forward<Args>(args)...);
++auto format_to_n(Out out, std::iter_difference_t<Out> n, std::string_view f, Args&&... args) {   // (mkw-recomp: Eden's
++    const std::string text = std::vformat(f, std::make_format_args(args...));
++    const auto size = (std::iter_difference_t<Out>)text.size();
++    for (std::iter_difference_t<Out> i = 0; i < size && i < n; i++) *out++ = text[(size_t)i];
++    return std::format_to_n_result<Out>{std::move(out), size};
+ }
+ template <typename Out, typename... Args>
+ Out format_to(Out out, runtime_format_string f, Args&&... args) {
+--- a/gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv.cpp
++++ b/gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv.cpp
+@@ -270,7 +270,8 @@
+         ctx.AddExecutionMode(main, spv::ExecutionMode::OutputVertices, program.mesh.max_vertices);
+         ctx.AddExecutionMode(main, spv::ExecutionMode::OutputPrimitivesEXT,
+                              program.mesh.max_primitives);
+-        ctx.AddExecutionMode(main, spv::ExecutionMode::OutputTrianglesEXT);
++        ctx.AddExecutionMode(main, program.mesh.topology == 1 ? spv::ExecutionMode::OutputLinesEXT
++                                                              : spv::ExecutionMode::OutputTrianglesEXT);
+         break;
+     case Stage::TessellationControl:
+         execution_model = spv::ExecutionModel::TessellationControl;
+--- a/gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv_mesh.cpp
++++ b/gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv_mesh.cpp
+@@ -10,6 +10,7 @@
+ // epilogue (reached by every invocation, see structured_control_flow.cpp) hands them to Vulkan.
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <span>
+ 
+ #include "shader_recompiler/backend/spirv/emit_spirv.h"
+@@ -107,12 +108,19 @@
+     ctx.OpStore(ctx.OpAccessChain(ctx.output_f32, ctx.output_position, vertex, ctx.Const(2U)), z);
+ }
+ 
++u32 task_cap(u32 threads) {   // (RX_VK_TASK_CAP=<n>: mesh workgroups a task may start; 0: one a thread)
++    static const char* e = getenv("RX_VK_TASK_CAP");
++    const u32 n = e ? static_cast<u32>(atoi(e)) : 0U;
++    return n ? n : threads;
++}
++
+ void TaskEpilogue(EmitContext& ctx) {
+     Barrier(ctx);
+-    // (hookshot) at most 65535 mesh workgroups: a count past the device's limits is undefined, and an unwritten
+-    // payload word is anything (the Vulkan device was lost after new task and mesh programs were first drawn)
++    // (hookshot) at most one mesh workgroup a task thread: each thread keeps or culls one meshlet (the programs compact them by subgroup
++    // ballot). It was 65535, and a payload word a task left unwritten is anything: when the task culled everything, tens of thousands of
++    // mesh workgroups for a draw held the GPU past Windows' two seconds, and the device was lost, on about half the first starts
+     const Id count{ctx.OpUMin(ctx.U32[1], ctx.OpLoad(ctx.U32[1], PayloadWord(ctx, ctx.Const(1U))),
+-                              ctx.Const(65535U))};
++                              ctx.Const(task_cap(ctx.mesh_threads)))};
+     const Id one{ctx.Const(1U)};
+     // Marker for OpEmitMeshTasksEXT count, 1, 1, payload (PatchMeshInstructions).
+     ctx.OpStore(count, one);
+@@ -153,20 +161,21 @@
+     for (u32 first = 0; first < mesh.max_primitives; first += threads) {
+         const Id primitive{ctx.OpIAdd(ctx.U32[1], invocation, ctx.Const(first))};
+         If(ctx, ctx.OpULessThan(ctx.U1, primitive, count), [&] {
+-            // Vertex indices: map bytes 4 + 3 * primitive.
+-            const Id byte{ctx.OpIAdd(ctx.U32[1], ctx.OpIMul(ctx.U32[1], primitive, ctx.Const(3U)),
++            // Vertex indices: map bytes 4 + 3 * primitive (lines: 4 + 2 * primitive).
++            const u32 corners{mesh.topology == 1 ? 2U : 3U};
++            const Id byte{ctx.OpIAdd(ctx.U32[1], ctx.OpIMul(ctx.U32[1], primitive, ctx.Const(corners)),
+                                      ctx.Const(4U))};
+             std::array<Id, 3> indices;
+-            for (u32 element = 0; element < 3; ++element) {
++            for (u32 element = 0; element < corners; ++element) {
+                 const Id address{ctx.OpIAdd(ctx.U32[1], byte, ctx.Const(element))};
+                 // (hookshot) within the vertices: an index byte the program left unwritten is anything, and an index
+                 // past the vertex count is undefined (a device fault on NVIDIA)
+                 indices[element] = Clamped(ctx, ctx.OpLoad(ctx.U32[1], SharedWord(ctx, ctx.mesh_map, address)),
+                                            mesh.max_vertices);
+             }
+-            const Id output_indices{ctx.TypePointer(spv::StorageClass::Output, ctx.U32[3])};
++            const Id output_indices{ctx.TypePointer(spv::StorageClass::Output, ctx.U32[corners])};
+             ctx.OpStore(ctx.OpAccessChain(output_indices, ctx.mesh_primitive_indices, primitive),
+-                        ctx.OpCompositeConstruct(ctx.U32[3], std::span<const Id>(indices)));
++                        ctx.OpCompositeConstruct(ctx.U32[corners], std::span<const Id>(indices.data(), corners)));
+             CopyLines(ctx, primitive, ctx.mesh_primitive_base, primitive_lines,
+                       ctx.mesh_primitive_targets);
+         });
+@@ -213,6 +222,12 @@
+ }
+ 
+ void EmitMeshPrologue(EmitContext& ctx) {
++    if (ctx.stage == Stage::Task) {
++        // (hookshot) the count starts at nothing: task payload memory holds whatever the last task left, and a task that keeps no meshlet
++        // never writes it. The barrier: every thread has done this before any of them goes on to write the real count
++        ctx.OpStore(PayloadWord(ctx, ctx.Const(1U)), ctx.u32_zero_value);
++        Barrier(ctx);
++    }
+     if (ctx.stage != Stage::Mesh) {
+         return;
+     }
+--- a/gpu/vk/eden/shader_recompiler/backend/spirv/spirv_emit_context.cpp
++++ b/gpu/vk/eden/shader_recompiler/backend/spirv/spirv_emit_context.cpp
+@@ -1722,7 +1722,7 @@
+     mesh_attribute_words = (std::max)(
+         mesh_primitive_base + Common::DivCeil(mesh_info.max_primitives, 32U) * primitive_lines * 32,
+         1U);
+-    mesh_map_bytes = 4 + 3 * mesh_info.max_primitives;
++    mesh_map_bytes = 4 + (mesh_info.topology == 1 ? 2 : 3) * mesh_info.max_primitives;
+     mesh_shared_u32 = TypePointer(spv::StorageClass::Workgroup, U32[1]);
+     mesh_attributes = DefineVariable(*this, TypeArray(U32[1], Const(mesh_attribute_words)),
+                                      std::nullopt, spv::StorageClass::Workgroup);
+@@ -1736,9 +1736,11 @@
+ 
+     const Id vertex_count{Const(mesh_info.max_vertices)};
+     const Id primitive_count{Const(mesh_info.max_primitives)};
++    const bool mesh_lines{mesh_info.topology == 1};
+     mesh_primitive_indices =
+-        DefineVariable(*this, TypeArray(U32[3], primitive_count),
+-                       spv::BuiltIn::PrimitiveTriangleIndicesEXT, spv::StorageClass::Output);
++        DefineVariable(*this, TypeArray(U32[mesh_lines ? 2 : 3], primitive_count),
++                       mesh_lines ? spv::BuiltIn::PrimitiveLineIndicesEXT : spv::BuiltIn::PrimitiveTriangleIndicesEXT,
++                       spv::StorageClass::Output);
+     std::array<Id, IR::NUM_GENERICS> generics[2]{};
+     Id point_size{}, primitive_layer{}, primitive_viewport{}, primitive_id_output{};
+     const auto per_primitive_builtin = [&](Id& variable, spv::BuiltIn builtin) {
+--- a/gpu/vk/eden/shader_recompiler/frontend/maxwell/translate_program.cpp
++++ b/gpu/vk/eden/shader_recompiler/frontend/maxwell/translate_program.cpp
+@@ -434,7 +434,7 @@
+         const u32 threads{program.stage == Stage::Task ? init & 0x3f : (shader_b >> 20) & 0x3f};
+         program.workgroup_size = {(std::max)(threads, 1U), 1, 1};
+         if (program.stage == Stage::Mesh) {
+-            if (program.mesh.topology != 4) {
++            if (program.mesh.topology != 4 && program.mesh.topology != 1) {   // (GL's numbers: 1 lines, 4 triangles)
+                 throw NotImplementedException("Mesh output topology {} (SET_MESH_SHADER_A {:#010x})",
+                                               program.mesh.topology, shader_a);
+             }
+--- a/gpu/vk/eden/shader_recompiler/ir_opt/oot_visual_workaround.h
++++ b/gpu/vk/eden/shader_recompiler/ir_opt/oot_visual_workaround.h
+@@ -3,7 +3,7 @@
+ // the IR's shape here instead of Orchid's shader hashes: a visual workaround for Ocarina of Time, not a fix. The root
+ // cause of the washed-out outdoors is open there and here.
+ //  - fog: the one compute shader with an add of 2^x and -2^y, the fog integration: its slice distance scaled before
+-//    the extinction and scattering accumulation (Orchid: 0.25; it thins interiors' fog too);
++//    the extinction and scattering accumulation (Orchid: 0.25; 0.08 here; it thins interiors' fog too);
+ //  - exposure: a fragment shader with three loads of c3+0x38, the final pass's exposure before its filmic curve (0.65).
+ // RX_VK_OOT_VISUAL=0: off. RX_VK_OOT_FOG, RX_VK_OOT_EXPOSURE: the factors.
+ #pragma once
+--- a/gpu/vk/sirit/src/stream.h
++++ b/gpu/vk/sirit/src/stream.h
+@@ -1,3 +1,4 @@
++#include <cstdlib>
+ /* This file is part of the sirit project.
+  * Copyright (c) 2019 sirit
+  * This software may be used and distributed according to the terms of the
+--- a/gpu/vk/vk_bank.cpp
++++ b/gpu/vk/vk_bank.cpp
+@@ -1,3 +1,4 @@
++#include <cstdio>
+ // Texture / sampler registrations and the driver's constant banks (from the WebGPU renderer's gpu/render/rx_nvn.cpp,
+ // whose comments explain the layouts: measured on TOTK by the MIT-licensed reference layer, NVN2 compute's packed c0
+ // found from MKW's programs).
+--- a/gpu/vk/vk_coopmat.cpp
++++ b/gpu/vk/vk_coopmat.cpp
+@@ -148,6 +148,9 @@
+     vkCreateShaderModule(dev.device, &smi, nullptr, &module);
+     VkComputePipelineCreateInfo cpi{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+     cpi.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_COMPUTE_BIT, module, "main", nullptr};
++    VkPipelineShaderStageRequiredSubgroupSizeCreateInfo lanes{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO};
++    lanes.requiredSubgroupSize = 32;   // (as the programs it stands for will run: vk_main.cpp)
++    if (dev.sg32_stages & VK_SHADER_STAGE_COMPUTE_BIT) cpi.stage.pNext = &lanes;
+     cpi.layout = layout;
+     VkPipeline pipeline{};
+     const VkResult pr = module ? vkCreateComputePipelines(dev.device, VK_NULL_HANDLE, 1, &cpi, nullptr, &pipeline)
+@@ -326,6 +329,17 @@
+ } // namespace
+ 
+ // (vk_main.cpp, once the device is made: dev.coop_matrix says the extension and its feature are on)
++namespace {
++/// Without cooperative matrices (a GTX 1650, an RTX 2060 on some drivers, AMD and Intel cards): the same multiplies in a shader function on
++/// subgroup shuffles. The lowering refuses a matrix multiply it has no way to run, and the game's upscaling networks were then left out:
++/// the 3D scene came out black or as coloured noise, with the HUD over it (Hookshot issues 10 and 14)
++void software_multiplies(const char* why) {
++    Shader::Backend::SPIRV::mma_software = true;
++    dev.native_mma = true;
++    logf("vk: matrix multiplies in software (%s)", why);
++}
++} // namespace
++
+ void coopmat_init() {
+     // (hookshot) RX_VK_MMA_SOFTWARE=1: HMMA_nx2 in a shader function on subgroup shuffles, no cooperative matrices
+     // (emit_spirv_warp.cpp, from Lichii): the lowering still gives HMMA_nx2 (dev.native_mma)
+@@ -340,8 +354,8 @@
+         logf("vk: native matrix multiplies off (RX_VK_NATIVE_MMA=0)");
+         return;
+     }
+-    if (!dev.coop_matrix || !vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR) {
+-        logf("vk: no cooperative matrices: matrix multiplies are expanded (EDEN_NX2_TENSOR)");
++    if (!dev.coop_matrix || !vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR || std::getenv("RX_VK_MMA_NO_COOP")) {
++        software_multiplies("no cooperative matrices");
+         return;
+     }
+     uint32_t n = 0;
+@@ -354,11 +368,11 @@
+                  p.BType == VK_COMPONENT_TYPE_FLOAT16_KHR && p.CType == VK_COMPONENT_TYPE_FLOAT16_KHR &&
+                  p.ResultType == VK_COMPONENT_TYPE_FLOAT16_KHR && p.scope == VK_SCOPE_SUBGROUP_KHR;
+     if (!shape) {
+-        logf("vk: cooperative matrices lack 16x8x16 f16 (%u shapes): matrix multiplies are expanded", n);
++        software_multiplies("the cooperative matrices lack 16x8x16 f16");
+         return;
+     }
+     if (!dev.vk12.shaderFloat16) {
+-        logf("vk: no f16 shaders: matrix multiplies are expanded");
++        software_multiplies("no f16 shaders");
+         return;
+     }
+     bool ok = measure_order() && test_multiply();
+@@ -378,9 +392,12 @@
+     override_order("RX_VK_MMA_A_ORDER", Shader::Backend::SPIRV::mma_order_a);
+     override_order("RX_VK_MMA_B_ORDER", Shader::Backend::SPIRV::mma_order_b);
+     override_order("RX_VK_MMA_C_ORDER", Shader::Backend::SPIRV::mma_order_c);
+-    dev.native_mma = ok;
+-    logf("vk: native matrix multiplies %s", ok ? "on (cooperative matrices, the console's fragment layout checked)"
+-                                              : "off (the cooperative matrix layout is not the console's)");
++    if (!ok) {
++        software_multiplies("the cooperative matrix layout is not the console's");
++        return;
++    }
++    dev.native_mma = true;
++    logf("vk: native matrix multiplies on (cooperative matrices, the console's fragment layout checked)");
+ }
+ 
+ } // namespace mkwvk
+--- a/gpu/vk/vk_draw.cpp
++++ b/gpu/vk/vk_draw.cpp
+@@ -36,9 +36,24 @@
+ #include "shaders/clear_u_frag_spv.h"
+ #include "shaders/clear_vert_spv.h"
+ #include "shaders/taau_upscale_comp_spv.h"
++#include "shaders/movie_upscale_comp_spv.h"
++#include "shader_recompiler/backend/spirv/mma_layout.h"
+ 
+ namespace mkwvk {
+ namespace {
++
++/// 32 lanes, where the stage can be held to it (workgroup_x: a compute stage's width, which full subgroups must divide)
++void pin_subgroup(VkPipelineShaderStageCreateInfo& st, uint32_t workgroup_x = 0) {
++    static const VkPipelineShaderStageRequiredSubgroupSizeCreateInfo size = [] {
++        VkPipelineShaderStageRequiredSubgroupSizeCreateInfo r{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO};
++        r.requiredSubgroupSize = 32;
++        return r;
++    }();
++    if (!(dev.sg32_stages & st.stage)) return;
++    st.pNext = &size;
++    if (workgroup_x && !(workgroup_x % 32) && dev.vk13.computeFullSubgroups)
++        st.flags |= VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT;
++}
+ 
+ inline uint64_t mix(uint64_t h, uint64_t v) {
+     h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+@@ -398,6 +413,21 @@
+     return is_depth_format(f) && f != VK_FORMAT_S8_UINT;
+ }
+ 
++// (hookshot) A driver's compiler that faults on a shader (amdvlk64.dll on a mesh program, Hookshot issue 26) costs that one draw, not the game
++__declspec(noinline) VkResult guarded_graphics(VkPipelineCache cache, const VkGraphicsPipelineCreateInfo* ci, VkPipeline* pl) {
++    __try {
++        return vkCreateGraphicsPipelines(dev.device, cache, 1, ci, nullptr, pl);
++    } __except (1) {
++        return VK_ERROR_UNKNOWN;
++    }
++}
++__declspec(noinline) VkResult guarded_compute(VkPipelineCache cache, const VkComputePipelineCreateInfo* ci, VkPipeline* pl) {
++    __try {
++        return vkCreateComputePipelines(dev.device, cache, 1, ci, nullptr, pl);
++    } __except (1) {
++        return VK_ERROR_UNKNOWN;
++    }
++}
+ VkPipeline build_graphics(const Program& p, const NvnState& s, const Targets& at, VkPrimitiveTopology topo, int part = -1);
+ 
+ /// A target's write mask: the state's channel mask, nothing for a target the fragment shader leaves unwritten
+@@ -607,6 +637,7 @@
+         si.stage = st.vk_stage;
+         si.module = st.module;
+         si.pName = "main";
++        pin_subgroup(si);
+         stages.push_back(si);
+     }
+     // vertex input: the attributes the vertex stage reads; those without a stream read zeros (binding 15)
+@@ -674,7 +705,7 @@
+     if (dev.provoking_vertex) rs.pNext = &pvs;
+     VkPipelineMultisampleStateCreateInfo ms{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+     ms.rasterizationSamples = at.samples;
+-    ms.alphaToCoverageEnable = s.ms.a2c && !dev.eds3_a2c;
++    ms.alphaToCoverageEnable = s.ms.a2c && !dev.eds3_a2c && !getenv("RX_VK_NO_A2C");
+     VkPipelineDepthStencilStateCreateInfo ds{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+     VkPipelineColorBlendAttachmentState cb[8]{};
+     for (int i = 0; i < at.n; i++) {
+@@ -763,7 +794,7 @@
+         }
+     }
+     VkPipeline pl = VK_NULL_HANDLE;
+-    const VkResult r = vkCreateGraphicsPipelines(dev.device, part >= 0 ? VK_NULL_HANDLE : pcache, 1, &ci, nullptr, &pl);
++    const VkResult r = guarded_graphics(part >= 0 ? VK_NULL_HANDLE : pcache, &ci, &pl);
+     if (part >= 0) {
+         if (r != VK_SUCCESS) {
+             static std::atomic<int> logged;
+@@ -1594,10 +1625,15 @@
+     vkCmdSetCheckpointNV(cmd, (void*)(uintptr_t)(i + 1));
+ }
+ 
++void draw_records_log(uint64_t lo, uint64_t hi);
+ void checkpoints_report() {
+     static bool done;
+     if (done) return;
+     done = true;
++    {   // (RX_VK_FLASH_RECORD=<program,...>: those programs' last draws, sizes and all)
++        const uint64_t f = texture_frame_no();
++        draw_records_log(f > 6 ? f - 6 : 0, f);
++    }
+     // (checkpoints first: on NVIDIA vkGetDeviceFaultInfoEXT has not come back after a fault, which lost the report)
+     logf("vk: device lost: reading %s", dev.checkpoints ? "the checkpoints" : "the fault info (RX_VK_CHECKPOINTS=1 for markers)");
+     struct FaultLast { ~FaultLast() { if (std::getenv("RX_VK_FAULT_INFO")) device_fault_report(); } } fault_last;
+@@ -1627,6 +1663,11 @@
+         for (uint32_t b = 1; b <= 6; b++) {
+             const Checkpoint& o = checkpoints[(i - b) & 0xFFFF];
+             logf("vk:     before: %s %016llx", kind(o.kind), (unsigned long long)o.prog);
++        }
++        // (and the ones after it: what the GPU never reached)
++        for (uint32_t b = 1; b <= 8; b++) {
++            const Checkpoint& o = checkpoints[(i + b) & 0xFFFF];
++            logf("vk:     after: marker %u %s %016llx, frame %llu", o.seq, kind(o.kind), (unsigned long long)o.prog, (unsigned long long)o.frame);
+         }
+     }
+ }
+@@ -1888,7 +1929,7 @@
+     d.poly = s.poly.mode == 0 ? VK_POLYGON_MODE_POINT : s.poly.mode == 1 ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
+     static const bool fp_lines = getenv("RX_VK_FOOTPRINT_LINES") != nullptr;   // (the footprints as wireframes)
+     if (fp && fp_lines) d.poly = VK_POLYGON_MODE_LINE;
+-    d.clamp = s.depth_clamp, d.a2c = s.ms.a2c != 0;
++    d.clamp = s.depth_clamp, d.a2c = s.ms.a2c != 0 && !getenv("RX_VK_NO_A2C");
+     d.n = dev.eds3_blend ? at.n : 0;
+     for (int i = 0; i < d.n; i++) {
+         const nvn_blend_st& b = s.blend[i];
+@@ -2518,7 +2559,7 @@
+ }
+ 
+ const std::vector<uint64_t>& record_progs();
+-void record_draw(const NvnState& s, const Program& p, const DrawArgs& d);
++void record_draw(const NvnState& s, const Program& p, const DrawArgs& d, const Targets& at);
+ void probe_draw(const NvnState& s, const Program& p, int pass_draws);
+ /// (RX_VK_DUMP_ARGS=<key>[,<key>...] (hex; 1: every draw): in a dump, each draw of those programs logged with its
+ /// arguments, its indirect arguments as guest memory holds them, its vertex buffers and the first words of the vertex
+@@ -2633,6 +2674,12 @@
+             const uint32_t w = stage_cbuf_word(s, st, 3, 0x38);
+             std::lock_guard lk(exposure_mu);
+             exposure_ring[exposure_at++ % 32] = {presents_now, w};
++            static const bool every = getenv("RX_VK_EXPOSURE_LOG") && atoi(getenv("RX_VK_EXPOSURE_LOG")) == 2;
++            if (every) {
++                float f;
++                std::memcpy(&f, &w, 4);
++                logf("vk: exposure %llu %g", (unsigned long long)presents_now, f);
++            }
+         }
+ }
+ void exposure_log_dump(const char* why) {
+@@ -2646,6 +2693,28 @@
+         n += snprintf(line + n, sizeof line - n, " %lld:%.3g", (long long)e.present, v);
+     }
+     logf("%s", line);
++}
++
++// (hookshot) NVN's indirect mesh draws hold (count, first) and Vulkan's (x, y, z): given as they were, every one drew y = first = 0 workgroups,
++// with no error. They are most of the game's vegetation: the forest's trees, ferns and grass (GPU culling writes their counts, so they can only
++// be moved on the GPU): each count is copied into this buffer of (count, 1, 1) just before its draw. The GPU runs the copies and draws in
++// order, so a slot used again is safe. A first other than 0 has no Vulkan counterpart.
++constexpr uint32_t kMeshArgs = 1u << 16;
++VkBuffer mesh_args_buffer = VK_NULL_HANDLE;
++VmaAllocation mesh_args_alloc = nullptr;
++uint32_t* mesh_args_words = nullptr;
++bool mesh_args_ready() {
++    static const bool ok = [] {
++        void* mapped = nullptr;
++        if (!create_buffer((uint64_t)kMeshArgs * 12, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true, mesh_args_buffer,
++                           mesh_args_alloc, &mapped) || !mapped)
++            return false;
++        uint32_t* w = (uint32_t*)mapped;
++        mesh_args_words = w;
++        for (uint32_t i = 0; i < kMeshArgs; i++) w[i * 3] = 0, w[i * 3 + 1] = 1, w[i * 3 + 2] = 1;
++        return true;
++    }();
++    return ok;
+ }
+ 
+ void draw(VkCommandBuffer cmd, NvnState& s, const DrawArgs& d) {
+@@ -2691,9 +2760,12 @@
+                               program_code_keys(s).c_str());
+         SKIP_HERE();
+     }
+-    {   // (hookshot, RX_VK_SKIP_PROG: draws too, their native code keys logged once. None by default: OoT's 53509044401d78d2,
+-        // a full-screen pass sampling a 64^3 volume, was left out while its draws lost the device; they no longer do)
+-        static const char* skip = getenv("RX_VK_SKIP_PROG") && strcmp(getenv("RX_VK_SKIP_PROG"), "-") ? getenv("RX_VK_SKIP_PROG") : nullptr;
++    {   // (hookshot, RX_VK_SKIP_PROG: draws too, their native code keys logged once; =-: none. By default OoT's 53509044401d78d2, 128
++        // draws of a full-screen pass over two 64^3 volumes, once, while the game loads: on about half the first starts the GPU stalled in
++        // them for Windows' two seconds and the device was lost, a black screen with the frame counter over it. Its shaders are straight-line
++        // sampling code and the cause is still open. It was taken off this list once after a few clean runs: it had not gone. 0 lost
++        // of 8 first starts without it, against 7 of 14 with it)
++        static const char* skip = !getenv("RX_VK_SKIP_PROG") ? "53509044401d78d2" : strcmp(getenv("RX_VK_SKIP_PROG"), "-") ? getenv("RX_VK_SKIP_PROG") : nullptr;
+         if (skip) {
+             char hex[24];
+             snprintf(hex, sizeof hex, "%016llx", (unsigned long long)cp->key);
+@@ -2746,7 +2818,7 @@
+     if (!pl) SKIP_HERE();
+     cur_program = &p;
+     if (!record_progs().empty() && std::find(record_progs().begin(), record_progs().end(), p.key) != record_progs().end())
+-        record_draw(s, p, d);
++        record_draw(s, p, d, at);
+     // (RX_VK_DUMP_EACH=<key>,...: in a dump, the pass ends after each draw of those programs, so every one of them is
+     // read back on its own)
+     struct EachGuard {
+@@ -2810,6 +2882,38 @@
+     static const bool barrier_every = getenv("RX_VK_BARRIER_EVERY_DRAW") != nullptr;   // (an experiment: a pass each)
+     if (barrier_every) end_pass(cmd);
+     const uint16_t writes = draw_hazards(cmd, p, s, at);
++    BufferRef mesh_args{};
++    uint32_t mesh_args_at = 0;
++    static const bool mesh_rewrite = getenv("RX_VK_MESH_ARGS") != nullptr;   // (off: the game's foliage culling writes zeros here, see below)
++    if (mesh_rewrite && d.mesh && d.indirect) {   // (out of the pass: a copy cannot be made in one)
++        const uint32_t n = (uint32_t)std::clamp(d.max, 1, (int)kMeshArgs), stride = d.stride ? (uint32_t)d.stride : 8u;
++        BufferRef src = gpu_buffer_bind(d.indirect, (uint64_t)n * stride, false);
++        if (!src) SKIP_HERE();
++        if (mesh_args_ready()) {
++            static const uint32_t word = getenv("RX_VK_MESH_COUNT_WORD") ? (uint32_t)atoi(getenv("RX_VK_MESH_COUNT_WORD")) : 0;
++            end_pass(cmd);
++            full_barrier(cmd);
++            static thread_local std::vector<VkBufferCopy> copies;
++            copies.clear();
++            static std::atomic<uint32_t> next{0};
++            mesh_args_at = next.fetch_add(n) % (kMeshArgs - n + 1);
++            static const bool show = getenv("RX_VK_LOG_MESH_INDIRECT") != nullptr;
++            if (show && mesh_args_at > 4096 && (mesh_args_at & 4095) < n) {   // (the counts the GPU copied, of the last 4096)
++                uint32_t nonzero = 0, most = 0;
++                uint64_t sum = 0;
++                for (uint32_t i = mesh_args_at - 4096; i < mesh_args_at; i++) {
++                    const uint32_t v = mesh_args_words[i * 3];
++                    nonzero += v != 0, most = std::max(most, v), sum += v;
++                }
++                logf("vk: mesh counts: %u of 4096 not zero, largest %u, sum %llu", nonzero, most, (unsigned long long)sum);
++            }
++            for (uint32_t i = 0; i < n; i++)
++                copies.push_back({src.offset + i * stride + word * 4, (VkDeviceSize)(mesh_args_at + i) * 12, 4});
++            vkCmdCopyBuffer(cmd, src.buffer, mesh_args_buffer, (uint32_t)copies.size(), copies.data());
++            full_barrier(cmd);
++            mesh_args = {mesh_args_buffer, (VkDeviceSize)mesh_args_at * 12, (VkDeviceSize)n * 12, 0};
++        }
++    }
+     begin_pass(cmd, at);
+     probe_draw(s, p, pass.draws);   // (hookshot: RX_VK_PROBE)
+     pass.prog = p.key;
+@@ -2888,15 +2992,46 @@
+         }
+     }
+     if (d.mesh) {
++        {   // (RX_VK_LOG_MESH_DRAWS=1: how large each is, the largest so far, 400 lines)
++            static const bool log_sizes = getenv("RX_VK_LOG_MESH_DRAWS") != nullptr;
++            if (log_sizes) {
++                static std::atomic<int> told{0};
++                static std::atomic<uint32_t> most{0};
++                uint32_t w[3] = {(uint32_t)d.groups[0], (uint32_t)d.groups[1], (uint32_t)d.groups[2]}, draws = (uint32_t)std::max(d.max, 1);
++                if (d.indirect) host->gpu_read(d.indirect, w, sizeof w);
++                if (d.count_addr) host->gpu_read(d.count_addr, &draws, 4);
++                const uint64_t size = (uint64_t)w[0] * w[1] * w[2] * draws;
++                uint32_t was = most.load();
++                if (size > was && told++ < 400) {
++                    most = (uint32_t)std::min<uint64_t>(size, 0xFFFFFFFFu);
++                    logf("vk: mesh draw prog %016llx frame %llu: groups %u %u %u, %u draws (max %d, stride %d), indirect %#llx count %#llx", (unsigned long long)p.key,
++                         (unsigned long long)texture_frame_no(), w[0], w[1], w[2], draws, d.max, d.stride, (unsigned long long)d.indirect, (unsigned long long)d.count_addr);
++                }
++            }
++        }
++        {   // (RX_VK_LOG_MESH_INDIRECT=1: what indirect mesh draws hold, 300 lines)
++            static const bool on = getenv("RX_VK_LOG_MESH_INDIRECT") != nullptr;
++            static std::atomic<int> told{0};
++            if (on && d.indirect && told < 300) {
++                uint32_t w[12]{}, cnt = 0;
++                host->gpu_read(d.indirect, w, sizeof w);
++                if (d.count_addr) host->gpu_read(d.count_addr, &cnt, 4);
++                told++;
++                logf("vk: mesh indirect prog %016llx: stride %d max %d count %u (at %#llx): %u %u %u %u %u %u %u %u", (unsigned long long)p.key, d.stride, d.max, cnt,
++                     (unsigned long long)d.count_addr, w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]);
++            }
++        }
+         if (d.indirect) {
+-            BufferRef args = gpu_buffer_bind(d.indirect, (uint64_t)std::max(d.max, 1) * std::max(d.stride, 12), false);
+             BufferRef cnt = d.count_addr ? gpu_buffer_bind(d.count_addr, 4, false) : BufferRef{};
+-            if (!args) SKIP_HERE();
++            if (!mesh_args.buffer) {
++                mesh_args = gpu_buffer_bind(d.indirect, (uint64_t)std::max(d.max, 1) * std::max(d.stride, 12), false);
++                if (!mesh_args) SKIP_HERE();
++            }
++            const uint32_t step = mesh_rewrite ? 12u : (uint32_t)std::max(d.stride, 12);
+             if (cnt && vkCmdDrawMeshTasksIndirectCountEXT)
+-                vkCmdDrawMeshTasksIndirectCountEXT(cmd, args.buffer, args.offset, cnt.buffer, cnt.offset, d.max,
+-                                                   std::max(d.stride, 12));
++                vkCmdDrawMeshTasksIndirectCountEXT(cmd, mesh_args.buffer, mesh_args.offset, cnt.buffer, cnt.offset, d.max, step);
+             else
+-                vkCmdDrawMeshTasksIndirectEXT(cmd, args.buffer, args.offset, std::max(d.max, 1), std::max(d.stride, 12));
++                vkCmdDrawMeshTasksIndirectEXT(cmd, mesh_args.buffer, mesh_args.offset, (uint32_t)std::max(d.max, 1), step);
+         } else {
+             vkCmdDrawMeshTasksEXT(cmd, (uint32_t)std::max(d.groups[0], 0), (uint32_t)std::max(d.groups[1], 1),
+                                   (uint32_t)std::max(d.groups[2], 1));
+@@ -3006,6 +3141,77 @@
+ /// blit of that texture into the image: the frame at its full size, without the network's detail. (An image the
+ /// pass also samples is one of its inputs, never the output.)
+ /// RX_VK_NO_UPSCALE_STUB=1: left out, as before. The first replacement of each program is logged.
++/// (shaders/movie_upscale.comp) The upscale in a shader: it reads and writes the two images as the network's own passes do, where a blit came
++/// out black on an RX 9070 XT. False: no way to, the blit is tried
++bool movie_upscale(VkCommandBuffer cmd, uint32_t in_handle, uint32_t out_handle, const Texture* out) {
++    static const bool off = getenv("RX_VK_MOVIE_BLIT") != nullptr;
++    if (off || !dev.push_descriptor || !vkCmdPushDescriptorSetKHR) return false;
++    Texture* a = nullptr;
++    Texture* b = nullptr;
++    uint32_t la = 0, lb = 0;
++    const VkImageView in = texture_view_of(in_handle, VK_IMAGE_VIEW_TYPE_2D, ViewUse::Sample, VK_FORMAT_UNDEFINED, &a, &la);
++    const VkImageView to = texture_view_of(out_handle, VK_IMAGE_VIEW_TYPE_2D, ViewUse::Storage, VK_FORMAT_R8G8B8A8_UNORM, &b, &lb);
++    if (!in || !to || !b) return false;
++    static VkPipeline pipe = VK_NULL_HANDLE;
++    static VkPipelineLayout layout = VK_NULL_HANDLE;
++    static VkSampler linear = VK_NULL_HANDLE;
++    static const bool made = [] {
++        VkDescriptorSetLayoutBinding bind[2] = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
++                                                {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
++        VkDescriptorSetLayoutCreateInfo li{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
++        li.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
++        li.bindingCount = 2, li.pBindings = bind;
++        VkDescriptorSetLayout set{};
++        if (vkCreateDescriptorSetLayout(dev.device, &li, nullptr, &set) != VK_SUCCESS) return false;
++        const VkPushConstantRange pr{VK_SHADER_STAGE_COMPUTE_BIT, 0, 8};
++        VkPipelineLayoutCreateInfo pi{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
++        pi.setLayoutCount = 1, pi.pSetLayouts = &set, pi.pushConstantRangeCount = 1, pi.pPushConstantRanges = &pr;
++        const VkResult layout_result = vkCreatePipelineLayout(dev.device, &pi, nullptr, &layout);
++        vkDestroyDescriptorSetLayout(dev.device, set, nullptr);
++        if (layout_result != VK_SUCCESS) return false;
++        VkShaderModuleCreateInfo mi{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
++        mi.codeSize = sizeof MOVIE_UPSCALE_COMP_SPV, mi.pCode = MOVIE_UPSCALE_COMP_SPV;
++        VkShaderModule m{};
++        if (vkCreateShaderModule(dev.device, &mi, nullptr, &m) != VK_SUCCESS) {
++            vkDestroyPipelineLayout(dev.device, layout, nullptr);
++            layout = VK_NULL_HANDLE;
++            return false;
++        }
++        VkComputePipelineCreateInfo ci{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
++        ci.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_COMPUTE_BIT, m, "main", nullptr};
++        ci.layout = layout;
++        if (vkCreateComputePipelines(dev.device, VK_NULL_HANDLE, 1, &ci, nullptr, &pipe) != VK_SUCCESS) pipe = VK_NULL_HANDLE;
++        vkDestroyShaderModule(dev.device, m, nullptr);
++        VkSamplerCreateInfo si{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
++        si.magFilter = si.minFilter = VK_FILTER_LINEAR;
++        si.addressModeU = si.addressModeV = si.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
++        si.maxLod = 0.25f;
++        const VkResult sampler_result = vkCreateSampler(dev.device, &si, nullptr, &linear);
++        if (pipe && sampler_result == VK_SUCCESS) return true;
++        if (linear) vkDestroySampler(dev.device, linear, nullptr);
++        if (pipe) vkDestroyPipeline(dev.device, pipe, nullptr);
++        vkDestroyPipelineLayout(dev.device, layout, nullptr);
++        linear = VK_NULL_HANDLE;
++        pipe = VK_NULL_HANDLE;
++        layout = VK_NULL_HANDLE;
++        logf("vk: movie compute upscale unavailable; trying the original blit");
++        return false;
++    }();
++    if (!made) return false;
++    const VkDescriptorImageInfo in_info{linear, in, VK_IMAGE_LAYOUT_GENERAL};
++    const VkDescriptorImageInfo out_info{VK_NULL_HANDLE, to, VK_IMAGE_LAYOUT_GENERAL};
++    VkWriteDescriptorSet w[2]{{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}, {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET}};
++    w[0].dstBinding = 0, w[0].descriptorCount = 1, w[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, w[0].pImageInfo = &in_info;
++    w[1].dstBinding = 1, w[1].descriptorCount = 1, w[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, w[1].pImageInfo = &out_info;
++    const uint32_t size[2] = {std::max(1u, out->width >> lb), std::max(1u, out->height >> lb)};
++    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
++    vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 2, w);
++    vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 8, size);
++    vkCmdDispatch(cmd, (size[0] + 7) / 8, (size[1] + 7) / 8, 1);
++    descriptors_disturbed();
++    return true;
++}
++
+ bool upscale_stub(VkCommandBuffer cmd, const NvnState& s, uint64_t key) {
+     static const bool off = getenv("RX_VK_NO_UPSCALE_STUB") != nullptr;
+     if (off) return false;
+@@ -3057,6 +3263,11 @@
+         return false;
+     end_pass(cmd);
+     full_barrier(cmd);
++    if (dst->format == VK_FORMAT_R8G8B8A8_UNORM && movie_upscale(cmd, in_h, out_h, dst)) {
++        full_barrier(cmd);
++        texture_written(dst);
++        return true;
++    }
+     VkImageBlit bl{};
+     bl.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+     bl.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+@@ -3084,10 +3295,13 @@
+ /// (shaders/taau_upscale.comp). The network's translation loses the blue channel, the yellow cast over every
+ /// scene; with this the picture is right, without the network's temporal anti-aliasing.
+ /// RX_VK_TAAU_KEYS=<program key prefixes,...> (default fd029a317a9a4b94; "-": none, the network runs)
+-bool taau_stand_in(VkCommandBuffer cmd, const NvnState& s, const Program& p) {
+-    static const char* keys = getenv("RX_VK_TAAU_KEYS") ? getenv("RX_VK_TAAU_KEYS") : "-";   // (off: the real network works since the TEX.F16 fix; a key turns the stand-in on)
++bool taau_key(uint64_t key) {
++    // (the real network where the card runs it as the console does; on the software multiplies it cost most of a frame on AMD's cards, and a
++    // locked 60 with this in its place: Hookshot issue 52)
++    static const char* keys = getenv("RX_VK_TAAU_KEYS") ? getenv("RX_VK_TAAU_KEYS")
++                              : Shader::Backend::SPIRV::mma_software ? "fd029a317a9a4b94" : "-";
+     char hex[24];
+-    snprintf(hex, sizeof hex, "%016llx", (unsigned long long)p.key);
++    snprintf(hex, sizeof hex, "%016llx", (unsigned long long)key);
+     bool match = false;
+     for (const char* q = keys; *q && !match;) {
+         const char* e = q;
+@@ -3095,7 +3309,11 @@
+         match = e > q && *q != '-' && !strncmp(hex, q, (size_t)(e - q));
+         q = *e ? e + 1 : e;
+     }
+-    if (!match || !dev.push_descriptor || !vkCmdPushDescriptorSetKHR || p.stages.empty()) return false;
++    return match;
++}
++bool taau_stand_in(VkCommandBuffer cmd, const NvnState& s, const Program& p) {
++    const char* keys = getenv("RX_VK_TAAU_KEYS") ? getenv("RX_VK_TAAU_KEYS") : "fd029a317a9a4b94";
++    if (!taau_key(p.key) || !dev.push_descriptor || !vkCmdPushDescriptorSetKHR || p.stages.empty()) return false;
+     const Stage& st = p.stages[0];
+     if (st.info.texture_descriptors.empty() || st.info.image_descriptors.empty()) return false;
+     size_t ntex = 0;   // (build_descriptors' image infos: the textures', then the images')
+@@ -3121,15 +3339,21 @@
+         li.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+         li.bindingCount = 3, li.pBindings = b;
+         VkDescriptorSetLayout set{};
+-        vkCreateDescriptorSetLayout(dev.device, &li, nullptr, &set);
++        if (vkCreateDescriptorSetLayout(dev.device, &li, nullptr, &set) != VK_SUCCESS) return false;
+         const VkPushConstantRange pr{VK_SHADER_STAGE_COMPUTE_BIT, 0, 12};
+         VkPipelineLayoutCreateInfo pi{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+         pi.setLayoutCount = 1, pi.pSetLayouts = &set, pi.pushConstantRangeCount = 1, pi.pPushConstantRanges = &pr;
+-        vkCreatePipelineLayout(dev.device, &pi, nullptr, &layout);
++        const VkResult layout_result = vkCreatePipelineLayout(dev.device, &pi, nullptr, &layout);
++        vkDestroyDescriptorSetLayout(dev.device, set, nullptr);
++        if (layout_result != VK_SUCCESS) return false;
+         VkShaderModuleCreateInfo mi{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+         mi.codeSize = sizeof TAAU_UPSCALE_COMP_SPV, mi.pCode = TAAU_UPSCALE_COMP_SPV;
+         VkShaderModule m{};
+-        vkCreateShaderModule(dev.device, &mi, nullptr, &m);
++        if (vkCreateShaderModule(dev.device, &mi, nullptr, &m) != VK_SUCCESS) {
++            vkDestroyPipelineLayout(dev.device, layout, nullptr);
++            layout = VK_NULL_HANDLE;
++            return false;
++        }
+         VkComputePipelineCreateInfo ci{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+         ci.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_COMPUTE_BIT, m, "main", nullptr};
+         ci.layout = layout;
+@@ -3293,6 +3517,18 @@
+ 
+ void precompile_run(void (*progress)(size_t done, size_t total)) {
+     const auto t0 = std::chrono::steady_clock::now();
++    // (a start that dies in here would die in here every time, the notes being what it builds from: a player saw the console reach
++    // 542 of 543 and the game close. The file says this step began and did not end: the next start lets the notes go and plays)
++    const std::string running = pipe_notes_path() + ".running";
++    if (FILE* f = fopen(running.c_str(), "rb")) {
++        fclose(f);
++        remove(running.c_str());
++        remove(pipe_notes_path().c_str());
++        logf("vk: the last start did not get through the precompile: its notes are dropped");
++        return;
++    }
++    if (FILE* f = fopen(running.c_str(), "wb")) fclose(f);
++    struct Done { const std::string& path; ~Done() { remove(path.c_str()); } } done_marker{running};
+     pcache_init();
+     std::vector<std::unique_ptr<PipeNote>> notes;
+     std::unordered_set<uint64_t> wanted;
+@@ -3327,6 +3563,7 @@
+                 ci.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+                 ci.stage.module = p.stages[0].module;
+                 ci.stage.pName = "main";
++                pin_subgroup(ci.stage, p.workgroup[0]);
+                 ci.layout = p.layout;
+                 if (vkCreateComputePipelines(dev.device, pcache, 1, &ci, nullptr, &p.compute_pipeline) != VK_SUCCESS) p.compute_pipeline = VK_NULL_HANDLE;
+             } else {
+@@ -3459,16 +3696,17 @@
+     Program& p = const_cast<Program&>(*cp);
+     ParLock plk(!p.layout || !p.compute_pipeline);
+     ensure_layout(p);
+-    if (!p.compute_pipeline) {
++    if (!p.compute_pipeline && !taau_key(p.key)) {   // (a stood-in network is never compiled)
+         pcache_init();
+         VkComputePipelineCreateInfo ci{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+         ci.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+         ci.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+         ci.stage.module = p.stages[0].module;
+         ci.stage.pName = "main";
++        pin_subgroup(ci.stage, p.workgroup[0]);
+         ci.layout = p.layout;
+         const auto t0 = std::chrono::steady_clock::now();
+-        if (vkCreateComputePipelines(dev.device, pcache, 1, &ci, nullptr, &p.compute_pipeline) != VK_SUCCESS) {
++        if (guarded_compute(pcache, &ci, &p.compute_pipeline) != VK_SUCCESS) {
+             p.compute_pipeline = VK_NULL_HANDLE;
+             p.failed = true;
+             SKIP_HERE();
+@@ -3490,7 +3728,21 @@
+     static const bool no_order = getenv("RX_VK_NO_DISPATCH_ORDER") != nullptr;
+     if (work_since_barrier && !no_order) full_barrier(cmd);
+     work_since_barrier = true;
++    if (!p.stages.empty() && p.stages[0].info.uses_cooperative_matrix) {   // (the game's networks, once each: what they read and write)
++        static std::mutex mu;
++        static std::unordered_map<uint64_t, int> seen;
++        std::lock_guard lk(mu);
++        if (seen[p.key]++ == 0) {
++            char line[900];
++            int n = snprintf(line, sizeof line, "vk: network %016llx: dispatch %ux%ux%u, %zu textures %zu images:", (unsigned long long)p.key, x, y, z,
++                             p.stages[0].info.texture_descriptors.size(), p.stages[0].info.image_descriptors.size());
++            for (const Texture* t : draw_sampled)
++                if (t && n < 860) n += snprintf(line + n, sizeof line - n, " %ux%ux%u/%u", t->width, t->height, t->depth, (unsigned)t->format);
++            logf("%s", line);
++        }
++    }
+     if (taau_stand_in(cmd, s, p)) return void(st_dispatches++);
++    if (!p.compute_pipeline) SKIP_HERE();
+     dump_ssbos(cmd, p, "before");
+     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, p.compute_pipeline);
+     if (!bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, p)) SKIP_HERE();
+@@ -3584,12 +3836,21 @@
+     }();
+     return v;
+ }
+-void record_draw(const NvnState& s, const Program& p, const DrawArgs& d) {
++void record_draw(const NvnState& s, const Program& p, const DrawArgs& d, const Targets& at) {
+     char line[1024];
+     int n = snprintf(line, sizeof line, "prog %016llx count %d first %d inst %d bv %d bi %d idx %d ibuf %#llx ind %#llx/%#llx",
+                      (unsigned long long)p.key, d.count, d.first, d.instances, d.base_vertex, d.base_instance,
+                      (int)d.indexed, (unsigned long long)d.ibuf, (unsigned long long)d.indirect,
+                      (unsigned long long)d.count_addr);
++    n += snprintf(line + n, sizeof line - n, " target %ux%u n%d samples %d c0 %d depth %d vp %g %g %g %g scissor %d %d %d %d", at.width, at.height, at.n,
++                  (int)at.samples, (int)at.color_format[0], (int)at.depth_format, s.viewport[0][0], s.viewport[0][1], s.viewport[0][2], s.viewport[0][3],
++                  s.scissor[0], s.scissor[1], s.scissor[2], s.scissor[3]);
++    n += snprintf(line + n, sizeof line - n, "%s", program_textures(s, p).c_str());
++    if (d.indirect) {   // (what the GPU will take the draw's size from)
++        uint32_t w[5]{};
++        if (host->gpu_read(d.indirect, w, sizeof w))
++            n += snprintf(line + n, sizeof line - n, " args %u %u %u %d %u", w[0], w[1], w[2], (int)w[3], w[4]);
++    }
+     for (const Stage& st : p.stages) {   // (each stage's uniform buffers: address, size, a hash of the first 512 bytes)
+         const int ns = std::clamp(st.nvn_stage, 0, kNvnStages - 1);
+         for (int i = 0; i < 16 && n < 900; i++) {
+@@ -3604,6 +3865,22 @@
+                           (unsigned long long)u.size, (unsigned long long)h);
+         }
+     }
++    {
++        static std::atomic<int> told{0};
++        if (told++ < 300) logf("vk: record: %s", line);
++    }
++    // (RX_VK_RECORD_FLOATS=<words>: the fragment stage's first uniform buffer as floats, each draw, one line: which constant does what)
++    static const int words = getenv("RX_VK_RECORD_FLOATS") ? atoi(getenv("RX_VK_RECORD_FLOATS")) : 0;
++    if (words > 0) {
++        const nvn_p_bind_buf& u = s.ubo[1][0];
++        std::vector<float> f((size_t)std::min(words, 128));
++        if (u.addr && host->gpu_read(u.addr, f.data(), f.size() * 4)) {
++            std::string o = "vk: floats " + std::to_string(texture_frame_no());
++            char b[24];
++            for (const float v : f) snprintf(b, sizeof b, " %.4g", v), o += b;
++            logf("%s", o.c_str());
++        }
++    }
+     std::lock_guard lk(rec_mu);
+     const uint64_t f = texture_frame_no();
+     draw_records[f].push_back(line);
+--- a/gpu/vk/vk_framegen.cpp
++++ b/gpu/vk/vk_framegen.cpp
+@@ -58,6 +58,8 @@
+     bool init = false, failed = false;
+     uint32_t w = 0, h = 0;
+     Pipe copy, luma, flow, median, synth, scale;
++    Img cropped;
++    uint32_t cropped_w = 0, cropped_h = 0;
+     Img scaled;   // (the Insert menu's upscaling: at the window's size)
+     uint32_t scaled_w = 0, scaled_h = 0;
+     VkSampler nearest = VK_NULL_HANDLE, linear = VK_NULL_HANDLE;
+@@ -310,9 +312,32 @@
+     return on && !dev.offscreen && !fg.failed;
+ }
+ 
+-VkImage framegen_scale(VkCommandBuffer cmd, VkImageView src, uint32_t dw, uint32_t dh) {
++VkImage framegen_scale(VkCommandBuffer cmd, VkImageView src, VkImage image, uint32_t sw, uint32_t sh, const int crop[4], uint32_t dw, uint32_t dh) {
+     if (!opts.upscale && !opts.sharpness) return VK_NULL_HANDLE;
+     if (!src || !fg.scale.pipe) return VK_NULL_HANDLE;
++    // (the game draws into part of its window textures, 2048 x 1152 of 2560 x 1440 here: the filter was given the whole texture, and the
++    // picture came out in the top left corner of the window with black around it. The crop first, then the filter)
++    if (crop && crop[2] > 0 && crop[3] > 0 && (crop[0] || crop[1] || (uint32_t)crop[2] < sw || (uint32_t)crop[3] < sh)) {
++        const uint32_t cw = std::min((uint32_t)crop[2], sw - (uint32_t)crop[0]), ch = std::min((uint32_t)crop[3], sh - (uint32_t)crop[1]);
++        if (fg.cropped_w != cw || fg.cropped_h != ch) {
++            {
++                std::lock_guard qk(dev.present_mu);
++                vkDeviceWaitIdle(dev.device);
++            }
++            drop_img(fg.cropped);
++            if (!make_img(fg.cropped, cw, ch, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)) return VK_NULL_HANDLE;
++            fg.cropped_w = cw, fg.cropped_h = ch;
++            to_general(cmd, fg.cropped.image);
++        }
++        VkImageBlit b{};
++        b.srcSubresource = b.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
++        b.srcOffsets[0] = {crop[0], crop[1], 0};
++        b.srcOffsets[1] = {crop[0] + (int)cw, crop[1] + (int)ch, 1};
++        b.dstOffsets[1] = {(int)cw, (int)ch, 1};
++        vkCmdBlitImage(cmd, image, VK_IMAGE_LAYOUT_GENERAL, fg.cropped.image, VK_IMAGE_LAYOUT_GENERAL, 1, &b, VK_FILTER_NEAREST);
++        full_barrier(cmd);
++        src = fg.cropped.view;
++    }
+     if (fg.scaled_w != dw || fg.scaled_h != dh) {
+         {
+             std::lock_guard qk(dev.present_mu);   // (the queue is idle only while nothing else submits to it)
+--- a/gpu/vk/vk_framegen.h
++++ b/gpu/vk/vk_framegen.h
+@@ -16,6 +16,6 @@
+ /// The window's present of an image (GENERAL, w x h; crop as above or null), vk_replay.cpp: the display thread's
+ void present_image(VkImage src, uint32_t w, uint32_t h, const int crop[4], VkImageView view = VK_NULL_HANDLE);
+ /// The Insert menu's upscaling of a frame to the window (dw x dh), recorded: the image to show, or null when it is off
+-VkImage framegen_scale(VkCommandBuffer cmd, VkImageView src, uint32_t dw, uint32_t dh);
++VkImage framegen_scale(VkCommandBuffer cmd, VkImageView src, VkImage image, uint32_t sw, uint32_t sh, const int crop[4], uint32_t dw, uint32_t dh);
+ 
+ } // namespace mkwvk
+--- a/gpu/vk/vk_internal.h
++++ b/gpu/vk/vk_internal.h
+@@ -21,6 +21,10 @@
+     VkInstance instance = VK_NULL_HANDLE;
+     VkPhysicalDevice physical = VK_NULL_HANDLE;
+     VkPhysicalDeviceProperties props{};
++    VkDriverId driver_id{};
++    VkShaderStageFlags subgroup_stages = 0;
++    uint32_t subgroup_size = 32;
++    uint32_t subgroup_max = 32;
+     VkPhysicalDeviceMemoryProperties memory{};
+     VkPhysicalDeviceFeatures features{};
+     VkDevice device = VK_NULL_HANDLE;
+@@ -40,6 +44,7 @@
+     bool eds3_polygon = false, eds3_clamp = false, eds3_blend = false, eds3_a2c = false;
+     VkPhysicalDeviceVulkan12Features vk12{};
+     VkPhysicalDeviceVulkan13Features vk13{};
++    VkShaderStageFlags sg32_stages = 0;   // (stages that run at 32 lanes when asked: the size the translated programs assume)
+     uint32_t max_push_descriptors = 0;
+     // no window (HOS_HEADLESS): presents go to an image of their own, which RX_VK_SHOTS can write out
+     bool offscreen = false;
+--- a/gpu/vk/vk_main.cpp
++++ b/gpu/vk/vk_main.cpp
+@@ -242,6 +242,27 @@
+     dev.eds3_a2c = dev.dynamic_state3 && eds3.extendedDynamicState3AlphaToCoverageEnable;
+     dev.vk12 = f12;
+     dev.vk13 = f13;
++    {   // (hookshot, after TotK Recomp's vk_caps.c) NVN's programs are written for 32 lanes: the translator is told 32, and the lane
++        // shuffles of OoT's networks and the lane masks of its mesh programs depend on it. NVIDIA's GPUs have no other size; AMD's
++        // default to 64 where they like, and the networks' output came out as coloured noise (Hookshot issues 10 and 14)
++        VkPhysicalDeviceDriverProperties driver{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES};
++        VkPhysicalDeviceSubgroupSizeControlProperties sc{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES};
++        VkPhysicalDeviceSubgroupProperties sg{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES};
++        sg.pNext = &sc;
++        sc.pNext = &driver;
++        VkPhysicalDeviceProperties2 p2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
++        p2.pNext = &sg;
++        vkGetPhysicalDeviceProperties2(dev.physical, &p2);
++        dev.driver_id = driver.driverID;
++        dev.subgroup_stages = sg.supportedStages;
++        dev.subgroup_size = sg.subgroupSize;
++        dev.subgroup_max = sc.maxSubgroupSize ? sc.maxSubgroupSize : sg.subgroupSize;
++        logf("vk: driver %u: %s (%s)", (unsigned)driver.driverID, driver.driverName, driver.driverInfo);
++        const bool pin = f13.subgroupSizeControl && sc.minSubgroupSize <= 32 && sc.maxSubgroupSize >= 32 && !getenv("RX_VK_NO_SUBGROUP_PIN");
++        dev.sg32_stages = pin ? sc.requiredSubgroupSizeStages : 0;
++        logf("vk: subgroups: default %u lanes, %u-%u, pinned to 32 on stages %#x", sg.subgroupSize, sc.minSubgroupSize, sc.maxSubgroupSize,
++             (unsigned)dev.sg32_stages);
++    }
+     if (!f13.dynamicRendering || !f13.synchronization2 || !f12.timelineSemaphore) {
+         logf("vk: the GPU lacks dynamic rendering, synchronization2 or timeline semaphores");
+         return false;
+@@ -297,10 +318,11 @@
+     std::vector<VkPresentModeKHR> modes(n);
+     vkGetPhysicalDeviceSurfacePresentModesKHR(dev.physical, dev.surface, &n, modes.data());
+     VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
++    for (auto m : modes)   // (RX_VK_FIFO=1: as on a card or driver with vsync forced, or no mailbox)
++        if (m == VK_PRESENT_MODE_MAILBOX_KHR && !getenv("RX_VK_FIFO")) mode = m;
++    // (hookshot) no mailbox (AMD's Windows driver has none): immediate before FIFO, which held anything under 60 fps to 30 (40 fps became 30 here)
+     for (auto m : modes)
+-        if (m == VK_PRESENT_MODE_MAILBOX_KHR) mode = m;
+-    for (auto m : modes)
+-        if (m == VK_PRESENT_MODE_IMMEDIATE_KHR && getenv("RX_VK_IMMEDIATE")) mode = m;
++        if (m == VK_PRESENT_MODE_IMMEDIATE_KHR && (getenv("RX_VK_IMMEDIATE") || mode == VK_PRESENT_MODE_FIFO_KHR) && !getenv("RX_VK_FIFO")) mode = m;
+     VkSwapchainCreateInfoKHR ci{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
+     ci.surface = dev.surface;
+     ci.minImageCount = std::max(caps.minImageCount, 4u);   // (hookshot: mailbox with frame interpolation: an image always free)
+@@ -424,3 +446,7 @@
+     fill_replay_table(table);
+     return &table;
+ }
++
++namespace mkwvk {
++HWND app_window() { return main_window; }   // (hookshot: the Insert menu's Fullscreen row)
++} // namespace mkwvk
+--- a/gpu/vk/vk_memory.cpp
++++ b/gpu/vk/vk_memory.cpp
+@@ -1145,7 +1145,14 @@
+     return on != 0;
+ }
+ uint64_t mirror_budget() {
+-    static const uint64_t b = (uint64_t)(getenv("RX_VK_MIRROR_MB") ? atoi(getenv("RX_VK_MIRROR_MB")) : 3072) << 20;
++    // (a quarter of the card, at most the 3 GB it was for all: on a 6 GB laptop those and the textures were past what the card has)
++    static const uint64_t b = [] {
++        if (const char* e = getenv("RX_VK_MIRROR_MB")) return (uint64_t)atoi(e) << 20;
++        uint64_t vram = 0;
++        for (uint32_t h = 0; h < dev.memory.memoryHeapCount; h++)
++            if (dev.memory.memoryHeaps[h].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) vram = std::max(vram, (uint64_t)dev.memory.memoryHeaps[h].size);
++        return vram ? std::min<uint64_t>(vram / 4, 3072ull << 20) : 3072ull << 20;
++    }();
+     return b;
+ }
+ uint64_t mirror_bytes = 0, mirror_epoch = 0;
+--- a/gpu/vk/vk_menu.cpp
++++ b/gpu/vk/vk_menu.cpp
+@@ -12,6 +12,7 @@
+ #include "vk_menu.h"
+ 
+ namespace mkwvk {
++HWND app_window();
+ 
+ Options opts;
+ 
+@@ -46,6 +47,7 @@
+ const char* tx_ultrawide(int v) { return v ? "Monitor's shape (restart)" : "16:9 (restart)"; }
+ 
+ Row rows[] = {
++    {"Fullscreen", &opts.fullscreen, 0, 1, 1, tx_onoff},
+     {"Frame generation", &opts.framegen, 0, 4, 1, tx_framegen},
+     {"Frame pacing", &opts.pace, 0, 1, 1, tx_onoff},
+     {"Resolution", &opts.resolution, 0, 4, 1, tx_resolution},
+@@ -60,6 +62,7 @@
+ 
+ std::atomic<bool> open_now{false};
+ int selected = 0;
++bool menu_refresh = false;
+ std::string ini_path() {
+     char exe[MAX_PATH];
+     const DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+@@ -174,7 +177,7 @@
+         TextOutA(dc, (int)w - 16 * s - sz.cx, y + 4 * s, v, (int)strlen(v));
+     }
+     SetTextColor(dc, RGB(140, 150, 144));
+-    const char* hint = "Arrows change   Insert closes";
++    const char* hint = "Arrows change   Insert or F1 closes";
+     TextOutA(dc, 16 * s, top + kRows * rh + 6 * s, hint, (int)strlen(hint));
+     SelectObject(dc, old);
+     DeleteObject(title);
+@@ -278,6 +281,7 @@
+     if (opts.framegen == 1) opts.framegen = 2;
+     if (const char* e = getenv("RX_VK_FRAMEGEN_MULT")) opts.framegen = std::min(std::max(atoi(e), 2), 4);
+     if (const char* e = getenv("RX_VK_PACE")) opts.pace = atoi(e) != 0;
++    if (const char* e = getenv("RX_VK_UPSCALE")) opts.upscale = atoi(e);
+     if (const char* e = getenv("HOS_REALTIME_STEP")) opts.realtime = atoi(e) != 0;
+     if (const char* e = getenv("HOS_DYNRES")) opts.resolution = atoi(e) != 0 ? 0 : 1;
+ }
+@@ -289,23 +293,47 @@
+     if (game_frame) game_frames.fetch_add(1, std::memory_order_relaxed);
+ }
+ 
++// The Fullscreen row and F11 are one setting: the row asks the window's thread (host/display.c), F11 shows in the row
++void fullscreen_tick() {
++    static int applied = 0, settle = 0;
++    const HWND main_window = app_window();
++    if (!main_window) return;
++    static const bool env = getenv("HOS_FULLSCREEN") != nullptr;   // (a test's own choice: the row is left alone)
++    if (env) return;
++    if (opts.fullscreen != applied) {
++        applied = opts.fullscreen;
++        settle = 60;
++        PostMessageA(main_window, WM_APP + 7, (WPARAM)applied, 0);
++        return;
++    }
++    if (settle > 0) { settle--; return; }
++    const int now = !(GetWindowLongA(main_window, GWL_STYLE) & WS_CAPTION);
++    if (now != applied) {
++        opts.fullscreen = applied = now;
++        menu_refresh = true;
++        save();
++    }
++}
++
+ void menu_tick() {
+-    static bool held[6];
+-    static const int keys[6] = {VK_INSERT, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESCAPE};
++    fullscreen_tick();
++    static bool held[7];
++    static const int keys[7] = {VK_INSERT, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESCAPE, VK_F1};   // (F1: for keyboards without Insert)
+     HWND fg = GetForegroundWindow();
+     DWORD pid = 0;
+     if (fg) GetWindowThreadProcessId(fg, &pid);
+     const bool mine = pid == GetCurrentProcessId();
+-    bool press[6] = {};
+-    for (int i = 0; i < 6; i++) {
++    bool press[7] = {};
++    for (int i = 0; i < 7; i++) {
+         const bool down = mine && (GetAsyncKeyState(keys[i]) & 0x8000) != 0;
+         press[i] = down && !held[i];
+         held[i] = down;
+     }
+     const int scale = scale_of(dev.swap_extent.height);
+-    bool changed = scale != cur_scale;
++    bool changed = scale != cur_scale || menu_refresh;
++    menu_refresh = false;
+     cur_scale = scale;
+-    if (press[0]) open_now = !open_now.load(), changed = true;
++    if (press[0] || press[6]) open_now = !open_now.load(), changed = true;
+     if (open_now.load()) {
+         if (press[5]) open_now = false;
+         if (press[1]) selected = (selected + kRows - 1) % kRows, changed = true;
+@@ -349,6 +377,13 @@
+         std::unique_lock lk(bmp_mu);
+         const uint32_t mw = menu_bmp.w, mh = menu_bmp.h;
+         lk.unlock();
++        // (one copy finished before the next: on a Radeon the menu came out with its top torn away beside the FPS counter)
++        VkMemoryBarrier2 mb{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
++        mb.srcStageMask = mb.dstStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
++        mb.srcAccessMask = mb.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
++        VkDependencyInfo di{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
++        di.memoryBarrierCount = 1, di.pMemoryBarriers = &mb;
++        vkCmdPipelineBarrier2(cmd, &di);
+         if (mw) copy_over(cmd, dst, menu_bmp, ups[0][slot], (int)(w - mw) / 2, (int)(h - mh) / 2, w, h);
+     }
+ }
+--- a/gpu/vk/vk_menu.h
++++ b/gpu/vk/vk_menu.h
+@@ -16,6 +16,7 @@
+     int handheld = 0;     // the game's handheld profile: ~4 fps, softer; read once, at the start (host/nn_applet.c)
+     int ultrawide = 0;    // the camera at the monitor's shape when it is wider than 16:9; read once, at the start (host/hos_main.c)
+     int show_fps = 0;
++    int fullscreen = 0;   // borderless, at the monitor's size: F11 is the same setting
+ };
+ extern Options opts;
+ 
+--- a/gpu/vk/vk_replay.cpp
++++ b/gpu/vk/vk_replay.cpp
+@@ -875,11 +875,11 @@
+ }
+ 
+ // ---- parallel replay: the threads and a command buffer's segments ----
+-// (RX_VK_PARALLEL=<threads recording a command buffer, the replay thread one of them>; 0, 1: off. 3 by default: in a
+-// Grand Prix race 58-59 fps against 46-49 on the replay thread alone, the game's GPU waits 0.3 s in 5 s against 1.9;
+-// it was slower while textures were evicted and made again every 10 frames)
++// (RX_VK_PARALLEL=<threads recording a command buffer, the replay thread one of them>; 0, 1: off, the default. Segments
++// recorded out of order left one-frame black scenes in play, 48-93 in a walk through Kakariko against none on the
++// replay thread alone, at about the same frame rate here: 36-40 fps against 38-41)
+ int par_threads() {
+-    static const int n = std::clamp(getenv("RX_VK_PARALLEL") ? atoi(getenv("RX_VK_PARALLEL")) : 3, 0, 8);
++    static const int n = std::clamp(getenv("RX_VK_PARALLEL") ? atoi(getenv("RX_VK_PARALLEL")) : 0, 0, 8);
+     return n;
+ }
+ struct ParPool {
+@@ -1918,6 +1918,11 @@
+ 
+ uint64_t present_value = 0;   // (the present job's value, handed out as it came; 0: the next one)
+ void do_present(const nvn_tex* t, const int crop[4]) {
++    {   // (hookshot, RX_VK_PASS_TRACE_AT=<frames>: the passes of the frames around these frame numbers, for finding what a frame is made of)
++        static std::atomic<int64_t> seen{0};
++        static const int64_t at = getenv("RX_VK_PASS_TRACE_AT") ? atoll(getenv("RX_VK_PASS_TRACE_AT")) : 0;
++        if (at && ++seen % at == 0) pass_traces_log(texture_frame_no() - 1, texture_frame_no());
++    }
+     static const char* shots = getenv("RX_VK_SHOTS");
+     static const int shot_every = getenv("RX_VK_SHOT_EVERY") ? std::max(1, atoi(getenv("RX_VK_SHOT_EVERY"))) : 300;
+     VkImage src = VK_NULL_HANDLE;
+@@ -2383,7 +2388,7 @@
+     VkImage dst = dev.swap_images[index];
+     full_barrier(f.cmd);   // (after the game's work for the frame: earlier submits on this queue)
+     image_barrier(f.cmd, dst, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+-    if (const VkImage scaled = src && view ? framegen_scale(f.cmd, view, dev.swap_extent.width, dev.swap_extent.height) : VK_NULL_HANDLE) {
++    if (const VkImage scaled = src && view ? framegen_scale(f.cmd, view, src, sw, sh, crop, dev.swap_extent.width, dev.swap_extent.height) : VK_NULL_HANDLE) {
+         blit_crop(f.cmd, scaled, dev.swap_extent.width, dev.swap_extent.height, nullptr, dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   dev.swap_extent.width, dev.swap_extent.height);
+     } else if (src) {
+--- a/gpu/vk/vk_shader.cpp
++++ b/gpu/vk/vk_shader.cpp
+@@ -12,6 +12,7 @@
+ #include <io.h>
+ #include <algorithm>
+ #include <chrono>
++#include <stdexcept>
+ #include <cstdio>
+ #include <functional>
+ #include <cstring>
+@@ -22,6 +23,7 @@
+ #include <unordered_map>
+ #include <vector>
+ 
++#include "shader_recompiler/backend/spirv/mma_layout.h"
+ #include "shader_recompiler/ir_opt/oot_visual_workaround.h"
+ #include "shader_recompiler/backend/bindings.h"
+ #include "shader_recompiler/backend/spirv/emit_spirv.h"
+@@ -408,10 +410,13 @@
+     p.support_scaled_attributes = false;   // (*_UI2F / *_I2F read as integers, converted in the shader: R32 has no scaled format)
+     p.support_multi_viewport = true;
+     p.support_sampled_image_array_nonuniform_indexing = true;
+-    p.warp_size_potentially_larger_than_guest = false;
++    p.warp_size_potentially_larger_than_guest = dev.subgroup_size > 32;
+     p.lower_left_origin_mode = false;
+     p.need_declared_frag_colors = false;
+-    p.max_subgroup_size = 32;
++    // Driver workarounds from the supplied Eglantine/Lichii Vulkan profile.
++    p.need_gather_subpixel_offset = dev.props.vendorID == 0x1002;
++    p.has_broken_spirv_position_input = dev.driver_id == VK_DRIVER_ID_AMD_PROPRIETARY;
++    p.max_subgroup_size = dev.subgroup_max;
+     p.min_ssbo_alignment = dev.props.limits.minStorageBufferOffsetAlignment;
+     return p;
+ }
+@@ -714,7 +719,7 @@
+ void oot_visual(Shader::IR::Program& program, uint64_t key) {
+     static const bool on = !getenv("RX_VK_OOT_VISUAL") || atoi(getenv("RX_VK_OOT_VISUAL")) != 0;
+     if (!on) return;
+-    static const float fog = getenv("RX_VK_OOT_FOG") ? (float)atof(getenv("RX_VK_OOT_FOG")) : 0.25f;
++    static const float fog = getenv("RX_VK_OOT_FOG") ? (float)atof(getenv("RX_VK_OOT_FOG")) : 0.08f;
+     static const float exposure = getenv("RX_VK_OOT_EXPOSURE") ? (float)atof(getenv("RX_VK_OOT_EXPOSURE")) : 0.65f;
+     if (const size_t n = Shader::Optimization::ApplyOotVisualWorkaround(program, fog, exposure))
+         logf("vk: OoT visual workaround: %s program %016llx, %zu edits", program.stage == Shader::Stage::Compute ? "fog" : "exposure",
+@@ -746,8 +751,14 @@
+     // lost it)
+     const uint64_t translator = HOOKSHOT_SHADER_STAMP;
+     add(&translator, sizeof translator);
++    // Translated SPIR-V also depends on the target driver and subgroup/MMA paths.
++    // Do not reuse NVIDIA shaders after moving the output folder to an AMD PC.
++    const uint32_t target[] = {dev.props.vendorID, dev.props.deviceID, dev.props.driverVersion,
++        (uint32_t)dev.driver_id, dev.subgroup_size, dev.subgroup_max,
++        (uint32_t)dev.sg32_stages, (uint32_t)Shader::Backend::SPIRV::mma_software};
++    add(target, sizeof target);
+     for (char** e = _environ; e && *e; e++)
+-        for (const char* pre : {"RX_VK_OOT", "RX_VK_MMA", "RX_VK_NATIVE", "RX_VK_NAN", "EDEN_"})
++        for (const char* pre : {"RX_VK_OOT", "RX_VK_MMA", "RX_VK_NATIVE", "RX_VK_NAN", "RX_VK_TASK_CAP", "RX_VK_NETWORK", "EDEN_"})
+             if (!strncmp(*e, pre, strlen(pre))) add(*e, strlen(*e));
+     return h;
+ }
+@@ -961,6 +972,24 @@
+             oot_visual(t->program, csc->key);
+             Shader::RuntimeInfo rt{};
+             dump_ir(p, "compute", t->program);   // (before the SPIR-V: the programs it fails on are the ones to read)
++            // (hookshot) The movie upscaler's dozen networks, on a card that cannot run them as the console does: their software matrix multiplies
++            // took minutes each for AMD's compiler (the black screen with sound, Hookshot issue 26: JaredEzz's analysis) and the movies ran at 10 fps
++            // (issues 38, 43). Left out, the last pass becomes a linear upscale of the movie (upscale_stub in vk_draw.cpp): the same picture at 60
++            // fps, a little softer. The gameplay TAAU network stays. RX_VK_NETWORK_KEEP=<key prefixes>, "all": every one runs
++            if (t->program.info.uses_cooperative_matrix) {
++                static const std::string keep = getenv("RX_VK_NETWORK_KEEP") ? getenv("RX_VK_NETWORK_KEEP") : "fd029a317a9a4b94";
++                char hex[24];
++                snprintf(hex, sizeof hex, "%016llx", (unsigned long long)p.key);
++                bool kept_one = keep == "all";
++                for (size_t at = 0; !kept_one && at < keep.size();) {
++                    const size_t e = keep.find(',', at);
++                    const std::string k = keep.substr(at, e == std::string::npos ? std::string::npos : e - at);
++                    kept_one = !k.empty() && !strncmp(hex, k.c_str(), k.size());
++                    at = e == std::string::npos ? keep.size() : e + 1;
++                }
++                if (!kept_one && (Shader::Backend::SPIRV::mma_software || dev.props.vendorID != 0x10DE))
++                    throw std::runtime_error("a network left out on this card");
++            }
+             const std::vector<uint32_t> spirv = Shader::Backend::SPIRV::EmitSPIRV(profile(), rt, t->program, bindings);
+             Stage st;
+             st.nvn_stage = 5;
+@@ -1270,6 +1299,27 @@
+ } // namespace
+ 
+ /// (hookshot) the bound program's stages and code keys, as "stage:key" words (RX_VK_SKIP_PROG's log)
++/// (for logs) what the program's textures resolve to now
++std::string program_textures(const NvnState& s, const Program& p) {
++    std::string out;
++    for (const Stage& st : p.stages)
++        for (const auto& d : st.info.texture_descriptors) {
++            const uint32_t h = descriptor_handle(s, st, d);
++            nvn_tex t;
++            nvn_view v;
++            bool has_view = false;
++            char b[160];
++            const bool known = h && texture_of((int)(h & 0xFFFFF), &t, &v, &has_view);
++            if (known)
++                snprintf(b, sizeof b, " tex %#x %ux%ux%u fmt %#x target %d view %d", h, (unsigned)t.d.width, (unsigned)t.d.height, (unsigned)t.d.depth,
++                         (unsigned)t.d.format, (int)t.d.target, (int)has_view);
++            else
++                snprintf(b, sizeof b, " tex %#x (not registered)", h);
++            out += b;
++        }
++    return out;
++}
++
+ std::string program_code_keys(const NvnState& s) {
+     std::string out;
+     if (!s.has_prog) return out;
+--- a/gpu/vk/vk_shader.h
++++ b/gpu/vk/vk_shader.h
+@@ -66,6 +66,7 @@
+ /// Graphics programs may come back not ready yet (translation queued): the draw leaves itself out or program_wait()s.
+ const Program* program_for(const NvnState& s, ProgramKind kind, const uint8_t color_types[8]);
+ uint64_t compute_code_key(const NvnState& s);   // (hookshot) the bound compute program's code key, 0: none
++std::string program_textures(const NvnState& s, const Program& p);   // (hookshot, for logs)
+ std::string program_code_keys(const NvnState& s);   // (hookshot) " stage:key" for each of the bound program's codes
+ const Program* program_pick(const NvnState& s, ProgramKind kind, const uint8_t color_types[8]);   // (program_for without its cache)
+ void program_wait(const Program* p);
+--- a/gpu/vk/vk_texture.cpp
++++ b/gpu/vk/vk_texture.cpp
+@@ -1576,8 +1576,10 @@
+     // (the menus were missing every letter added later). Only whole pages of its storage: a write to another variable
+     // sharing an edge page once re-uploaded garbage over a drawn LUT (the rainbow sky). Opt-in (RX_VK_CPU_OVER_GPU=1): transient render targets share memory the CPU writes for other things, and took that over their texels, and the menus' letters stayed missing with it.
+     if (tex->gpu_written && !tex->released) {
++        // (hookshot) and a texture the GPU only cleared: the game's font cache, whose letters the CPU writes as text appears. Its menu text
++        // went missing at random (Hookshot issues 40 and 44), whenever the clear reached the image first
+         static const bool take = getenv("RX_VK_CPU_OVER_GPU") != nullptr;
+-        if (!take || tex->checked_epoch == epoch) return tex;
++        if ((!take && !tex->only_cleared) || tex->checked_epoch == epoch) return tex;
+         tex->checked_epoch = epoch;
+         static thread_local Ranges cpu, inner;
+         if (!texture_dirty(*tex, std::max(tex->upload_gen, tex->gpu_gen), cpu)) return tex;
+@@ -2161,7 +2163,15 @@
+ 
+ void texture_written(Texture* tex) {
+     if (!tex) return;
++    if (tex->upload_value == rec_value && tex->upload_seg > tl_seg) {   // (a parallel replay's order broken: see dry_mark_written)
++        static int64_t n;
++        if (n++ < 40 || n % 500 == 0)
++            logf("vk: parallel: #%u %#llx %ux%u x%u NVN %#x written in segment %llu, uploaded by the later segment %llu (%lld so)",
++                 tex->id, (unsigned long long)tex->gpu, tex->width, tex->height, tex->layers, tex->nvn_format,
++                 (unsigned long long)tl_seg, (unsigned long long)tex->upload_seg, (long long)n);
++    }
+     vw_note(*tex);
++    tex->only_cleared = false;
+     if (tex->sparse && !tex->gpu_written) {
+         static int logged;
+         if (logged++ < 20) logf("vk: sparse texture %#llx written by the GPU (#%u)", (unsigned long long)tex->gpu, tex->id);
+@@ -2180,7 +2190,7 @@
+     tex->last_frame = frame_no;   // (the same values whichever thread stores them)
+     tex->last_value = rec_value;
+     if (!for_sampling) return true;
+-    if (tex->gpu_written && !tex->released) return true;
++    if (tex->gpu_written && !tex->released && !tex->only_cleared) return true;
+     if (tex->upload_value == rec_value && tex->upload_seg > tl_seg) return false;
+     return tex->uploaded && tex->checked_epoch == epoch;
+ }
+--- a/gpu/vk/vk_texture.h
++++ b/gpu/vk/vk_texture.h
+@@ -57,6 +57,7 @@
+     std::vector<Run> runs;
+     uint32_t runs_maps_gen = ~0u;             // (the GPU mappings' generation the runs were made at)
+     bool gpu_written = false; // the GPU rendered, copied or stored into it: the image is the content
++    bool only_cleared = false; // (hookshot) all the GPU did was clear it: what the CPU writes after still counts (a font cache's glyphs)
+     uint32_t gpu_gen = 0;     // (the memory generation when the GPU last wrote it: CPU writes after it are taken)
+     bool released = false;    // its texture was finalized after the GPU wrote it: CPU writes count again
+     uint32_t release_gen = 0;
+--- a/gpu/vk/vk_xfer.cpp
++++ b/gpu/vk/vk_xfer.cpp
+@@ -1,3 +1,4 @@
++#include <cstdio>
+ // Texture <-> buffer and texture <-> texture copies, and texture clears: totk-pc-recomp's runtime/vk_exec_xfer.c
+ // (MIT; sub_resolve, buffer_side, copy_buffer_image, copy_t2t, clear_tex), on the textures of vk_texture.cpp (an
+ // image per texture: a copy addresses a level, its layers or slices, and a region).
+@@ -341,7 +342,9 @@
+         }
+     }
+     full_barrier(cmd);
++    const bool fresh = !s.tex->gpu_written || s.tex->released || s.tex->only_cleared;
+     texture_written(s.tex);
++    s.tex->only_cleared = fresh && s.tex->aspect == VK_IMAGE_ASPECT_COLOR_BIT;
+ }
+ 
+ } // namespace mkwvk
+--- a/host/display.c
++++ b/host/display.c
+@@ -33,6 +33,7 @@
+     return mouse_captured;
+ }
+ 
++static HANDLE renderer_up;
+ static int fullscreen;
+ static WINDOWPLACEMENT windowed_place;
+ 
+@@ -112,6 +113,9 @@
+         if (wp == VK_ESCAPE) mouse_capture(w, 0);
+         if (wp == VK_F11 && !(lp & (1 << 30))) set_fullscreen(w, !fullscreen);
+         return 0;
++    case WM_APP + 7:   /* (the Insert menu's row) */
++        set_fullscreen(w, (int)wp);
++        return 0;
+     case WM_DPICHANGED:
+         if (!fullscreen) {
+             const RECT *s = (const RECT *)lp;
+@@ -197,7 +201,8 @@
+     RAWINPUTDEVICE rid = {1, 2, 0, hwnd};   /* generic desktop mouse: WM_INPUT while the window is in front */
+     RegisterRawInputDevices(&rid, 1, sizeof rid);
+     renderer = rx_start(hwnd);
+-    if (!renderer) hos_log("display: no WebGPU device: the window stays black");
++    if (!renderer) hos_fatal(NULL, "display: could not start the Vulkan renderer");
++    SetEvent(renderer_up);
+     SetTimer(hwnd, 1, 250, NULL);
+     MSG m;
+     while (GetMessageA(&m, NULL, 0, 0) > 0) {
+@@ -207,10 +212,22 @@
+     return 0;
+ }
+ 
++/* (hookshot) The game's first work for the GPU waits for the renderer. It ran beside the renderer's start, and what it submitted while the
++   shaders were being prepared (80 s on a first start) was lost: that run had no ambient light, black foliage and dark characters. The
++   game itself goes on starting as it did: held at the start instead, it left holes in the ground */
++void hos_renderer_wait(void) {
++    if (renderer_up && WaitForSingleObject(renderer_up, INFINITE) != WAIT_OBJECT_0)
++        hos_fatal(NULL, "display: failed while waiting for the Vulkan renderer");
++}
++
+ void hos_display_start(void) {
+     if (getenv("HOS_HEADLESS")) {   /* no window: the renderer still draws, offscreen (screenshots, frame dumps) */
+         rx_start(NULL);
+         return;
+     }
+-    CreateThread(NULL, 0, display_main, NULL, 0, NULL);
+-}
++    renderer_up = CreateEventA(NULL, TRUE, FALSE, NULL);
++    if (!renderer_up) hos_fatal(NULL, "display: could not create renderer startup event");
++    HANDLE thread = CreateThread(NULL, 0, display_main, NULL, 0, NULL);
++    if (!thread) hos_fatal(NULL, "display: could not start renderer thread");
++    CloseHandle(thread);
++}
+--- a/host/hos_main.c
++++ b/host/hos_main.c
+@@ -140,6 +140,24 @@
+ 
+ float hos_aspect_ratio = 0;   /* (the window's default shape: host/display.c) */
+ int main(int argc, char **argv) {
++#ifdef _WIN32
++    {   // (the whole process, not only the window's thread: the renderer asks the window's size from its own, and on a 4K screen at 150%
++        // Windows answered such a thread 2560 x 1440: the picture was that size, in the corner of the window. Hookshot issues 15, 18, 20)
++        typedef BOOL(WINAPI * SetAware)(void *);
++        SetAware set = (SetAware)(void *)GetProcAddress(GetModuleHandleA("user32.dll"), "SetProcessDpiAwarenessContext");
++        if (set && !getenv("HOS_DPI_UNAWARE")) set((void *)(intptr_t)-4);
++    }
++    {   // (started from its icon the game has nowhere to log to: hookshot_log.txt beside it, last run only, for players to send in)
++        HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
++        if (!err || err == INVALID_HANDLE_VALUE || GetFileType(err) == FILE_TYPE_UNKNOWN) {
++            char path[MAX_PATH + 32];
++            DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
++            while (n && path[n - 1] != 92 && path[n - 1] != 47) n--;
++            memcpy(path + n, "hookshot_log.txt", 17);
++            if (freopen(path, "w", stderr)) setvbuf(stderr, NULL, _IONBF, 0);
++        }
++    }
++#endif
+     const char *image = NULL;
+     for (int i = 1; i < argc; i++) {
+         if (!strcmp(argv[i], "--romfs") && i + 1 < argc) hos_romfs_dir = argv[++i];
+--- a/host/hos_thread.c
++++ b/host/hos_thread.c
+@@ -9,6 +9,9 @@
+ #include <stdlib.h>
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
++#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION   /* (older Windows SDKs lack it: Windows 10 1803 and later take it) */
++#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
++#endif
+ #include <emmintrin.h>
+ #ifdef __EMSCRIPTEN__
+ #include <sched.h>
+--- a/host/mf_av1.c
++++ b/host/mf_av1.c
+@@ -11,6 +11,7 @@
+ #define COBJMACROS
+ #include "hos.h"
+ #include <windows.h>
++#include <shellapi.h>
+ #include <initguid.h>
+ #include <mfapi.h>
+ #include <mferror.h>
+@@ -69,8 +70,27 @@
+     return 1;
+ }
+ 
++/* (hookshot) Without the AV1 Video Extension the movies have no decoder: their pictures stay empty, which shows as a green screen, and the
++   intro never ends. Said once, on its own thread (the game goes on), with the way to the Store page. HOS_AV1_MISSING=1: as if it were missing */
++static DWORD WINAPI av1_missing_notice(LPVOID unused) {
++    (void)unused;
++    if (MessageBoxA(NULL, "Hookshot's movies need Microsoft's free AV1 Video Extension, which this PC does not have. Without it they show a green "
++                          "screen and the game can stop at a black screen.\n\nOpen its Microsoft Store page now? Install it, then restart the game.",
++                    "Hookshot", MB_YESNO | MB_ICONINFORMATION | MB_TOPMOST) == IDYES)
++        ShellExecuteA(NULL, "open", "ms-windows-store://pdp/?ProductId=9MVZQVXJBQ9V", NULL, NULL, SW_SHOWNORMAL);
++    return 0;
++}
++
++static void av1_missing(void) {
++    static LONG told;
++    if (InterlockedExchange(&told, 1)) return;
++    hos_log("video: no AV1 decoder in Media Foundation: the AV1 Video Extension is not installed, movies will not show");
++    CreateThread(NULL, 0, av1_missing_notice, NULL, 0, NULL);
++}
++
+ void *mf_av1_open(int w, int h) {
+     if (!com_ready()) return NULL;
++    if (getenv("HOS_AV1_MISSING")) { av1_missing(); return NULL; }
+     MFT_REGISTER_TYPE_INFO in = {MFMediaType_Video, MFVideoFormat_AV1};
+     IMFActivate **acts = NULL;
+     UINT32 n = 0;
+@@ -99,7 +119,7 @@
+         CoTaskMemFree(acts);
+         acts = NULL, n = 0;
+     }
+-    if (!mft) { hos_log("video: no AV1 decoder in Media Foundation (the AV1 Video Extension is not installed?)"); return NULL; }
++    if (!mft) { av1_missing(); return NULL; }
+     IMFMediaType *t = NULL;
+     MFCreateMediaType(&t);
+     IMFMediaType_SetGUID(t, &MF_MT_MAJOR_TYPE, &MFMediaType_Video);
+--- a/host/nn_applet.c
++++ b/host/nn_applet.c
+@@ -40,7 +40,11 @@
+         FILE *f = fopen(path, "r");
+         if (f) {
+             char line[80];
++            int whole = 1;   /* (the first line is longer than this: its second piece, "ave, and start...", was taken for the code) */
+             while (fgets(line, sizeof line, f)) {
++                const int starts = whole;
++                whole = strchr(line, 10) != NULL;
++                if (!starts) continue;
+                 const char *p = line;
+                 while (*p == ' ' || *p == '\t') p++;
+                 if (*p == '#' || *p == '\r' || *p == '\n' || !*p) continue;
+--- a/host/nn_hid.c
++++ b/host/nn_hid.c
+@@ -232,6 +232,13 @@
+             offset += (int64_t)n;
+             const int64_t at = (now - script_t0) / 1000000;
+             if (line[0] == '!') {   /* commands: !dump = a frame dump of the next frame (as RX_DUMP_AT) */
++#if defined(OCARINA_VULKAN_ONLY)
++                extern volatile int hos_nvn_sync_log_on;
++                if (!strncmp(line, "!synclog", 8)) hos_nvn_sync_log_on = 1;
++                else if (!strncmp(line, "!dump", 5) || !strncmp(line, "!shots ", 7) ||
++                         !strncmp(line, "!rdoc", 5) || !strncmp(line, "!flasharm", 9))
++                    hos_log("hid: this diagnostic command belongs to WebGPU and is unavailable in the Vulkan-only build");
++#else
+                 void rx_request_frame_dump(void);   /* gpu/render/rx_debug.cpp */
+                 if (!strncmp(line, "!dump", 5)) rx_request_frame_dump();
+                 extern volatile int hos_nvn_sync_log_on;   /* nvn_native.c: "!synclog" */
+@@ -242,6 +249,7 @@
+                 if (!strncmp(line, "!rdoc", 5)) rx_request_rdoc_capture(atoi(line + 5));
+                 void rx_flash_dark_arm(void);   /* gpu/render/rx_core.cpp: arms RX_FLASH_DARK_DUMP (RX_FLASH_DARK_AFTER=-1) */
+                 if (!strncmp(line, "!flasharm", 9)) rx_flash_dark_arm();
++#endif
+                 hos_log("hid: live command at %.1f s: %.*s", at / 1000.0, (int)(n > 1 ? n - 1 : 0), line);
+                 continue;
+             }
+--- a/host/nvn_native.c
++++ b/host/nvn_native.c
+@@ -2096,6 +2096,7 @@
+     }
+ }
+ NV(nvnQueueSubmitCommands) {
++    { void hos_renderer_wait(void); static volatile LONG up; if (!up) { hos_renderer_wait(); up = 1; } }   /* (display.c) */
+     nvn_queue *q = (nvn_queue *)P(0);
+     const int n = I(1);
+     uint64_t h[64];
+--- a/nx2/build.py
++++ b/nx2/build.py
+@@ -29,11 +29,14 @@
+ import subprocess
+ import sys
+ import time
++from pathlib import Path
+ 
+ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # (python -I leaves the script folder off)
+ import kit
+ import rtgen
+ import toolchain
++from ocarina.build_support import object_key, link_options, video_libraries, is_mingw
++from ocarina.config import compile_jobs
+ 
+ NX2_RT = os.path.join(kit.HERE, "rt")
+ HOST = os.path.join(kit.HERE, "..", "host")
+@@ -45,7 +48,7 @@
+ 
+ def HOT_ORDER():
+     p = os.path.join(kit.WORK, "hot_order.txt")
+-    return ["-Wl,/order:@" + p.replace("\\", "/"), "-Wl,/ignore:4037"] if os.path.exists(p) and not os.environ.get("RX_NO_ORDER") else []
++    return ["-Wl,/order:@" + p.replace("\\", "/"), "-Wl,/ignore:4037"] if not is_mingw() and os.path.exists(p) and not os.environ.get("RX_NO_ORDER") else []
+ 
+ 
+ HOST_LIBS = ["-luser32", "-lwinmm", "-ladvapi32", "-lole32", "-lshell32", "-lgdi32", "-ldbghelp"]
+@@ -53,28 +56,6 @@
+ # FFmpeg (libavcodec's VP8/VP9 decoders, swscale) for nn::codec's video decoders (host/nn_video.c): the static build
+ # in the Eglantine clone's package cache
+ FFMPEG = None   # (found in the CPM caches below, once cpm_dirs is defined)
+-# the renderer's WebGPU: a wgpu-native release (include/, lib/); TOTKPort's build of it by default
+-WGPU = os.environ.get("WGPU_NATIVE", os.path.join(os.path.expanduser("~"), "Desktop", "TOTKPort", "third_party",
+-                                                  "wgpu-native"))
+-
+-
+-def gpu_sources():
+-    """The renderer (gpu/render, TOTKPort's, NVN replayed with WebGPU) and what it builds on, from suyu
+-    (gpu/third_party/suyu): the shader recompiler (Maxwell frontend, IR passes, the WGSL backend; the Ampere
+-    lowering is header-only), surface formats, texture decoders (block linear, ASTC)."""
+-    suyu = os.path.join(GPU, "third_party", "suyu")
+-    out = []
+-    for d, dirs, files in os.walk(os.path.join(suyu, "shader_recompiler")):
+-        dirs[:] = [x for x in dirs if x != "glsl"]   # (the GLSL backend: TOTKPort's shader tests' reference only)
+-        out += [os.path.join(d, f) for f in files if f.endswith(".cpp") and f not in ("attribute.cpp", "flow_test.cpp")]
+-    vc = os.path.join(suyu, "video_core")
+-    out += [os.path.join(vc, *f.split("/")) for f in ("surface.cpp", "texture_cache/format_lookup_table.cpp",
+-                                                      "textures/astc.cpp", "textures/decoders.cpp")]
+-    render = os.path.join(GPU, "render")
+-    out += [os.path.join(render, f) for f in os.listdir(render) if f.endswith(".cpp")]
+-    return sorted(out)
+-
+-
+ def tree_headers(*roots, skip=()):
+     """Every header under these folders, as one dependency blob (suyu's headers sit in many folders); folders named
+     in skip are left out"""
+@@ -105,22 +86,12 @@
+     return sorted(out)
+ 
+ 
+-def cpm_dirs():
+-    """Eden's CPM package caches, read only: RX_CPM, this project's work/eg clone, mkw-recomp's, the shared
+-    Eglantine checkout's (Vulkan and SPIR-V headers, VMA, FFmpeg)"""
+-    eden_ns2 = os.path.dirname(kit.ROOT)
+-    return [d for d in (os.environ.get("RX_CPM"), os.path.join(kit.WORK, "eg", ".cache", "cpm"),
+-                        os.path.join(eden_ns2, "mkw-recomp", "work", "eg", ".cache", "cpm"),
+-                        os.path.join(eden_ns2, "Eglantine", ".cache", "cpm")) if d and os.path.isdir(d)]
+-
+-
+ def cpm_package(name):
+-    """The newest version of a package in the first CPM cache that has it (cpm_dirs), or None"""
+-    for root in cpm_dirs():
+-        d = os.path.join(root, name)
+-        if os.path.isdir(d) and os.listdir(d):
+-            return os.path.join(d, sorted(os.listdir(d))[-1])
+-    return None
++    """Pinned dependencies in this distribution; never probe another project's checkout."""
++    root = os.environ.get("OCARINA_DEPS", os.path.join(kit.ROOT, "ferramentas", "deps"))
++    folder = {"vulkanheaders": "vulkan", "spirv-headers": "spirv", "vulkanmemoryallocator": "vma", "ffmpeg": "ffmpeg"}[name]
++    path = os.path.join(root, folder)
++    return path if os.path.isdir(path) else None
+ 
+ 
+ def cache_put(obj, key):
+@@ -136,8 +107,7 @@
+         shutil.copyfile(obj, dst)
+ 
+ 
+-FFMPEG = next((os.path.join(d, n) for d in [os.path.join(r, "ffmpeg") for r in cpm_dirs()] if os.path.isdir(d)
+-               for n in sorted(os.listdir(d)) if os.path.isdir(os.path.join(d, n, "lib"))), None)
++FFMPEG = cpm_package("ffmpeg")
+ 
+ 
+ # the soft write watch (rt/a64.h A64_MARK): lifted stores mark their 4 KB page, and the renderer reads the marks
+@@ -172,40 +142,11 @@
+     return path
+ 
+ 
+-def object_key(src, fl, deps):
+-    """What an object depends on: its source, the flags without the include folders (the two builds' generated
+-    headers are in different folders; their contents are in deps), and the headers"""
+-    return hashlib.sha1(open(src, "rb").read() + " ".join(f for f in fl if not f.startswith("-I")).encode() +
+-                        deps).hexdigest()
+-
+-
+-def migrate_stamps(gen, obj_dir, fl, deps):
+-    """Objects stamped with the old key (flags with include folders) are restamped with object_key and cached, so
+-    a build from before the cache does not have to be compiled again"""
+-    if not os.path.isdir(obj_dir):
+-        return
+-    if not os.path.isdir(gen) or not os.path.isdir(obj_dir):   # (a first build in a fresh folder)
+-        return
+-    for f in os.listdir(gen):
+-        if not (f.startswith("code_") and f.endswith(".c")):
+-            continue
+-        obj = os.path.join(obj_dir, f[:-2] + ".o")
+-        stamp = obj + ".sha1"
+-        if not (os.path.exists(obj) and os.path.exists(stamp)):
+-            continue
+-        src = os.path.join(gen, f)
+-        content = open(src, "rb").read()
+-        if open(stamp).read() == hashlib.sha1(content + " ".join(fl).encode() + deps).hexdigest():
+-            key = object_key(src, fl, deps)
+-            open(stamp, "w").write(key)
+-            cache_put(obj, key)
+-
+-
+ def compile_one(job):
+     cc, src, obj, fl, deps = job
+-    key = object_key(src, fl, deps)
+-    stamp = obj + ".sha1"
+-    if os.path.exists(obj) and os.path.exists(stamp) and open(stamp).read() == key:
++    key = object_key(cc, src, fl, deps)
++    stamp = obj + ".sha256"
++    if os.path.exists(obj) and os.path.exists(stamp) and Path(stamp).read_text() == key:
+         return src, 0.0, None
+     cached = os.path.join(OBJ_CACHE, key + ".o")
+     if os.path.exists(cached):   # (the same source and flags built for the other target)
+@@ -216,13 +157,17 @@
+         except OSError:
+             import shutil
+             shutil.copyfile(cached, obj)
+-        open(stamp, "w").write(key)
++        Path(stamp).write_text(key)
+         return src, 0.0, None
+     t = time.time()
+-    r = subprocess.run([cc] + fl + ["-c", src, "-o", obj], capture_output=True, text=True)
++    temporary = obj + ".building"
++    r = subprocess.run([cc] + fl + ["-c", src, "-o", temporary], capture_output=True, text=True)
+     if r.returncode:
++        if os.path.exists(temporary):
++            os.remove(temporary)
+         return src, time.time() - t, r.stderr[-4000:]
+-    open(stamp, "w").write(key)
++    os.replace(temporary, obj)
++    Path(stamp).write_text(key)
+     cache_put(obj, key)
+     return src, time.time() - t, None
+ 
+@@ -230,7 +175,7 @@
+ def main():
+     kit.wait_for_quiet('the compile')
+     p = argparse.ArgumentParser()
+-    p.add_argument("--jobs", type=int, default=1)
++    p.add_argument("--jobs", type=int, default=None)
+     p.add_argument("--only", default="")
+     p.add_argument("--opt", default="O1")
+     p.add_argument("--no-polls", action="store_true")
+@@ -238,6 +183,7 @@
+     p.add_argument("--lib", action="store_true")
+     p.add_argument("--standalone", action="store_true")
+     a = p.parse_args()
++    a.jobs = compile_jobs(a.jobs)
+     sa = os.path.join(kit.WORK, "sa")
+     gen = os.path.join(sa if a.standalone else kit.WORK, "gen")
+     out = os.path.join(sa if a.standalone else kit.WORK, "build")
+@@ -250,10 +196,6 @@
+     deps = b"".join(open(os.path.join(d, f), "rb").read() for d in (gen, rt64) for f in sorted(os.listdir(d))
+                     if f.endswith(".h"))
+     shim_deps = deps + open(os.path.join(NX2_RT, "mkw_host.h"), "rb").read()
+-    eden_gen, eden_out = os.path.join(kit.WORK, "gen"), os.path.join(kit.WORK, "build")
+-    migrate_stamps(eden_gen, os.path.join(eden_out, "obj"),
+-                   flags(eden_gen, os.path.join(eden_out, "rt64"), a.opt, not a.no_polls), deps)
+-    migrate_stamps(gen, obj_dir, fl, deps)
+     chunks = sorted(f for f in os.listdir(gen) if f.startswith("code_") and f.endswith(".c"))
+     if a.only:
+         want = {"code_%03d.c" % int(n) for n in a.only.split(",")}
+@@ -265,7 +207,7 @@
+                 [os.path.join(rt64, "a64_rt.c")]
+         if a.standalone:
+             srcs += [os.path.join(gen, f) for f in ("a64_stubs.c", "hos_image.c", "nvn2_exports.c")]
+-            host_srcs = sorted(os.path.join(HOST, f) for f in os.listdir(HOST) if f.endswith(".c") and (f != "pgo_rt.c" or PGO == "gen"))
++            host_srcs = sorted(os.path.join(HOST, f) for f in os.listdir(HOST) if f.endswith(".c") and f != "rx_webgpu_unavailable.c" and (f != "pgo_rt.c" or PGO == "gen"))
+         else:
+             srcs += [os.path.join(NX2_RT, "eden_shim.c"), write_info(out)]
+     # biggest first, so the long ones do not end up alone at the end
+@@ -284,9 +226,8 @@
+              shim_deps if os.path.dirname(s) == NX2_RT else deps) for s in srcs]
+     # the runtime: ordinary C at -O2, with its own headers (any host/*.h change rebuilds all of it)
+     host_fl = toolchain.native_target() + CPU + ["-I" + HOST, "-I" + rt64, "-I" + gen, "-Wno-everything", "-O2", "-g0",
+-                                           "-mcx16", "-DA64_POLLING"] + WRITE_TRACK
+-    host_deps = deps + b"".join(open(os.path.join(HOST, f), "rb").read() for f in sorted(os.listdir(HOST))
+-                                if f.endswith(".h"))
++                                           "-mcx16", "-DA64_POLLING", "-DOCARINA_VULKAN_ONLY"] + WRITE_TRACK
++    host_deps = deps + tree_headers(HOST, os.path.join(GPU, "render")) + open(os.path.join(GPU, "vk", "vk_api.h"), "rb").read()
+     jobs += [(cc, s, os.path.join(obj_dir, "host_" + os.path.basename(s)[:-2] + ".o"),
+               host_fl + ["-I" + os.path.join(OPUS, "include")] +
+               (["-I" + os.path.join(FFMPEG, "include")] if FFMPEG else []), host_deps) for s in host_srcs]
+@@ -297,23 +238,14 @@
+         for rel in open(os.path.join(OPUS, "sources.txt")).read().split():
+             jobs.append((cc, os.path.join(OPUS, rel), os.path.join(obj_dir, "opus_" + rel.replace("/", "_")[:-2] + ".o"),
+                          oflags, b"opus-1.5.2"))
+-    # the renderer (C++20, NDEBUG: no asserts in it or suyu), when a wgpu-native release is there
+-    wgpu = a.standalone and not a.only and os.path.isfile(os.path.join(WGPU, "include", "webgpu", "webgpu.h"))
+-    if a.standalone and not a.only and not wgpu:
+-        print("no wgpu-native at %s (WGPU_NATIVE): building without the renderer" % WGPU)
+-    if wgpu:
+-        cxx = toolchain.need(toolchain.find("clang++"))
+-        gflags = toolchain.native_target() + ["-std=c++20", "-O2", "-g0", "-DNDEBUG", "-Wno-everything",
+-                                              "-I" + os.path.join(GPU, "compat"),
+-                                              "-I" + os.path.join(GPU, "third_party", "suyu"),
+-                                              "-I" + os.path.join(WGPU, "include"), "-I" + HOST, "-I" + rt64] + WRITE_TRACK +                  ["-include", os.path.join(GPU, "render", "rx_wgpu_names.h")]   # (rx_* -> wgr_*: host/rx_backend.c)
+-        gdeps = tree_headers(GPU, HOST, skip=("vk",)) + open(os.path.join(WGPU, "include", "webgpu", "webgpu.h"), "rb").read()
+-        for src in gpu_sources():
+-            name = os.path.relpath(src, GPU).replace(os.sep, "_")[:-4]
+-            jobs.append((cxx, src, os.path.join(obj_dir, "gpu_" + name + ".o"), gflags, gdeps))
++    if a.standalone and not a.only:
++        jobs.append((cc, os.path.join(HOST, "rx_webgpu_unavailable.c"),
++                     os.path.join(obj_dir, "host_rx_webgpu_unavailable.o"), host_fl, host_deps))
+     # the Vulkan back end, a DLL of its own (RX_BACKEND=vulkan): built when the Vulkan headers are in the CPM cache
+     vk_jobs = []
+     vk_headers, spirv_headers = cpm_package("vulkanheaders"), cpm_package("spirv-headers")
++    if a.standalone and not a.only and not (vk_headers and spirv_headers and cpm_package("vulkanmemoryallocator") and FFMPEG):
++        raise SystemExit("Missing Vulkan/SPIR-V/VMA/FFmpeg dependencies; run manage.py doctor first")
+     if a.standalone and not a.only and vk_headers and spirv_headers:
+         cxx = toolchain.need(toolchain.find("clang++"))
+         vk = os.path.join(GPU, "vk")
+@@ -340,8 +272,10 @@
+         # (Eden's recompiler and sirit see only their own headers: a change to the back end's vk_*.h does not
+         # rebuild their ~500 files; the back end itself depends on everything, suyu's texture decoders included)
+         vk_lib_deps = tree_headers(os.path.join(vk, "eden"), os.path.join(vk, "sirit"), os.path.join(vk, "compat"),
+-                                   os.path.join(GPU, "compat"))
+-        vdeps = tree_headers(vk, os.path.join(GPU, "render"), os.path.join(GPU, "compat"),
++                                   os.path.join(GPU, "compat"), os.path.join(spirv_headers, "include"),
++                                   os.path.join(vk_headers, "include"))
++        vdeps = vk_lib_deps + tree_headers(vk, os.path.join(GPU, "render"), os.path.join(GPU, "compat"),
++                             os.path.join(cpm_package("vulkanmemoryallocator"), "include"),
+                              os.path.join(GPU, "third_party", "suyu", "video_core", "textures"))
+         for src in vk_sources():
+             name = os.path.relpath(src, vk).replace(os.sep, "_")[:-4]
+@@ -378,13 +312,10 @@
+         exe = os.path.join(out, "hookshot.exe")   # (+ hookshot.map: crash offsets -> f_<guest address>)
+         t = time.time()
+         r = subprocess.run([cc] + toolchain.native_target() + toolchain.native_link() +
+-                           ["-o", exe, "-Wl,/map:" + exe[:-4] + ".map", "-Wl,/stack:8388608", "@" + rsp] + HOT_ORDER() + HOST_LIBS +
++                           ["-o", exe, "@" + rsp] + link_options(exe[:-4] + ".map", stack=True, windowed=os.environ.get("RX_RELEASE") == "1") + HOT_ORDER() + HOST_LIBS +
+                            (["-Wl,/nodefaultlib:clang_rt.profile.lib"] if PGO == "gen" else []) +
+                            ([os.path.join(kit.WORK, "hookshot.res")] if os.path.exists(os.path.join(kit.WORK, "hookshot.res")) else []) +   # (nx2/make_icon.py)
+-                           (["-Wl,/subsystem:windows,/entry:mainCRTStartup"] if os.environ.get("RX_RELEASE") == "1" else []) +   # (no console window)
+-                           ([os.path.join(WGPU, "lib", "wgpu_native.dll.lib")] if wgpu else []) +
+-                           ([os.path.join(FFMPEG, "lib", l + ".lib") for l in ("avcodec", "swscale", "swresample", "avutil")] +
+-                            ["-lbcrypt", "-lmfplat", "-lmfuuid", "-lstrmiids", "-lole32"] if FFMPEG else []),
++                           (video_libraries(FFMPEG) if FFMPEG else []),
+                            capture_output=True, text=True)
+         undefined = sorted({l.strip() for l in (r.stdout + r.stderr).splitlines() if "undefined symbol" in l})
+         if r.returncode:
+@@ -392,11 +323,6 @@
+             print("\n".join(undefined[:60]) if undefined else (r.stdout + r.stderr)[-3000:])
+             return 1
+         print("linked %s: %d MB (%.0fs)" % (exe, os.path.getsize(exe) >> 20, time.time() - t))
+-        if wgpu:   # (wgpu_native.dll beside it; in use while the game runs)
+-            import shutil
+-            dll, dst = os.path.join(WGPU, "lib", "wgpu_native.dll"), os.path.join(out, "wgpu_native.dll")
+-            if not os.path.exists(dst) or os.path.getsize(dst) != os.path.getsize(dll):
+-                shutil.copyfile(dll, dst)
+         # (hookshot) SDL2.dll beside it: host/pad_sdl.c's controllers (DualSense, DualShock 4, Switch Pro ...)
+         sdl = os.path.join(kit.HERE, "..", "third_party", "sdl2", "SDL2.dll")
+         sdl_dst = os.path.join(out, "SDL2.dll")
+@@ -408,8 +334,8 @@
+         vrsp = os.path.join(out, "vk_objs.rsp")
+         open(vrsp, "w").write("\n".join('"%s"' % j[2].replace("\\", "/") for j in vk_jobs))
+         t = time.time()
+-        r = subprocess.run([cc] + toolchain.native_target() + toolchain.native_link() +
+-                           ["-shared", "-o", vdll, "-Wl,/map:" + vdll[:-4] + ".map", "@" + vrsp, "-luser32", "-lgdi32"],
++        r = subprocess.run([cxx] + toolchain.native_target() + toolchain.native_link() +
++                           ["-shared", "-o", vdll, "@" + vrsp, "-luser32", "-lgdi32"] + link_options(vdll[:-4] + ".map"),
+                            capture_output=True, text=True)
+         if r.returncode:
+             undefined = sorted({l.strip() for l in (r.stdout + r.stderr).splitlines() if "undefined symbol" in l})
+@@ -421,7 +347,7 @@
+         dll = os.path.join(out, "hookshot_game.dll")   # (+ hookshot_game.map: crash offsets -> f_<guest address>)
+         t = time.time()
+         r = subprocess.run([cc] + toolchain.native_target() + toolchain.native_link() +
+-                           ["-shared", "-o", dll, "-Wl,/map:" + dll[:-4] + ".map", "@" + rsp],
++                           ["-shared", "-o", dll, "@" + rsp] + link_options(dll[:-4] + ".map"),
+                            capture_output=True, text=True)
+         undefined = sorted({l.strip() for l in (r.stdout + r.stderr).splitlines() if "undefined symbol" in l})
+         if r.returncode:
+--- a/nx2/chunks.py
++++ b/nx2/chunks.py
+@@ -50,10 +50,13 @@
+     path = os.path.join(img_dir, FILE)
+     if not os.path.exists(path):
+         return []
+-    return [int(l, 16) for l in open(path) if l.strip() and not l.startswith("#")]
++    with open(path) as f:
++        return [int(l, 16) for l in f if l.strip() and not l.startswith("#")]
+ 
+ 
+ def save(img_dir, starts):
++    # A standalone-only build creates sa/image, not this shared metadata directory.
++    os.makedirs(img_dir, exist_ok=True)
+     with open(os.path.join(img_dir, FILE), "w") as f:
+         f.write("# first guest address of each lifted C chunk after the first (nx2/chunks.py)\n")
+         f.write("".join("%08x\n" % s for s in sorted(starts)))
+@@ -66,11 +69,12 @@
+     pat = re.compile(r"^void f_([0-9a-f]+)\(Ctx \*__restrict A64_NOESC c\) \{")
+     n = 1
+     while os.path.exists(os.path.join(gen_dir, "code_%03d.c" % n)):
+-        for line in open(os.path.join(gen_dir, "code_%03d.c" % n)):
+-            m = pat.match(line)
+-            if m:
+-                starts.append(int(m.group(1), 16))
+-                break
++        with open(os.path.join(gen_dir, "code_%03d.c" % n)) as f:
++            for line in f:
++                m = pat.match(line)
++                if m:
++                    starts.append(int(m.group(1), 16))
++                    break
+         n += 1
+     return starts
+ 
+@@ -91,10 +95,13 @@
+         files = L.write(gen_dir, chunk_bytes=b)
+     finally:
+         del L.emit_function
+-    n = len(files)
+-    while os.path.exists(os.path.join(gen_dir, "code_%03d.c" % n)):   # (fewer chunks than the last lift)
+-        os.remove(os.path.join(gen_dir, "code_%03d.c" % n))
+-        n += 1
++    # The output list may also contain code_hot.c, so its length is not the
++    # number of ordinary chunks. Retain exactly the numbered files just emitted.
++    generated = {os.path.basename(path) for path in files}
++    with os.scandir(gen_dir) as entries:
++        for entry in entries:
++            if re.fullmatch(r"code_\d+\.c", entry.name) and entry.name not in generated:
++                os.remove(entry.path)
+     save(img_dir, starts or b.recorded)
+     print("chunks: %d, boundaries %s" % (len(files), "kept" if starts else "from sizes (saved)"))
+     return files
+--- a/nx2/kit.py
++++ b/nx2/kit.py
+@@ -8,6 +8,8 @@
+ import sys
+ 
+ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++if ROOT not in sys.path:
++    sys.path.insert(0, ROOT)
+ KIT = os.path.join(ROOT, "third_party", "a64-kit")
+ for sub in ("lift", "tools", "hos", "rt"):
+     p = os.path.join(KIT, sub)
+--- a/nx2/make_game.py
++++ b/nx2/make_game.py
+@@ -1,199 +1,7 @@
+-"""A game folder from the user's own dump: what the builder app (builder/) runs.
+-
+-    python -I nx2/make_game.py --nup <file.nup> --out <folder> [--work <folder>] [--jobs <n>]
+-    python -I nx2/make_game.py --romfs <dir> --exefs <dir> --out <folder> [--work <folder>] [--jobs <n>]
+-    python -I nx2/make_game.py --check --nup <file.nup>       (or --exefs <dir>: is this the right game and version?)
+-
+-The folder holds the executable and all it needs, started with a double click: nothing goes back into the repository, and no game
+-data ever comes with the tools. Lines the app reads, each on its own line of stdout:
+-
+-    @@stage <id> <text>      a step begins
+-    @@progress <0..1>        how far that step is
+-    @@check <ok|bad> <text>  (--check) the answer
+-    @@done <folder>          finished
+-    @@error <text>           stopped
+-"""
+-import argparse
+-import os
+-import re
+-import shutil
+-import subprocess
++"""Compatibility entry point. The build pipeline lives in ocarina/build.py."""
+ import sys
+-
+-HERE = os.path.dirname(os.path.abspath(__file__))
+-ROOT = os.path.dirname(HERE)
+-PY = [sys.executable, "-I"]
+-BUILD_ID = "e0f3ccfa"   # (the version the patches, the hot list and the profile were made from)
+-BESIDE = ["hookshot.exe", "hookshot_vk.dll", "SDL2.dll", "wgpu_native.dll"]
+-LANGUAGES = [("en-US", "English (US)"), ("en-GB", "English (UK)"), ("fr", "French (France)"), ("fr-CA", "French (Canada)"), ("de", "German"),
+-             ("it", "Italian"), ("es", "Spanish (Spain)"), ("es-419", "Spanish (Latin America)"), ("pt-BR", "Portuguese (Brazil)"), ("nl", "Dutch"),
+-             ("pl", "Polish"), ("ru", "Russian"), ("ja", "Japanese"), ("ko", "Korean"), ("zh-Hans", "Chinese (Simplified)"),
+-             ("zh-Hant", "Chinese (Traditional)")]
+-
+-
+-def say(*words):
+-    print("@@" + " ".join(str(w) for w in words), flush=True)
+-
+-
+-def fail(text):
+-    say("error", text)
+-    sys.exit(1)
+-
+-
+-def run(cmd, env=None, on_line=None):
+-    e = dict(os.environ, PYTHONIOENCODING="utf-8")
+-    e.update(env or {})
+-    p = subprocess.Popen(cmd, cwd=ROOT, env=e, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+-                         errors="replace", bufsize=1)
+-    tail = []
+-    for line in p.stdout:
+-        line = line.rstrip()
+-        print(line, flush=True)
+-        tail = (tail + [line])[-12:]
+-        if on_line:
+-            on_line(line)
+-    if p.wait():
+-        fail("%s stopped: %s" % (os.path.basename(cmd[2]), tail[-1] if tail else "no output"))
+-
+-
+-def build_id(main):
+-    """the module id of an NSO, plain or compressed: the header is the same"""
+-    with open(main, "rb") as f:
+-        head = f.read(0x60)
+-    if head[:4] != b"NSO0":
+-        fail("%s is not a game executable" % main)
+-    return head[0x40:0x60].hex()
+-
+-
+-def check(a, work):
+-    if a.nup:
+-        probe = os.path.join(work, "probe")
+-        shutil.rmtree(probe, ignore_errors=True)
+-        run(PY + ["nx2/nup.py", a.nup, "--extract", probe, "--only", "exefs"])
+-        bid = build_id(os.path.join(probe, "exefs", "main"))
+-        shutil.rmtree(probe, ignore_errors=True)
+-    else:
+-        bid = build_id(os.path.join(a.exefs, "main"))
+-    if bid.startswith(BUILD_ID):
+-        say("check", "ok", "This is the version Hookshot supports (build %s)." % bid[:8])
+-    else:
+-        say("check", "bad", "This is build %s. Hookshot supports build %s." % (bid[:8], BUILD_ID))
+-
+-
+-def check_windows_sdk():
+-    """The compiler is bundled; Microsoft's C library and Windows SDK may not be, by their licences. Found now, not 40 minutes in."""
+-    sys.path.insert(0, os.path.join(ROOT, "third_party", "a64-kit", "tools"))
+-    import tempfile
+-    import toolchain
+-    with tempfile.TemporaryDirectory() as d:
+-        src = os.path.join(d, "t.c")
+-        with open(src, "w") as f:
+-            f.write(chr(10).join(("#include <stdio.h>", "#include <windows.h>", "int main(void) { return 0; }", "")))
+-        r = subprocess.run([toolchain.need(toolchain.find("clang"))] + toolchain.native_target() + ["-c", src, "-o", os.path.join(d, "t.o")],
+-                           capture_output=True, text=True)
+-    if r.returncode:
+-        fail("The Visual Studio C++ tools and the Windows SDK are needed. Install Visual Studio Build Tools with \"Desktop development "
+-             "with C++\" from visualstudio.microsoft.com, then build again.")
+-
+-
+-def link_or_copy(src, dst):
+-    """the romfs by hard links where the disk allows: 26 GB not written twice"""
+-    files = [os.path.join(d, f) for d, _, fs in os.walk(src) for f in fs]
+-    for i, s in enumerate(files):
+-        t = os.path.join(dst, os.path.relpath(s, src))
+-        os.makedirs(os.path.dirname(t), exist_ok=True)
+-        if not os.path.exists(t):
+-            try:
+-                os.link(s, t)
+-            except OSError:
+-                shutil.copy2(s, t)
+-        if i % 500 == 0:
+-            say("progress", "%.3f" % (i / max(1, len(files))))
+-
+-
+-def main():
+-    p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+-    p.add_argument("--nup")
+-    p.add_argument("--romfs")
+-    p.add_argument("--exefs")
+-    p.add_argument("--out")
+-    p.add_argument("--work", default=os.path.join(os.environ.get("LOCALAPPDATA", ROOT), "HookshotBuilder"))
+-    p.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
+-    p.add_argument("--language", default="en-US", help="the game's language: a code from LANGUAGES, written to language.txt")
+-    p.add_argument("--check", action="store_true")
+-    a = p.parse_args()
+-    os.makedirs(a.work, exist_ok=True)
+-    if a.check:
+-        return check(a, a.work)
+-    if not a.out or not (a.nup or (a.romfs and a.exefs)):
+-        fail("needs --out, and --nup or --romfs with --exefs")
+-    out = os.path.abspath(a.out)
+-    work = os.path.abspath(a.work)
+-    os.makedirs(out, exist_ok=True)
+-    check_windows_sdk()
+-    exefs = os.path.join(work, "exefs")
+-    romfs = os.path.join(out, "romfs")
+-
+-    say("stage", "read", "Reading your game files")
+-    shutil.rmtree(exefs, ignore_errors=True)
+-    if a.nup:
+-        game = os.path.join(out, ".game")
+-        run(PY + ["nx2/nup.py", a.nup, "--extract", game])
+-        shutil.move(os.path.join(game, "exefs"), exefs)
+-        if not os.path.isdir(romfs):
+-            shutil.move(os.path.join(game, "romfs"), romfs)
+-        shutil.rmtree(game, ignore_errors=True)
+-    else:
+-        shutil.copytree(a.exefs, exefs)   # (unpacked in place: the user's copy stays as it is)
+-        run(PY + ["nx2/unpack.py", exefs])
+-        link_or_copy(a.romfs, romfs)
+-    bid = build_id(os.path.join(exefs, "main"))
+-    if not bid.startswith(BUILD_ID):
+-        fail("This is build %s. Hookshot supports build %s." % (bid[:8], BUILD_ID))
+-
+-    # (made once on the development PC: lists of addresses and counts, no game code)
+-    for name in ("hot_funcs.txt", "hot_order.txt", "hookshot_pieces.prof", "hookshot.res"):
+-        src = os.path.join(ROOT, "work", name)
+-        if os.path.exists(src):
+-            shutil.copy2(src, os.path.join(work, name))
+-    os.makedirs(os.path.join(work, "image"), exist_ok=True)
+-    src = os.path.join(ROOT, "work", "image", "chunks.txt")   # (where the lifted code's files begin: addresses)
+-    if os.path.exists(src):
+-        shutil.copy2(src, os.path.join(work, "image", "chunks.txt"))
+-    env = {"OOT_WORK": work, "OOT_EXEFS": exefs, "OOT_ROMFS": romfs, "OOT_DUMP": out, "RX_RELEASE": "1", "A64_HOT_CHUNK": "1"}
+-    if os.path.exists(os.path.join(work, "hot_funcs.txt")):
+-        env["A64_HOT_FUNCS"] = os.path.join(work, "hot_funcs.txt")
+-    if os.path.exists(os.path.join(work, "hookshot_pieces.prof")):
+-        env["RX_PGO"] = os.path.join(work, "hookshot_pieces.prof")
+-
+-    say("stage", "lift", "Translating the game to PC code")
+-    run(PY + ["nx2/lift.py", "--standalone", "--write", "--exefs", exefs, "--work", work], env)
+-    run(PY + ["nx2/split_hot.py", os.path.join(work, "sa", "gen")], env)   # (eight files side by side: ~6 minutes, not 79)
+-
+-    say("stage", "compile", "Compiling")
+-    done = {"n": 0, "of": 1}
+-
+-    def compiled(line):
+-        m = re.match(r"(\d+) files, ", line)
+-        if m:
+-            done["of"] = int(m.group(1))
+-        elif re.match(r"\s+\S+\s+\d+ MB\s+\d+s", line):
+-            done["n"] += 1
+-            say("progress", "%.3f" % (done["n"] / done["of"]))
+-    run(PY + ["nx2/build.py", "--standalone", "--jobs", str(a.jobs)], env, compiled)
+-
+-    say("stage", "finish", "Putting the game folder together")
+-    built = os.path.join(work, "sa", "build")
+-    for name in BESIDE:
+-        if os.path.exists(os.path.join(built, name)):
+-            shutil.copy2(os.path.join(built, name), os.path.join(out, name))
+-    shutil.copy2(os.path.join(work, "sa", "image", "image.bin"), os.path.join(out, "image.bin"))
+-    language = os.path.join(out, "language.txt")   # (the same text as host/nn_applet.c writes)
+-    with open(language, "w", encoding="utf-8", newline="\n") as f:
+-        f.write("# The game's language. Change the line below to one of the codes listed here, save, and start the game again.\n\n%s\n\n" % a.language)
+-        f.writelines("# %-8s %s\n" % l for l in LANGUAGES)
+-    say("done", out)
+-
+-
++from pathlib import Path
++sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
++from ocarina.cli import main
+ if __name__ == "__main__":
+-    main()
++    raise SystemExit(main(["build", *sys.argv[1:]]))
+--- a/nx2/nup.py
++++ b/nx2/nup.py
+@@ -13,32 +13,68 @@
+            32-byte hash, 16 bytes 0
+     then   the child list, u32 each: a node index; below the dir count a dir, else (index - dirs) a file
+     then   the name strings (not 0-terminated)
+-The data of a file is stored as is (no compression, no encryption) at its data offset.
++File data is stored as is, or wrapped in a Zstandard frame by newer dumpers. Native game .zs frames must remain compressed.
+ """
+ import argparse
++import io
+ import os
+ import shutil
+ import struct
+ import sys
++from pathlib import Path, PurePosixPath, PureWindowsPath
++
++
++ZSTD = b"\x28\xb5\x2f\xfd"
++
++
++def frame_content_size(head):
++    if len(head) < 5 or head[:4] != ZSTD:
++        return None
++    descriptor = head[4]
++    single = (descriptor >> 5) & 1
++    at = 5 + (0 if single else 1) + (0, 1, 2, 4)[descriptor & 3]
++    count = (1 if single else 0, 2, 4, 8)[descriptor >> 6]
++    if not count or len(head) < at + count:
++        return None
++    size = int.from_bytes(head[at:at + count], "little")
++    return size + 256 if count == 2 else size
++
++
++def zstd_module():
++    try:
++        import zstandard
++    except ImportError:
++        raise SystemExit("zstandard nao foi encontrado. Aplique a atualizacao completa das dependencias.") from None
++    return zstandard
+ 
+ 
+ class Nup:
+     def __init__(self, path):
+         self.path = path
+         self.f = open(path, "rb")
++        try:
++            self._read_metadata()
++        except BaseException:
++            self.f.close()
++            raise
++
++    def _read_metadata(self):
+         h = self.f.read(0x80)
+         if h[:4] != b"NUP\x01":
+-            raise SystemExit("%s: not a NUP package (magic %r)" % (path, h[:4]))
++            raise SystemExit("%s: not a NUP package (magic %r)" % (self.path, h[:4]))
+         self.file_size = struct.unpack_from("<Q", h, 0x40)[0]
+         t = self.f.read(0x30)
+         if t[:4] != b"TOC\x01":
+-            raise SystemExit("%s: no TOC at 0x80" % path)
++            raise SystemExit("%s: no TOC at 0x80" % self.path)
+         nt, nd, nf, soff, ssz = struct.unpack_from("<IQQQQ", t, 4)
+         self.nd, self.nf = nd, nf
+         dirs_at = 0x80 + 0x30 + 0x40 * nt
+         files_at = dirs_at + 24 * nd
+         kids_at = files_at + 80 * nf
+         strings_at = 0x80 + soff
++        size = os.fstat(self.f.fileno()).st_size
++        if not nt or strings_at < kids_at or strings_at + ssz > size or (strings_at - kids_at) % 4:
++            raise ValueError("invalid NUP metadata bounds")
+         self.f.seek(0)
+         meta = self.f.read(strings_at + ssz)
+         self.strings = meta[strings_at:strings_at + ssz]
+@@ -69,9 +105,76 @@
+                 r = self.files[k - self.nd]
+                 yield prefix + self.name(r[0], r[1]), r
+ 
++    def _unpacked_blocks(self, r):
++        zstandard = zstd_module()
++        decoder = zstandard.ZstdDecompressor().decompressobj()
++        self.f.seek(r[3])
++        left = min(os.fstat(self.f.fileno()).st_size - r[3], r[2] + (1 << 16))
++        while left > 0 and not decoder.eof:
++            data = self.f.read(min(left, 1 << 16))
++            if not data:
++                break
++            left -= len(data)
++            try:
++                block = decoder.decompress(data)
++            except zstandard.ZstdError as error:
++                raise ValueError("invalid compressed NUP entry: %s" % error) from error
++            yield block
++        if not decoder.eof:
++            raise ValueError("truncated compressed NUP entry")
++
++    def is_packed(self, r, name=""):
++        self.f.seek(r[3])
++        head = self.f.read(18)
++        if head[:4] != ZSTD:
++            return False
++        stated = frame_content_size(head)
++        if stated is not None and stated != r[2]:
++            return False
++        # .zs is already compressed in the game. Only remove an outer wrapper
++        # when the result is itself a .zs frame of the listed file size.
++        if stated is None or name.endswith(".zs"):
++            total, prefix = 0, b""
++            try:
++                for block in self._unpacked_blocks(r):
++                    total += len(block)
++                    prefix = (prefix + block[:4])[:4]
++                    if total > r[2]:
++                        return False
++            except ValueError:
++                return False
++            return total == r[2] and (not name.endswith(".zs") or prefix == ZSTD)
++        return True
++
++    def copy_to(self, r, target, name="", packed=None):
++        packed = self.is_packed(r, name) if packed is None else packed
++        if packed:
++            total = 0
++            for block in self._unpacked_blocks(r):
++                total += len(block)
++                if total > r[2]:
++                    raise ValueError("compressed NUP entry exceeds its declared size")
++                target.write(block)
++            if total != r[2]:
++                raise ValueError("compressed NUP entry: %d bytes, expected %d" % (total, r[2]))
++            return
++        self.f.seek(r[3])
++        left = r[2]
++        while left:
++            block = self.f.read(min(left, 8 << 20))
++            if not block:
++                raise ValueError("short read in NUP entry")
++            target.write(block)
++            left -= len(block)
++
+     def read(self, r, n=None):
+-        self.f.seek(r[3])
+-        return self.f.read(r[2] if n is None else min(n, r[2]))
++        if not self.is_packed(r):
++            self.f.seek(r[3])
++            return self.f.read(r[2] if n is None else min(n, r[2]))
++        target = io.BytesIO()
++        self.copy_to(r, target, packed=True)
++        value = target.getvalue()
++        return value if n is None else value[:n]
+ 
+ 
+ def pick_title(nup, want):
+@@ -89,25 +192,48 @@
+         if only and part != only:
+             continue
+         for rel, r in nup.walk(t[part]):
+-            dst = os.path.join(out, part, *rel.split("/"))
+-            if os.path.exists(dst) and os.path.getsize(dst) == r[2]:
+-                continue          # (re-runs pick up where they stopped)
++            relative = PurePosixPath(rel)
++            windows = PureWindowsPath(rel)
++            if relative.is_absolute() or windows.drive or windows.root or "\\" in rel or any(
++                    component in ("", ".", "..") or ":" in component for component in rel.split("/")):
++                raise SystemExit("invalid archive path: %r" % rel)
++            root = Path(out, part).resolve()
++            destination = root.joinpath(*relative.parts).resolve()
++            if root not in destination.parents:
++                raise SystemExit("archive path leaves output: %r" % rel)
++            dst = str(destination)
++            packed = nup.is_packed(r, rel)
++            if os.path.exists(dst) and os.path.getsize(dst) == r[2] and not packed:
++                continue          # packed files from the older reader may have the right size but wrong bytes
+             os.makedirs(os.path.dirname(dst), exist_ok=True)
+-            nup.f.seek(r[3])
+-            left = r[2]
+             with open(dst + ".part", "wb") as g:
+-                while left:
+-                    b = nup.f.read(min(left, 8 << 20))
+-                    if not b:
+-                        raise SystemExit("short read in %s" % rel)
+-                    g.write(b)
+-                    left -= len(b)
++                nup.copy_to(r, g, rel, packed=packed)
+             os.replace(dst + ".part", dst)
+             total += r[2]
+             n += 1
+             if not quiet and n % 5000 == 0:
+                 print("  %d files, %.1f GB" % (n, total / 1e9), flush=True)
+     return n, total
++
++
++def heal(nup, selected, exefs, names):
++    for name in names:
++        path = os.path.join(exefs, name)
++        if os.path.exists(path):
++            with open(path, "rb") as source:
++                if source.read(4) == b"NSO0":
++                    continue
++        for other in reversed(nup.titles):
++            if other["index"] == selected["index"]:
++                continue
++            candidate = next((record for relative, record in nup.walk(other["exefs"]) if relative == name), None)
++            if candidate is not None and nup.read(candidate, 4) == b"NSO0":
++                os.makedirs(exefs, exist_ok=True)
++                with open(path + ".part", "wb") as target:
++                    nup.copy_to(candidate, target, name)
++                os.replace(path + ".part", path)
++                print("  %s: taken from title %d (v%d)" % (name, other["index"], other["version"]))
++                break
+ 
+ 
+ def main():
+@@ -138,6 +264,7 @@
+         if a.only != "romfs":   # (main is ZBIC-compressed on firmware 22+: made a plain NSO for the tools)
+             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+             import unpack
++            heal(nup, t, os.path.join(a.extract, "exefs"), unpack.NAMES)
+             for m in unpack.NAMES:
+                 p = os.path.join(a.extract, "exefs", m)
+                 if os.path.exists(p) and unpack.unpack_nso(p):
+--- a/nx2/zbic.py
++++ b/nx2/zbic.py
+@@ -13,11 +13,12 @@
+ 
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ SRC = os.path.join(os.path.dirname(HERE), "third_party", "zbic")
+-DLL = os.path.join(SRC, "zbic.dll" if os.name == "nt" else "zbic.so")
++DLL = os.path.join(os.environ.get("OCARINA_HELPER_CACHE", SRC), "zbic.dll" if os.name == "nt" else "zbic.so")
+ _lib = None
+ 
+ 
+ def _build():
++    os.makedirs(os.path.dirname(DLL), exist_ok=True)
+     srcs = [os.path.join(SRC, "zstd.c"), os.path.join(SRC, "zbic_api.c")]
+     if os.path.exists(DLL) and os.path.getmtime(DLL) > max(os.path.getmtime(s) for s in srcs):
+         return
+--- a/third_party/a64-kit/lift/build_emit.py
++++ b/third_party/a64-kit/lift/build_emit.py
+@@ -10,15 +10,20 @@
+ import toolchain
+ 
+ SRC = [os.path.join(HERE, "a64emit.cpp"), os.path.join(HERE, "suyu", "arm64_to_c.h")]
+-OUT = os.path.join(HERE, "a64emit.dll" if os.name == "nt" else "liba64emit.so")
++OUT = os.path.join(os.environ.get("OCARINA_HELPER_CACHE", HERE),
++                   "a64emit.dll" if os.name == "nt" else "liba64emit.so")
+ 
+ 
+ def build(force=False):
+-    key = hashlib.sha1(b"".join(open(f, "rb").read() for f in SRC)).hexdigest()
+-    stamp = OUT + ".sha1"
++    compiler = toolchain.need(toolchain.find("clang++"))
++    identity = " ".join([compiler, *toolchain.native_target(), *toolchain.native_link()]).encode()
++    key = hashlib.sha256(b"".join(open(f, "rb").read() for f in SRC) + identity +
++                         open(compiler, "rb").read()).hexdigest()
++    stamp = OUT + ".sha256"
+     if not force and os.path.exists(OUT) and os.path.exists(stamp) and open(stamp).read() == key:
+         return OUT
+-    cmd = [toolchain.need(toolchain.find("clang++")), "-std=c++20", "-O2", "-shared", "-o", OUT, SRC[0],
++    os.makedirs(os.path.dirname(OUT), exist_ok=True)
++    cmd = [compiler, "-std=c++20", "-O2", "-shared", "-o", OUT, SRC[0],
+            "-Wno-everything"] + toolchain.native_target() + toolchain.native_link()
+     if os.name != "nt":
+         cmd += ["-fPIC"]
+--- a/third_party/a64-kit/tools/toolchain.py
++++ b/third_party/a64-kit/tools/toolchain.py
+@@ -8,6 +8,16 @@
+ 
+ 
+ def find(tool):
++    portable = os.environ.get("OCARINA_LLVM_ROOT")
++    if portable:
++        suffix = ".exe" if os.name == "nt" else ""
++        names = (["x86_64-w64-mingw32-" + tool, tool] if tool in ("clang", "clang++")
++                 else ["ld.lld", "lld"] if tool == "lld" else [tool])
++        for name in names:
++            path = os.path.join(portable, "bin", name + suffix)
++            if os.path.isfile(path):
++                return path
++        return os.path.join(portable, "bin", names[0] + suffix)
+     root = emsdk()
+     exts = (".exe", ".bat") if os.name == "nt" else ("",)
+     native = tool in ("clang", "clang++", "lld") or tool.startswith("llvm-")
+@@ -35,10 +45,14 @@
+ 
+ 
+ def native_target():
++    if os.environ.get("OCARINA_TARGET") == "windows-gnu":
++        return ["--target=x86_64-w64-windows-gnu", "-fms-extensions", "-D_CRT_SECURE_NO_WARNINGS"]
+     return ["--target=x86_64-pc-windows-msvc", "-fms-extensions", "-D_CRT_SECURE_NO_WARNINGS"] if os.name == "nt" else []
+ 
+ 
+ def native_link():
++    if os.environ.get("OCARINA_TARGET") == "windows-gnu":
++        return ["-fuse-ld=lld", "-static"]
+     # (-fuse-ld=lld, found through -B: clang ignores --ld-path for the MSVC target and ran Microsoft's link.exe, which
+     # cannot read the renderer's ThinLTO bitcode)
+     return ["-fuse-ld=lld", "-B" + os.path.dirname(lld_link())] if os.name == "nt" else []

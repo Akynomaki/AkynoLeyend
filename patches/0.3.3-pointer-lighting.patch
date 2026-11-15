@@ -1,0 +1,1951 @@
+--- a/Coletar-Crash.cmd
++++ b/Coletar-Crash.cmd
+@@ -0,0 +1,6 @@
++@echo off
++"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" collect-crash %*
++set "ocarina_exit=%errorlevel%"
++echo.
++pause
++exit /b %ocarina_exit%
+--- a/Jogar-Teste-Crash.cmd
++++ b/Jogar-Teste-Crash.cmd
+@@ -0,0 +1,6 @@
++@echo off
++"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --short-romfs --trace-files --collect-crash %*
++set "ocarina_exit=%errorlevel%"
++echo.
++pause
++exit /b %ocarina_exit%
+--- a/LEIA-ME-ATUALIZACAO-0.3.3.txt
++++ b/LEIA-ME-ATUALIZACAO-0.3.3.txt
+@@ -0,0 +1,36 @@
++OCARINA BUILDER 0.3.3-dev.1 - POINTER LIGHTING 2 E DIAGNOSTICO
++
++Esta atualizacao deve ser aplicada sobre a instalacao 0.3.2 atualizada.
++
++1. Feche o jogo e o Builder.
++2. Copie TODO o conteudo do ZIP de atualizacao para a pasta existente que
++   contem OcarinaBuilder.exe, manage.py, ferramentas e work. Substitua arquivos.
++3. Preserve work, jogo e jogo\user\save. Nao renomeie a pasta instalada.
++4. Abra OcarinaBuilder.exe e clique Criar com a mesma entrada e destino.
++   O programa tenta preservar o diagnostico anterior antes de substituir o mapa.
++   O host/renderizador alterados precisam ser compilados. Objetos de jogo
++   inalterados continuam elegiveis ao cache.
++5. Ao terminar, rode Jogar-Teste-Crash.cmd na mesma pasta.
++   Ele testa RomFS por caminho curto e registra os arquivos abertos.
++6. Se fechar novamente, envie o novo ZIP criado em jogo\diagnosticos.
++   O terminal mostra o nome exato. Coletar-Crash.cmd tambem empacota a ultima
++   execucao existente, sem compilar ou abrir o jogo.
++
++O teste cria uma letra de unidade temporaria livre para a pasta RomFS, sem
++copiar ou mover o jogo. Nao precisa de administrador. O alias e removido ao
++encerrar normalmente ou ao tratar uma falha. Nao encerre o Python a forca.
++Se um encerramento forcado deixar o alias, a letra aparece no terminal; remova
++apenas esse alias com subst LETRA: /D apos fechar o jogo.
++
++A release Hookshot pointer-lighting-2 foi integrada em fonte a partir do
++HookshotBuilder(3).zip. Inclui acesso a memoria apenas nos shaders compute,
++endereco de tabela por push constants, fallback de imagens e pools retirados,
++alem das mudancas de idioma e energia/progresso do build.
++
++Primeiro inicio apos a mudanca pode reconstruir shaders. A melhora de cache
++se aplica aos inicios seguintes e nao elimina stutter em areas novas.
++
++O ultimo crash recebido foi 0xC0000005, leitura do endereco guest 0x150.
++A causa exata ainda exige o mapa/novo log do PC. Caminhos longos sao uma
++hipotese verificavel; esta entrega nao afirma que eles causaram aquele crash.
++A integracao nao foi executada no jogo/GPU neste host Linux.
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # Ocarina Hookshot — base independente
+ 
+-Versao **0.3.2-dev.1**, construida a partir dos fontes de `Hookshot-Release.zip` enviados pelo usuario. Mantem o lifter ARM64, o runtime e o renderizador Vulkan desse projeto como um conjunto. A orquestracao de compilacao, os perfis e os registros desta versao ficam no pacote Python `ocarina/`.
++Versao **0.3.3-dev.1**, construida a partir dos fontes de `Hookshot-Release.zip` enviados pelo usuario. Mantem o lifter ARM64, o runtime e o renderizador Vulkan desse projeto como um conjunto. A orquestracao de compilacao, os perfis e os registros desta versao ficam no pacote Python `ocarina/`.
+ 
+ Esta e uma base de desenvolvimento experimental. A compilacao do renderizador para Windows foi verificada; o jogo completo ainda precisa ser compilado e testado no PC de destino. Nao ha promessa de FPS, de consumo fixo de VRAM ou de resolucao de todos os crashes. O status do projeto original esta arquivado em `docs/upstream/`.
+ 
+@@ -118,3 +118,11 @@
+ Detalhes, escolhas de qualidade e limites em docs/atualizacao-amd.md. O resultado de 60 FPS informado pelo usuario pertence ao Hookshot fornecido, nao a um benchmark desta adaptacao.
+ 
+ O automatico agora permite ate oito compiladores, condicionado a RAM livre e aos nucleos. Mantem a reserva de 2 GiB e o orcamento estimado de 3.5 GiB por processo: com 24 GiB livres escolhe seis; com 16 GiB livres continua em quatro. Isso pode reduzir o primeiro build em PCs com folga, sem prometer um tempo fixo ou reduzir a otimizacao do codigo do jogo.
++
++## Atualizacao 0.3.3 — pointer-lighting-2
++
++Integracao dos fontes do HookshotBuilder(3).zip, com identidade conferida contra o asset oficial. Corrige o escopo de leituras indiretas dos shaders, permite cache estavel entre inicios e incorpora o fallback de imagens/pools, o parser de idioma e as melhorias de energia/progresso do build.
++
++Aplique Ocarina-Builder-0.3.3-atualizacao.zip na instalacao 0.3.2 existente e repita Criar com a mesma entrada/destino. Preserve work e jogo/user/save. Depois use Jogar-Teste-Crash.cmd para testar o caminho curto de RomFS e reunir diagnosticos. Coletar-Crash.cmd reune a ultima execucao sem abrir o jogo. Veja LEIA-ME-ATUALIZACAO-0.3.3.txt e docs/atualizacao-0.3.3.md.
++
++A integracao nao comprova correcao do ultimo crash de CPU 0xC0000005. O mapa e os novos logs permitem verificar sua origem. A interface WPF e mantida; os fontes e o motor foram atualizados.
+--- a/THIRD_PARTY_NOTICES.md
++++ b/THIRD_PARTY_NOTICES.md
+@@ -20,6 +20,7 @@
+ | Lista de otimizacao de funcoes | work/hot_funcs.txt do mesmo pacote; build e0f3ccfa | Metadados de enderecos fornecidos com o Hookshot; sem corpos de funcoes |
+ | Hookshot atualizado, shaders de filmes e workaround visual | HookshotBuilder (1)(1).zip e HookshotBuilder (2).zip fornecidos | MIT do codigo proprio; Eden/Orchid GPL-3.0-or-later conforme avisos dos fontes |
+ | Perfil Vulkan AMD | Adaptacao dos workarounds verificados no emulador Eglantine/Lichii fornecido | GPL conforme arquivos de origem e componentes Eden; avisos preservados |
++| Hookshot pointer-lighting-2 | HookshotBuilder(3).zip, asset oficial conferido por SHA-256 | MIT do codigo proprio; arquivos Eden/Lichii mantem avisos GPL e demais licencas |
+ | Orquestracao e lancadores novos | Esta adaptacao | MIT |
+ 
+ O build completo combina componentes GPL; a licenca MIT do codigo proprio do Hookshot nao transforma todos os componentes em MIT. Preserve estes avisos ao redistribuir fontes ou ferramentas.
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.3.2-dev.1
++0.3.3-dev.1
+--- a/docs/arquitetura.md
++++ b/docs/arquitetura.md
+@@ -36,7 +36,7 @@
+ 
+ A politica herdada troca o upscale neural de determinados filmes por amostragem linear em GPUs que nao executam aquelas redes adequadamente. Isso preserva a reproducao, mas nao equivale ao upscale neural original. A neblina reduzida e um workaround visual, com causa original ainda em aberto. Consulte docs/atualizacao-amd.md.
+ 
+-As alteracoes em arquivos existentes podem ser revisadas em `patches/base-portabilidade.patch`. O inventario em `upstream.json` registra os hashes do ZIP de origem e as diferencas de fontes. Nomes internos herdados (MKW, TOTK, RX, HOS) permanecem onde fazem parte das interfaces; renomea-los sem necessidade tornaria a comparacao com o original mais dificil.
++O historico ate 0.3.2 esta em `patches/base-portabilidade.patch`; a integracao seguinte esta em `patches/0.3.3-pointer-lighting.patch`. O inventario em `upstream.json` registra os hashes do ZIP de origem e as diferencas de fontes. Nomes internos herdados (MKW, TOTK, RX, HOS) permanecem onde fazem parte das interfaces; renomea-los sem necessidade tornaria a comparacao com o original mais dificil.
+ 
+ ## Proximas alteracoes
+ 
+@@ -47,3 +47,7 @@
+ `App.xaml` concentra o tema. `MainWindow` controla selecao, etapas e a navegacao; `Runner` controla o processo filho e drena stdout/stderr em paralelo. Os argumentos passam por `ProcessStartInfo.ArgumentList`, sem montar um comando de shell. O modo UTF-8 do Python e solicitado por `-X utf8`, pois `-I` ignora variaveis PYTHON do ambiente. O Python local e localizado a partir da pasta do executavel; nao ha fallback silencioso para uma instalacao do sistema.
+ 
+ A checagem de origem tem debounce, timeout e identificador de tentativa. Uma resposta antiga nao habilita o botao para outra entrada. Cancelar encerra a arvore do processo; retomar usa a mesma pasta `work` e seus objetos validos. Uma mensagem `@@done` so representa sucesso quando o processo tambem terminou com codigo zero e o manifesto existe. O botao Jogar usa a CLI, incluindo hashes, perfis e caminhos do runtime.
++
++## Integracao 0.3.3
++
++A tabela de paginas de memoria guest e usada somente nos shaders compute e seu endereco e enviado por push constants. ocarina/power.py concentra as solicitacoes Windows de energia para o build; windows_paths.py cria o alias DOS opt-in de RomFS. crash_report.py confere o hash do executavel junto do mapa antes de coletar simbolos e preserva o diagnostico anterior ao proximo build. O fluxo normal de execucao nao ativa o alias nem o trace; Jogar-Teste-Crash.cmd ativa ambos explicitamente.
+--- a/docs/atualizacao-0.3.3.md
++++ b/docs/atualizacao-0.3.3.md
+@@ -0,0 +1,50 @@
++# Integracao pointer-lighting-2 — 0.3.3-dev.1
++
++## Origem verificada
++
++O arquivo correto HookshotBuilder(3).zip coincide por SHA-256 com o asset HookshotBuilder.zip informado pela API oficial da release pointer-lighting-2: 5c017fe89bc468a606afb0192bff923d3118380bd315f3b4433555b2ae1e4f11. O ultimo HookshotBuilder(2).zip enviado tem os mesmos bytes. O arquivo mais antigo HookshotBuilder (2).zip, com espaco, e diferente.
++
++A API oficial identifica publicacao em 2026-11-07T11:28:13Z. Fontes: https://github.com/NotRexed/Hookshot/releases/tag/pointer-lighting-2 e https://api.github.com/repos/NotRexed/Hookshot/releases/tags/pointer-lighting-2 . O target_commitish da release e main; isso nao e tratado como identificacao de commit imutavel.
++
++## Mudancas aplicadas ao motor
++
++- Leitura indireta da memoria guest pelo shader compute com tabela de paginas, preservando o caminho anterior dos shaders graficos. O passe de memoria deixa de aplicar a regra de ponteiros mistos ao texto do menu.
++- Endereco da tabela enviado por push constants. Ele deixa de entrar como constante de execucao no SPIR-V. O cache do driver pode reutilizar shaders iguais nos proximos inicios; caches ainda dependem de GPU, driver, tradutor e opcoes.
++- Atualizacao da tabela ao criar/importar/mirrorizar/retirar pools. A liberacao de mirror de pool aposentado nao recoloca um endereco antigo na faixa que outro pool ocupa.
++- Fallback do VMA para imagens quando a tentativa limitada a VRAM falha. Nao e um teto global de memoria e nao garante boa velocidade sob pressao.
++- Leitura de language.txt tolera BOM e ignora linhas que nao representam um idioma valido. Portugues brasileiro segue disponivel.
++- Mantidas as correcoes AMD de subgrupos, gather, Position SPIR-V, filmes, protecao de flashes e sincronizacao inicial do renderizador da 0.3.2.
++
++Adaptacoes locais: flush das faixas alteradas da tabela em memoria host nao coerente (VMA), asserts do alinhamento/tamanho dos push constants e simplificacao do dumper SPIR-V opcional. O caminho experimental RX_VK_NO_F16 continua desativado por padrao. Nenhum desenho extra foi omitido para esconder erros.
++
++## Compilacao e lentidao
++
++O orquestrador e os compiladores filhos solicitam desativar EcoQoS nos seus processos. Durante o build e solicitada continuidade do sistema, com restauracao do estado anterior ao sair, inclusive por excecao. Nao sao alterados plano de energia, prioridade de tempo real ou limites de seguranca de RAM. O maximo automatico permanece oito processos, condicionado a memoria livre.
++
++As etapas Python passam a usar -u para liberar a saida imediatamente. As flags O1/O2 dos arquivos traduzidos e a selecao de chunks permanecem; caches de objetos validos sao reaproveitados. Os ajustes do upstream para localizar SDK/CRT do Visual Studio nao foram copiados: esta base usa LLVM-MinGW/UCRT portatil e ja verifica um link Windows antes do build longo.
++
++A interface WPF e seu executavel continuam sendo o componente 0.3.2; o motor/orquestrador e esta distribuicao sao 0.3.3-dev.1. Nao houve mudanca visual nesta entrega.
++
++## Crash de execucao recebido
++
++A tentativa recebida usou a 0.3.2-dev.1, perfil Original, RTX 5070 Ti Laptop e driver NVIDIA 617.42. O Vulkan iniciou, importou memoria, preparou a fila e recebeu comandos. A falha foi de CPU na BootupBackgroundWorkThread: 0xC0000005 ao ler guest 0x150, em hookshot.exe+0x11bd0984. Nao ha VK_ERROR_DEVICE_LOST nesse log.
++
++O build recebido fechou o link de ambos os binarios: 223 segundos na compilacao, zero falhas, total registrado 382.62 segundos. Os chunks de jogo foram reaproveitados (0 s). Portanto, a compilacao longa anterior nao se repetiu nessa tentativa.
++
++O RomFS registrado ocupa 160 caracteres antes do nome relativo. nn_fs.c usa char[MAX_PATH] e snprintf sem detectar truncamento: sobram 98 caracteres para um nome relativo ASCII nesse caminho. Isso demonstra uma limitacao do runtime em pastas profundas; os logs enviados nao mostram ainda qual arquivo falhou. Nao e prova da causa do ponteiro nulo.
++
++## Teste sem mover dados
++
++Jogar-Teste-Crash.cmd usa --short-romfs --trace-files --collect-crash. Cria um alias DOS livre apenas para RomFS, registra HOS_FS_TRACE e remove o alias ao terminar. Nao ativa validacao Vulkan nem estatisticas de todas as chamadas host, para evitar esse custo no teste. Nao ha recompilacao, extracao ou alteracao de saves nesse comando.
++
++Coletar-Crash.cmd empacota a ultima tentativa. Os ZIPs incluem apenas logs, resumo e hookshot.map quando o executavel junto do mapa tem o mesmo hash daquele crash. Nenhum executavel, imagem, codigo gerado ou save e incluido. Antes de um novo build, o programa tenta preservar esse diagnostico, para nao perder o mapa anterior quando o link o substituir.
++
++Mapear o simbolo anterior a um endereco nao equivale a demonstrar a causa da falha. Se o formato do mapa nao for reconhecido, ele e incluido para analise; se o executavel mudou, ele nao e atribuido ao crash antigo.
++
++Fontes tecnicas do alias e da limitacao de caminhos: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-definedosdevicew e https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation . A remocao usa DDD_EXACT_MATCH_ON_REMOVE para nao remover um mapeamento alheio.
++
++## Limites
++
++Nao foi executado o jogo ou uma GPU fisica neste ambiente Linux. Nao houve benchmark, verificacao visual do menu/iluminacao nem teste real do alias DOS neste host. A compatibilidade Windows foi conferida por compilacao/link cruzados e testes sinteticos; detalhes em resultado-native-0.3.3.txt e resultado-testes.txt.
++
++Folhas, grama e samambaias incompletas, ruido em GTX 10xx e stutter no primeiro acesso a areas continuam sendo limitacoes relatadas pelo upstream. Nao foi atribuida a esta integracao uma solucao que o autor ainda esta investigando.
+--- a/docs/origem.md
++++ b/docs/origem.md
+@@ -43,3 +43,7 @@
+ ## Integracao 0.3.2
+ 
+ Atualizacao de host/GPU a partir dos pacotes HookshotBuilder (1)(1).zip e HookshotBuilder (2).zip. O segundo fornece a sincronizacao da primeira submissao, ajuste de fog 0.08 e o shader movie_upscale. Perfil AMD de gather/Position adaptado do codigo Vulkan do emulador Eglantine/Lichii v4 fornecido. Mantidos os avisos Hookshot, Eden, Sirit e Orchid em seus arquivos. Adaptacoes locais: fechamento do link Vulkan-only, verificacao de erros no startup/upscale e cache por dispositivo. Escopo e limites em atualizacao-amd.md; hashes e inventario em upstream.json.
++
++## Integracao 0.3.3
++
++Renderizador e parser de idioma atualizados do HookshotBuilder(3).zip da release pointer-lighting-2, cujo hash coincide com o asset da API oficial. Mantidos os avisos Hookshot/Eden/Lichii. Energia e saida do build adaptadas a orquestracao local, sem a dependencia de MSVC do builder original. Acrescentados flush da tabela, coleta de crash e teste opcional de alias RomFS. Escopo e limites em atualizacao-0.3.3.md.
+--- a/docs/resultado-native-0.3.3.txt
++++ b/docs/resultado-native-0.3.3.txt
+@@ -0,0 +1,356 @@
++352 files, 4 jobs, -D_CRT_SECURE_NO_WARNINGS -O1 -DA64_POLLING -DA64_WRITE_TRACK
++  hos_image.c         0 MB       0s  (0s)
++  a64_table.c         0 MB       0s  (0s)
++  a64_hooks.c         0 MB       0s  (0s)
++  nvn2_exports.c      0 MB       0s  (0s)
++  a64_stubs.c         0 MB       0s  (0s)
++  a64_suyu.c          0 MB       1s  (1s)
++  hos_hostcall.c      0 MB       0s  (1s)
++  a64_rt.c            0 MB       1s  (1s)
++  display.c           0 MB       1s  (1s)
++  hos_mem.c           0 MB       0s  (1s)
++  hos_setjmp.c        0 MB       0s  (1s)
++  hos_main.c          0 MB       1s  (1s)
++  hos_svc.c           0 MB       0s  (1s)
++  nn_applet.c         0 MB       0s  (2s)
++  mkw_glue.c          0 MB       0s  (2s)
++  mf_av1.c            0 MB       0s  (2s)
++  hos_thread.c        0 MB       1s  (2s)
++  nn_diag.c           0 MB       0s  (2s)
++  nn_gs.c             0 MB       0s  (2s)
++  nn_codec.c          0 MB       0s  (2s)
++  nn_libc.c           0 MB       0s  (2s)
++  nn_fs.c             0 MB       0s  (2s)
++  nn_syncpt.c         0 MB       0s  (2s)
++  nn_hid.c            0 MB       0s  (2s)
++  nn_vi.c             0 MB       0s  (3s)
++  nn_audio.c          0 MB       1s  (3s)
++  nn_os_sync.c        0 MB       1s  (3s)
++  nvn_layout.c        0 MB       0s  (3s)
++  nn_video.c          0 MB       0s  (3s)
++  pad_sdl.c           0 MB       0s  (3s)
++  rx_backend.c        0 MB       0s  (3s)
++  nvdrv.c             0 MB       1s  (3s)
++  celt.c              0 MB       0s  (3s)
++  bands.c             0 MB       0s  (3s)
++  cwrs.c              0 MB       0s  (3s)
++  entcode.c           0 MB       0s  (3s)
++  entdec.c            0 MB       0s  (4s)
++  celt_decoder.c      0 MB       0s  (4s)
++  celt_encoder.c      0 MB       1s  (4s)
++  entenc.c            0 MB       0s  (4s)
++  mathops.c           0 MB       0s  (4s)
++  laplace.c           0 MB       0s  (4s)
++  modes.c             0 MB       0s  (4s)
++  mdct.c              0 MB       0s  (4s)
++  celt_lpc.c          0 MB       0s  (4s)
++  nvn_native.c        0 MB       1s  (4s)
++  pitch.c             0 MB       0s  (4s)
++  rate.c              0 MB       0s  (4s)
++  vq.c                0 MB       0s  (4s)
++  quant_bands.c       0 MB       0s  (4s)
++  code_signs.c        0 MB       0s  (4s)
++  init_decoder.c      0 MB       0s  (4s)
++  CNG.c               0 MB       0s  (4s)
++  decode_frame.c      0 MB       0s  (4s)
++  decode_parameters.c    0 MB       0s  (4s)
++  decode_indices.c    0 MB       0s  (4s)
++  decode_pulses.c     0 MB       0s  (4s)
++  decode_core.c       0 MB       0s  (4s)
++  decoder_set_fs.c    0 MB       0s  (4s)
++  encode_indices.c    0 MB       0s  (4s)
++  dec_API.c           0 MB       0s  (4s)
++  encode_pulses.c     0 MB       0s  (4s)
++  gain_quant.c        0 MB       0s  (4s)
++  enc_API.c           0 MB       0s  (4s)
++  NLSF_decode.c       0 MB       0s  (5s)
++  interpolate.c       0 MB       0s  (5s)
++  LP_variable_cutoff.c    0 MB       0s  (5s)
++  PLC.c               0 MB       0s  (5s)
++  kiss_fft.c          0 MB       1s  (5s)
++  NSQ.c               0 MB       0s  (5s)
++  tables_gain.c       0 MB       0s  (5s)
++  shell_coder.c       0 MB       0s  (5s)
++  tables_LTP.c        0 MB       0s  (5s)
++  tables_NLSF_CB_NB_MB.c    0 MB       0s  (5s)
++  tables_NLSF_CB_WB.c    0 MB       0s  (5s)
++  tables_other.c      0 MB       0s  (5s)
++  NSQ_del_dec.c       0 MB       0s  (5s)
++  tables_pitch_lag.c    0 MB       0s  (5s)
++  tables_pulses_per_block.c    0 MB       0s  (5s)
++  control_audio_bandwidth.c    0 MB       0s  (5s)
++  quant_LTP_gains.c    0 MB       0s  (5s)
++  VQ_WMat_EC.c        0 MB       0s  (5s)
++  NLSF_encode.c       0 MB       0s  (5s)
++  VAD.c               0 MB       0s  (5s)
++  HP_variable_cutoff.c    0 MB       0s  (5s)
++  NLSF_VQ.c           0 MB       0s  (5s)
++  process_NLSFs.c     0 MB       0s  (5s)
++  NLSF_unpack.c       0 MB       0s  (5s)
++  NLSF_del_dec_quant.c    0 MB       0s  (5s)
++  check_control_input.c    0 MB       0s  (5s)
++  stereo_MS_to_LR.c    0 MB       0s  (5s)
++  stereo_LR_to_MS.c    0 MB       0s  (5s)
++  control_SNR.c       0 MB       0s  (5s)
++  init_encoder.c      0 MB       0s  (5s)
++  ana_filt_bank_1.c    0 MB       0s  (5s)
++  control_codec.c     0 MB       0s  (5s)
++  biquad_alt.c        0 MB       0s  (5s)
++  bwexpander_32.c     0 MB       0s  (5s)
++  A2NLSF.c            0 MB       0s  (5s)
++  debug.c             0 MB       0s  (5s)
++  bwexpander.c        0 MB       0s  (5s)
++  decode_pitch.c      0 MB       0s  (5s)
++  lin2log.c           0 MB       0s  (5s)
++  inner_prod_aligned.c    0 MB       0s  (5s)
++  log2lin.c           0 MB       0s  (5s)
++  table_LSF_cos.c     0 MB       0s  (5s)
++  LPC_analysis_filter.c    0 MB       0s  (5s)
++  LPC_inv_pred_gain.c    0 MB       0s  (5s)
++  NLSF2A.c            0 MB       0s  (5s)
++  NLSF_stabilize.c    0 MB       0s  (5s)
++  NLSF_VQ_weights_laroia.c    0 MB       0s  (5s)
++  pitch_est_tables.c    0 MB       0s  (5s)
++  resampler.c         0 MB       0s  (5s)
++  resampler_down2_3.c    0 MB       0s  (5s)
++  resampler_private_AR2.c    0 MB       0s  (5s)
++  resampler_down2.c    0 MB       0s  (5s)
++  resampler_rom.c     0 MB       0s  (5s)
++  resampler_private_up2_HQ.c    0 MB       0s  (5s)
++  resampler_private_IIR_FIR.c    0 MB       0s  (5s)
++  resampler_private_down_FIR.c    0 MB       0s  (5s)
++  sigm_Q15.c          0 MB       0s  (5s)
++  sum_sqr_shift.c     0 MB       0s  (5s)
++  sort.c              0 MB       0s  (5s)
++  stereo_decode_pred.c    0 MB       0s  (5s)
++  stereo_encode_pred.c    0 MB       0s  (6s)
++  stereo_quant_pred.c    0 MB       0s  (6s)
++  stereo_find_predictor.c    0 MB       0s  (6s)
++  apply_sine_window_FLP.c    0 MB       0s  (6s)
++  LPC_fit.c           0 MB       0s  (6s)
++  corrMatrix_FLP.c    0 MB       0s  (6s)
++  find_LPC_FLP.c      0 MB       0s  (6s)
++  find_LTP_FLP.c      0 MB       0s  (6s)
++  find_pitch_lags_FLP.c    0 MB       0s  (6s)
++  encode_frame_FLP.c    0 MB       0s  (6s)
++  find_pred_coefs_FLP.c    0 MB       0s  (6s)
++  LTP_analysis_filter_FLP.c    0 MB       0s  (6s)
++  LPC_analysis_filter_FLP.c    0 MB       0s  (6s)
++  LTP_scale_ctrl_FLP.c    0 MB       0s  (6s)
++  process_gains_FLP.c    0 MB       0s  (6s)
++  noise_shape_analysis_FLP.c    0 MB       0s  (6s)
++  regularize_correlations_FLP.c    0 MB       0s  (6s)
++  residual_energy_FLP.c    0 MB       0s  (6s)
++  warped_autocorrelation_FLP.c    0 MB       0s  (6s)
++  autocorrelation_FLP.c    0 MB       0s  (6s)
++  bwexpander_FLP.c    0 MB       0s  (6s)
++  burg_modified_FLP.c    0 MB       0s  (6s)
++  wrappers_FLP.c      0 MB       0s  (6s)
++  energy_FLP.c        0 MB       0s  (6s)
++  inner_product_FLP.c    0 MB       0s  (6s)
++  k2a_FLP.c           0 MB       0s  (6s)
++  LPC_inv_pred_gain_FLP.c    0 MB       0s  (6s)
++  scale_copy_vector_FLP.c    0 MB       0s  (6s)
++  scale_vector_FLP.c    0 MB       0s  (6s)
++  schur_FLP.c         0 MB       0s  (6s)
++  sort_FLP.c          0 MB       0s  (6s)
++  pitch_analysis_core_FLP.c    0 MB       0s  (6s)
++  opus.c              0 MB       0s  (6s)
++  opus_multistream.c    0 MB       0s  (6s)
++  extensions.c        0 MB       0s  (6s)
++  opus_decoder.c      0 MB       0s  (6s)
++  opus_multistream_decoder.c    0 MB       0s  (6s)
++  opus_projection_encoder.c    0 MB       0s  (7s)
++  repacketizer.c      0 MB       0s  (7s)
++  opus_projection_decoder.c    0 MB       0s  (7s)
++  opus_multistream_encoder.c    0 MB       0s  (7s)
++  mapping_matrix.c    0 MB       0s  (7s)
++  opus_encoder.c      0 MB       0s  (7s)
++  mlp_data.c          0 MB       0s  (7s)
++  rx_webgpu_unavailable.c    0 MB       0s  (7s)
++  mlp.c               0 MB       0s  (7s)
++  analysis.c          0 MB       0s  (7s)
++  decoders.cpp        0 MB       1s  (8s)
++  astc.cpp            0 MB       2s  (8s)
++  emit_spirv_barriers.cpp    0 MB       2s  (9s)
++  emit_spirv_atomic.cpp    0 MB       3s  (10s)
++  emit_spirv_bitwise_conversion.cpp    0 MB       3s  (12s)
++  emit_spirv.cpp      0 MB       5s  (12s)
++  emit_spirv_context_get_set.cpp    0 MB       2s  (12s)
++  emit_spirv_composite.cpp    0 MB       3s  (13s)
++  emit_spirv_convert.cpp    0 MB       1s  (13s)
++  emit_spirv_floating_point.cpp    0 MB       1s  (13s)
++  emit_spirv_control_flow.cpp    0 MB       3s  (15s)
++  emit_spirv_integer.cpp    0 MB       2s  (15s)
++  emit_spirv_image_atomic.cpp    0 MB       2s  (16s)
++  emit_spirv_logical.cpp    0 MB       2s  (16s)
++  emit_spirv_image.cpp    0 MB       4s  (17s)
++  emit_spirv_memory.cpp    0 MB       3s  (18s)
++  emit_spirv_mesh.cpp    0 MB       3s  (18s)
++  emit_spirv_shared_memory.cpp    0 MB       2s  (18s)
++  emit_spirv_special.cpp    0 MB       2s  (21s)
++  emit_spirv_undefined.cpp    0 MB       2s  (21s)
++  emit_spirv_select.cpp    0 MB       5s  (21s)
++  condition.cpp       0 MB       2s  (23s)
++  emit_spirv_warp.cpp    0 MB       5s  (24s)
++  basic_block.cpp     0 MB       5s  (25s)
++  ir_emitter.cpp      0 MB       3s  (26s)
++  spirv_emit_context.cpp    0 MB       6s  (26s)
++  microinstruction.cpp    0 MB       3s  (26s)
++  opcodes.cpp         0 MB       1s  (26s)
++  type.cpp            0 MB       1s  (27s)
++  program.cpp         0 MB       2s  (28s)
++  patch.cpp           0 MB       2s  (29s)
++  decode.cpp          0 MB       1s  (29s)
++  post_order.cpp      0 MB       3s  (29s)
++  value.cpp           0 MB       3s  (30s)
++  opcodes.cpp         0 MB       2s  (31s)
++  indirect_branch_table_track.cpp    0 MB       3s  (32s)
++  control_flow.cpp    0 MB       4s  (33s)
++  structured_control_flow.cpp    0 MB       4s  (34s)
++  atomic_operations_global_memory.cpp    0 MB       3s  (34s)
++  atomic_operations_shared_memory.cpp    0 MB       2s  (35s)
++  attribute_memory_to_physical.cpp    0 MB       2s  (35s)
++  barrier_operations.cpp    0 MB       2s  (36s)
++  bitfield_extract.cpp    0 MB       2s  (37s)
++  bitfield_insert.cpp    0 MB       3s  (38s)
++  branch_indirect.cpp    0 MB       3s  (38s)
++  common_funcs.cpp    0 MB       3s  (39s)
++  condition_code_set.cpp    0 MB       3s  (39s)
++  double_add.cpp      0 MB       2s  (40s)
++  double_compare_and_set.cpp    0 MB       2s  (41s)
++  double_fused_multiply_add.cpp    0 MB       3s  (42s)
++  double_min_max.cpp    0 MB       2s  (42s)
++  double_set_predicate.cpp    0 MB       2s  (42s)
++  double_multiply.cpp    0 MB       3s  (43s)
++  find_leading_one.cpp    0 MB       2s  (44s)
++  exit_program.cpp    0 MB       3s  (44s)
++  floating_point_add.cpp    0 MB       3s  (45s)
++  floating_point_compare.cpp    0 MB       3s  (46s)
++  floating_point_compare_and_set.cpp    0 MB       3s  (47s)
++  floating_point_conversion_floating_point.cpp    0 MB       3s  (48s)
++  floating_point_conversion_integer.cpp    0 MB       2s  (48s)
++  floating_point_fused_multiply_add.cpp    0 MB       2s  (48s)
++  floating_point_min_max.cpp    0 MB       3s  (50s)
++  floating_point_multi_function.cpp    0 MB       2s  (50s)
++  floating_point_multiply.cpp    0 MB       3s  (50s)
++  floating_point_range_reduction.cpp    0 MB       3s  (51s)
++  floating_point_set_predicate.cpp    0 MB       1s  (51s)
++  half_floating_point_add.cpp    0 MB       1s  (52s)
++  floating_point_swizzled_add.cpp    0 MB       3s  (53s)
++  half_floating_point_fused_multiply_add.cpp    0 MB       3s  (54s)
++  half_floating_point_helper.cpp    0 MB       2s  (54s)
++  half_floating_point_multiply.cpp    0 MB       2s  (54s)
++  half_floating_point_set_predicate.cpp    0 MB       2s  (56s)
++  half_floating_point_set.cpp    0 MB       3s  (56s)
++  impl.cpp            0 MB       3s  (56s)
++  integer_add.cpp     0 MB       3s  (58s)
++  integer_add_three_input.cpp    0 MB       3s  (59s)
++  integer_compare.cpp    0 MB       3s  (59s)
++  integer_compare_and_set.cpp    0 MB       3s  (60s)
++  integer_floating_point_conversion.cpp    0 MB       3s  (61s)
++  integer_popcount.cpp    0 MB       2s  (62s)
++  integer_funnel_shift.cpp    0 MB       3s  (62s)
++  integer_minimum_maximum.cpp    0 MB       3s  (62s)
++  integer_scaled_add.cpp    0 MB       1s  (62s)
++  integer_set_predicate.cpp    0 MB       2s  (64s)
++  integer_shift_left.cpp    0 MB       3s  (65s)
++  integer_short_multiply_add.cpp    0 MB       3s  (65s)
++  integer_shift_right.cpp    0 MB       3s  (65s)
++  integer_to_integer_conversion.cpp    0 MB       3s  (66s)
++  internal_stage_buffer_entry_read.cpp    0 MB       2s  (67s)
++  load_constant.cpp    0 MB       3s  (68s)
++  load_effective_address.cpp    0 MB       3s  (68s)
++  load_store_attribute.cpp    0 MB       3s  (69s)
++  load_store_local_shared.cpp    0 MB       3s  (70s)
++  logic_operation.cpp    0 MB       3s  (70s)
++  load_store_memory.cpp    0 MB       3s  (71s)
++  logic_operation_three_input.cpp    0 MB       2s  (72s)
++  matrix_multiply_nx2.cpp    0 MB       3s  (73s)
++  move_register.cpp    0 MB       2s  (73s)
++  move_predicate_to_register.cpp    0 MB       2s  (73s)
++  output_geometry.cpp    0 MB       2s  (75s)
++  move_register_to_predicate.cpp    0 MB       3s  (75s)
++  move_special_register.cpp    0 MB       3s  (75s)
++  not_implemented.cpp    0 MB       3s  (76s)
++  predicate_set_predicate.cpp    0 MB       2s  (77s)
++  pixel_load.cpp      0 MB       3s  (77s)
++  register_map_nx2.cpp    0 MB       2s  (78s)
++  predicate_set_register.cpp    0 MB       3s  (78s)
++  select_source_with_predicate.cpp    0 MB       3s  (80s)
++  surface_atomic_operations.cpp    0 MB       3s  (80s)
++  surface_load_store.cpp    0 MB       4s  (81s)
++  texture_fetch.cpp    0 MB       4s  (82s)
++  texture_fetch_swizzled.cpp    0 MB       4s  (83s)
++  texture_gather_swizzled.cpp    0 MB       3s  (84s)
++  texture_gather.cpp    0 MB       4s  (84s)
++  texture_gradient.cpp    0 MB       3s  (84s)
++  texture_load.cpp    0 MB       2s  (85s)
++  texture_load_swizzled.cpp    0 MB       2s  (86s)
++  texture_mipmap_level.cpp    0 MB       3s  (87s)
++  texture_query.cpp    0 MB       2s  (87s)
++  video_helper.cpp    0 MB       3s  (88s)
++  video_minimum_maximum.cpp    0 MB       2s  (88s)
++  video_multiply_add.cpp    0 MB       3s  (90s)
++  video_set_predicate.cpp    0 MB       3s  (90s)
++  vote.cpp            0 MB       2s  (90s)
++  warp_shuffle.cpp    0 MB       2s  (91s)
++  conditional_barrier_pass.cpp    0 MB       1s  (92s)
++  translate.cpp       0 MB       3s  (92s)
++  collect_shader_info_pass.cpp    0 MB       4s  (94s)
++  dead_code_elimination_pass.cpp    0 MB       2s  (95s)
++  translate_program.cpp    0 MB       5s  (95s)
++  dual_vertex_pass.cpp    0 MB       1s  (95s)
++  constant_propagation_pass.cpp    0 MB       4s  (96s)
++  identity_removal_pass.cpp    0 MB       1s  (97s)
++  layer_pass.cpp      0 MB       2s  (98s)
++  geometry_compaction_pass.cpp    0 MB       4s  (98s)
++  lower_fp16_to_fp32.cpp    0 MB       2s  (99s)
++  global_memory_to_storage_buffer_pass.cpp    0 MB       4s  (99s)
++  lower_fp64_to_fp32.cpp    0 MB       3s  (101s)
++  position_pass.cpp    0 MB       2s  (101s)
++  rescaling_pass.cpp    0 MB       2s  (102s)
++  lower_int64_to_int32.cpp    0 MB       4s  (102s)
++  ssa_rewrite_pass.cpp    0 MB       3s  (104s)
++  vendor_workaround_pass.cpp    0 MB       2s  (104s)
++  verification_pass.cpp    0 MB       2s  (104s)
++  arithmetic.cpp      0 MB       1s  (105s)
++  atomic.cpp          0 MB       1s  (105s)
++  annotation.cpp      0 MB       1s  (105s)
++  barrier.cpp         0 MB       1s  (106s)
++  bit.cpp             0 MB       1s  (106s)
++  constant.cpp        0 MB       1s  (106s)
++  debug.cpp           0 MB       1s  (106s)
++  conversion.cpp      0 MB       1s  (106s)
++  texture_pass.cpp    0 MB       6s  (107s)
++  extension.cpp       0 MB       1s  (107s)
++  flow.cpp            0 MB       1s  (107s)
++  derivatives.cpp     0 MB       1s  (107s)
++  function.cpp        0 MB       1s  (108s)
++  group.cpp           0 MB       1s  (108s)
++  logical.cpp         0 MB       1s  (108s)
++  image.cpp           0 MB       1s  (109s)
++  misc.cpp            0 MB       1s  (109s)
++  stream.cpp          0 MB       0s  (109s)
++  memory.cpp          0 MB       1s  (109s)
++  sirit.cpp           0 MB       1s  (110s)
++  type.cpp            0 MB       1s  (110s)
++  vk_coopmat.cpp      0 MB       1s  (111s)
++  vk_bank.cpp         0 MB       2s  (111s)
++  vk_formats.cpp      0 MB       1s  (111s)
++  vk_dump.cpp         0 MB       2s  (112s)
++  vk_jobs.cpp         0 MB       1s  (113s)
++  vk_framegen.cpp     0 MB       2s  (113s)
++  vk_gprof.cpp        0 MB       1s  (113s)
++  vk_main.cpp         0 MB       2s  (115s)
++  vk_menu.cpp         0 MB       2s  (115s)
++  vk_draw.cpp         0 MB      10s  (120s)
++  vk_memory.cpp       0 MB       7s  (120s)
++  vk_replay.cpp       0 MB       6s  (120s)
++  vk_xfer.cpp         0 MB       1s  (121s)
++  vk_vma.cpp          0 MB       4s  (125s)
++  vk_shader.cpp       0 MB      11s  (126s)
++  vk_texture.cpp      0 MB       8s  (128s)
++compiled in 128s, 0 failed
++linked /workspace/scratch/36e73b9fbe85/analysis/pointer-native/work/sa/build/hookshot.exe: 4 MB (0s)
++linked /workspace/scratch/36e73b9fbe85/analysis/pointer-native/work/sa/build/hookshot_vk.dll: 5 MB (0s)
+--- a/docs/resultado-testes.txt
++++ b/docs/resultado-testes.txt
+@@ -4,6 +4,14 @@
+ test_retry_seeds_boundaries_from_text_written_before_failure (test_chunks.ChunksTests.test_retry_seeds_boundaries_from_text_written_before_failure) ... ok
+ test_save_creates_shared_metadata_directory (test_chunks.ChunksTests.test_save_creates_shared_metadata_directory) ... ok
+ test_failed_recompile_preserves_previous_object_and_cache (test_compile_cache.CompileCacheTests.test_failed_recompile_preserves_previous_object_and_cache) ... ok
++test_bundle_contains_only_logs_and_matching_map_never_game_or_saves (test_crash_recovery.CrashReportTests.test_bundle_contains_only_logs_and_matching_map_never_game_or_saves) ... ok
++test_path_audit_reports_overflow_and_ignores_traversal (test_crash_recovery.CrashReportTests.test_path_audit_reports_overflow_and_ignores_traversal) ... ok
++test_pe_base_and_both_map_formats_resolve_the_same_symbols (test_crash_recovery.CrashReportTests.test_pe_base_and_both_map_formats_resolve_the_same_symbols) ... ok
++test_real_child_runs_with_alias_and_trace_and_parent_collects_after_cleanup (test_crash_recovery.RecoveryLaunchTests.test_real_child_runs_with_alias_and_trace_and_parent_collects_after_cleanup) ... ok
++test_no_free_letter_does_not_remove_existing_mapping (test_crash_recovery.ShortPathsTests.test_no_free_letter_does_not_remove_existing_mapping) ... ok
++test_normalizes_unc_and_extended_paths_without_accepting_relative_input (test_crash_recovery.ShortPathsTests.test_normalizes_unc_and_extended_paths_without_accepting_relative_input) ... ok
++test_raced_creation_tries_another_free_letter (test_crash_recovery.ShortPathsTests.test_raced_creation_tries_another_free_letter) ... ok
++test_skips_occupied_drive_and_removes_only_own_exact_target_after_exception (test_crash_recovery.ShortPathsTests.test_skips_occupied_drive_and_removes_only_own_exact_target_after_exception) ... ok
+ test_cli_accepts_exefs_and_reports_missing_file (test_gui_bridge.GuiInputTests.test_cli_accepts_exefs_and_reports_missing_file) ... ok
+ test_cli_accepts_nup_without_tools_or_compilation (test_gui_bridge.GuiInputTests.test_cli_accepts_nup_without_tools_or_compilation) ... ok
+ test_cli_rejects_wrong_version_with_actionable_error (test_gui_bridge.GuiInputTests.test_cli_rejects_wrong_version_with_actionable_error) ... ok
+@@ -35,6 +43,9 @@
+ test_small_incompressible_wrapper_larger_than_plain_file (test_nup_packed.PackedNupTests.test_small_incompressible_wrapper_larger_than_plain_file) ... ok
+ test_truncated_wrapper_does_not_replace_an_existing_target (test_nup_packed.PackedNupTests.test_truncated_wrapper_does_not_replace_an_existing_target) ... ok
+ test_wrapped_files_with_and_without_frame_size_are_decoded (test_nup_packed.PackedNupTests.test_wrapped_files_with_and_without_frame_size_are_decoded) ... ok
++test_build_exception_restores_previous_execution_state (test_power.PowerTests.test_build_exception_restores_previous_execution_state) ... ok
++test_failed_power_request_does_not_change_restore_state (test_power.PowerTests.test_failed_power_request_does_not_change_restore_state) ... ok
++test_throttling_request_uses_only_the_supplied_child_handle (test_power.PowerTests.test_throttling_request_uses_only_the_supplied_child_handle) ... ok
+ test_archive_path_cannot_escape_destination (test_workflow.ArchiveTests.test_archive_path_cannot_escape_destination) ... ok
+ test_8gb_profile_preserves_compression_and_mirrors (test_workflow.WorkflowTests.test_8gb_profile_preserves_compression_and_mirrors) ... ok
+ test_build_lock_is_exclusive_and_reusable (test_workflow.WorkflowTests.test_build_lock_is_exclusive_and_reusable) ... ok
+@@ -52,24 +63,10 @@
+ test_wrong_and_truncated_game_versions_fail_early (test_workflow.WorkflowTests.test_wrong_and_truncated_game_versions_fail_early) ... ok
+ 
+ ----------------------------------------------------------------------
+-Ran 52 tests in 0.190s
++Ran 63 tests in 0.550s
+ 
+ OK (skipped=7)
+   rtld: taken from title 0 (v1)
+ Perfil: original 
+ Executavel SHA-256: b6267737f212a6e0045bbdce0da114876d1f9dc6cb6f572623ce6c76f4705f1f
+ Verificacao concluida; o jogo nao foi iniciado.
+-
+-
+-test_defaults_are_relative_to_script_from_another_working_directory (test_launcher_ps.LauncherExecutionTests.test_defaults_are_relative_to_script_from_another_working_directory) ... ok
+-test_explicit_paths_and_job_count_are_preserved (test_launcher_ps.LauncherExecutionTests.test_explicit_paths_and_job_count_are_preserved) ... ok
+-test_folder_inputs_are_passed_separately (test_launcher_ps.LauncherExecutionTests.test_folder_inputs_are_passed_separately) ... ok
+-test_incomplete_folder_input_is_rejected (test_launcher_ps.LauncherExecutionTests.test_incomplete_folder_input_is_rejected) ... ok
+-test_invalid_job_count_is_rejected_before_starting (test_launcher_ps.LauncherExecutionTests.test_invalid_job_count_is_rejected_before_starting) ... ok
+-test_mixed_input_modes_are_rejected (test_launcher_ps.LauncherExecutionTests.test_mixed_input_modes_are_rejected) ... ok
+-test_native_build_failure_exit_code_is_propagated (test_launcher_ps.LauncherExecutionTests.test_native_build_failure_exit_code_is_propagated) ... ok
+-
+-----------------------------------------------------------------------
+-Ran 7 tests in 2.241s
+-
+-OK
+--- a/docs/validacao.md
++++ b/docs/validacao.md
+@@ -51,3 +51,11 @@
+ O teste anterior que nao fechava o EXE completo foi ampliado: 352 unidades do runtime/backend foram compiladas e tanto o host EXE sintetico quanto a DLL Vulkan fecharam o link para Windows. Nao ha codigo real de jogo nesse fixture; a verificacao nao demonstra renderizacao correta. Foi publicada a GUI WPF 0.3.2-dev.1. Detalhes em docs/atualizacao-amd.md e resultado-native-amd.txt.
+ 
+ A suite atual tem 52 testes: 45 passaram na execucao portatil (sete checks PowerShell omitidos nessa execucao) e os sete checks do lancador passaram separadamente com PowerShell 7.4.6. Zero falhas. Inclui o teste de invocacoes do compilador na retomada e os novos limites de paralelismo por memoria.
++
++## Integracao 0.3.3
++
++- 352 unidades C/C++ compilaram com LLVM-MinGW 20261020 para Windows x64. O host EXE e a DLL Vulkan fecharam o link, zero falhas. O fixture inclui runtime generico e unidades de jogo vazias; nao inclui codigo do jogo. Registro em resultado-native-0.3.3.txt.
++- 63 casos descobertos: 56 passaram e sete checks de PowerShell nao foram executados por falta desse runtime neste host. Inclui oito casos de caminho curto/coleta e tres de energia. Os novos comandos CMD nao foram executados no shell Windows.
++- Testado o parser de mapa com o arquivo real do link LLVM-MinGW e o ImageBase do PE produzido, alem dos formatos MSVC/GNU sinteticos.
++- Teste de lancamento usa processo filho real em Linux e API DOS simulada: alias permanece durante o filho, e removido apos saida ou falha; logs entram no ZIP e saves/binarios ficam de fora. Isso nao substitui teste de DefineDosDevice no Windows.
++- Nao houve execucao do jogo, validacao de SPIR-V no driver, teste fisico AMD/NVIDIA ou benchmark. O ultimo crash de CPU do usuario ainda precisa do mapa correspondente/novo log para confirmar sua causa.
+--- a/gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv.h
++++ b/gpu/vk/eden/shader_recompiler/backend/spirv/emit_spirv.h
+@@ -32,6 +32,9 @@
+ constexpr u32 RESCALING_LAYOUT_WORDS_OFFSET = offsetof(RescalingLayout, rescaling_textures);
+ constexpr u32 RESCALING_LAYOUT_DOWN_FACTOR_OFFSET = offsetof(RescalingLayout, down_factor);
+ constexpr u32 RENDERAREA_LAYOUT_OFFSET = offsetof(RenderAreaLayout, render_area);
++// (hookshot) guest memory's page table, a u64 device address pushed to every compute program that reads global memory, after the blocks
++// above. It was a constant in the SPIR-V, and the address changes from run to run: the drivers' pipeline caches never hit
++constexpr u32 GUEST_PAGES_PUSH_OFFSET = sizeof(RescalingLayout) + sizeof(RenderAreaLayout);
+ 
+ [[nodiscard]] std::vector<u32> EmitSPIRV(const Profile& profile, const RuntimeInfo& runtime_info, IR::Program& program, Bindings& bindings);
+ [[nodiscard]] inline std::vector<u32> EmitSPIRV(const Profile& profile, IR::Program& program) {
+--- a/gpu/vk/eden/shader_recompiler/backend/spirv/spirv_emit_context.cpp
++++ b/gpu/vk/eden/shader_recompiler/backend/spirv/spirv_emit_context.cpp
+@@ -5,6 +5,7 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
+ #include <algorithm>
++#include <map>
+ #include <array>
+ #include <bit>
+ #include <climits>
+@@ -962,10 +963,44 @@
+     write_storage_cas_loop_func = func;
+ }
+ 
++// (hookshot) The page table of guest memory for pointers no bound buffer holds: 4 KB pages from this base, a device address each
++constexpr unsigned long long kGuestPagesBase = 0x1000000000ull;
++constexpr unsigned long long kGuestPagesBytes = 8ull << 30;
++
+ void EmitContext::DefineGlobalMemoryFunctions(const Info& info) {
+     if (!info.uses_global_memory || !profile.support_int64) {
+         return;
+     }
++    // (hookshot) A pointer that is in no bound buffer. Eden gave such a load 0, and the game's foliage culling follows pointers read from its
++    // storage buffers to all of a forest's data: it read zeros, and left out every tree, fern and blade of grass. The console's GPU just reads
++    // memory: here a page table (vk_memory.cpp) takes the guest address to its pool's device address.
++    const char* const gp_test{getenv("RX_VK_GP_TEST")};   // (1: the addressing model alone, 2: and the table's load, 3 or unset: all of it)
++    const int gp_level{gp_test ? atoi(gp_test) : 3};
++    const bool follow_pointers{stage == Stage::Compute};   // (the culling; a graphics stage with it hung the renderer at a load)
++    Id ptr_u64{};
++    if (follow_pointers) {
++        wants_guest_pages = true;
++        if (profile.unified_descriptor_binding) DefineRescalingInputPushConstant();   // (the table's address is in it)
++        AddCapability(spv::Capability::PhysicalStorageBufferAddresses);
++        AddExtension("SPV_KHR_physical_storage_buffer");
++        SetMemoryModel(spv::AddressingModel::PhysicalStorageBuffer64, spv::MemoryModel::GLSL450);
++        ptr_u64 = TypePointer(spv::StorageClass::PhysicalStorageBuffer, U64);
++    }
++    // (a load through an address as glslang makes one: a pointer to a laid-out block, its member read. A pointer to a bare scalar crashed
++    // NVIDIA's shader compiler)
++    std::map<u32, std::pair<Id, Id>> psb_types;   // (by the type's id)
++    const auto psb_load = [&](Id type, Id address, u32 align) {
++        auto it = psb_types.find(type.value);
++        if (it == psb_types.end()) {
++            const Id block{TypeStruct(type)};
++            Decorate(block, spv::Decoration::Block);
++            MemberDecorate(block, 0, spv::Decoration::Offset, 0U);
++            it = psb_types.emplace(type.value, std::make_pair(TypePointer(spv::StorageClass::PhysicalStorageBuffer, block),
++                                                        TypePointer(spv::StorageClass::PhysicalStorageBuffer, type))).first;
++        }
++        const Id member{OpAccessChain(it->second.second, OpConvertUToPtr(it->second.first, address), Const(0U))};
++        return OpLoad(type, member, spv::MemoryAccessMask::Aligned, align);
++    };
+     using DefPtr = Id StorageDefinitions::*;
+     const Id zero{u32_zero_value};
+     const auto define_body{[&](DefPtr ssbo_member, Id addr, Id element_pointer, u32 shift,
+@@ -1039,6 +1074,37 @@
+         const Id addr{OpFunctionParameter(U64)};
+         define_body(ssbo_member, addr, element_pointer, shift,
+                     [&](Id ssbo_pointer) { OpReturnValue(OpLoad(type, ssbo_pointer)); });
++        if (follow_pointers && gp_level >= 2) {
++            const Id table{wants_guest_pages && rescaling_push_constants.value != 0
++                               ? OpLoad(U64, OpAccessChain(TypePointer(spv::StorageClass::PushConstant, U64), rescaling_push_constants,
++                                                           Const(guest_pages_member_index)))
++                               : Constant(U64, u64{0})};   // (pushed: the table's device address, 0 for none)
++            const Id offset{OpISub(U64, addr, Constant(U64, u64{kGuestPagesBase}))};
++            const Id inside{OpLogicalAnd(U1, OpULessThan(U1, offset, Constant(U64, u64{kGuestPagesBytes})),
++                                         OpINotEqual(U1, table, Constant(U64, u64{0})))};
++            const Id then_label{OpLabel()};
++            const Id else_label{OpLabel()};
++            OpSelectionMerge(else_label, spv::SelectionControlMask::MaskNone);
++            OpBranchConditional(inside, then_label, else_label);
++            AddLabel(then_label);
++            const Id slot{OpIAdd(U64, table, OpShiftLeftLogical(U64, OpShiftRightLogical(U64, offset, Const(12U)), Const(3U)))};
++            const Id page{psb_load(U64, slot, 8U)};
++            const Id mapped{OpINotEqual(U1, page, Constant(U64, u64{0}))};   // (before the merge: it must stand right before its branch)
++            const Id hit_label{OpLabel()};
++            const Id miss_label{OpLabel()};
++            OpSelectionMerge(miss_label, spv::SelectionControlMask::MaskNone);
++            OpBranchConditional(mapped, hit_label, miss_label);
++            AddLabel(hit_label);
++            if (gp_level >= 3) {
++                const Id target{OpIAdd(U64, page, OpBitwiseAnd(U64, addr, Constant(U64, u64{0xfff})))};
++                OpReturnValue(psb_load(type, target, 4U));
++            } else {
++                OpReturnValue(ConstantNull(type));
++            }
++            AddLabel(miss_label);
++            OpBranch(else_label);
++            AddLabel(else_label);
++        }
+         OpReturnValue(ConstantNull(type));
+         OpFunctionEnd();
+         return func_id;
+@@ -1094,7 +1160,7 @@
+ }
+ 
+ void EmitContext::DefineRescalingInput(const Info& info) {
+-    if (!info.uses_rescaling_uniform) {
++    if (!info.uses_rescaling_uniform || rescaling_push_constants.value != 0) {   // (hookshot: or made already, for the page table)
+         return;
+     }
+     if (profile.unified_descriptor_binding) {
+@@ -1105,7 +1171,7 @@
+ }
+ 
+ void EmitContext::DefineRescalingInputPushConstant() {
+-    boost::container::static_vector<Id, 3> members{};
++    boost::container::static_vector<Id, 4> members{};
+     u32 member_index{0};
+ 
+     rescaling_textures_type = TypeArray(U32[1], Const(4u));
+@@ -1121,6 +1187,10 @@
+     if (stage != Stage::Compute) {
+         members.push_back(F32[1]);
+         rescaling_downfactor_member_index = member_index++;
++    }
++    if (wants_guest_pages) {
++        members.push_back(U64);
++        guest_pages_member_index = member_index++;
+     }
+     const Id push_constant_struct{TypeStruct(std::span(members.data(), members.size()))};
+     Decorate(push_constant_struct, spv::Decoration::Block);
+@@ -1139,6 +1209,10 @@
+                        spv::Decoration::Offset,
+                        static_cast<u32>(offsetof(RescalingLayout, down_factor)));
+         MemberName(push_constant_struct, rescaling_downfactor_member_index, "down_factor");
++    }
++    if (wants_guest_pages) {
++        MemberDecorate(push_constant_struct, guest_pages_member_index, spv::Decoration::Offset, GUEST_PAGES_PUSH_OFFSET);
++        MemberName(push_constant_struct, guest_pages_member_index, "guest_pages");
+     }
+     const Id pointer_type{TypePointer(spv::StorageClass::PushConstant, push_constant_struct)};
+     rescaling_push_constants = AddGlobalVariable(pointer_type, spv::StorageClass::PushConstant);
+--- a/gpu/vk/eden/shader_recompiler/backend/spirv/spirv_emit_context.h
++++ b/gpu/vk/eden/shader_recompiler/backend/spirv/spirv_emit_context.h
+@@ -304,6 +304,8 @@
+     u32 rescaling_textures_member_index{};
+     u32 rescaling_images_member_index{};
+     u32 rescaling_downfactor_member_index{};
++    u32 guest_pages_member_index{};   // (hookshot: GUEST_PAGES_PUSH_OFFSET's member, compute only)
++    bool wants_guest_pages{};
+     u32 texture_rescaling_index{};
+     u32 image_rescaling_index{};
+ 
+--- a/gpu/vk/eden/shader_recompiler/ir_opt/global_memory_to_storage_buffer_pass.cpp
++++ b/gpu/vk/eden/shader_recompiler/ir_opt/global_memory_to_storage_buffer_pass.cpp
+@@ -5,6 +5,9 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
+ #include <optional>
++#include <cstdlib>
++#include <vector>
++#include <unordered_set>
+ #include <unordered_map>
+ 
+ #include <boost/container/flat_set.hpp>
+@@ -418,6 +421,51 @@
+     return BreadthFirstSearch(value, pred);
+ }
+ 
++/// (hookshot, from Lichii b8d81e20) Whether an address is a select or phi of which one input is a pointer loaded from memory: Ocarina's foliage
++/// placement records are read from c0[12] or from *c0[12]. Tracked to the constant buffer pointer alone, the loaded path read out of bounds
++/// as zeros, the near-leaf pass wrote NaN positions, and trees had no leaves. Such a load stays global: the backend's page table reads it
++bool MixesLoadedPointer(const IR::Value& value) {
++    if (value.IsImmediate()) {
++        return false;
++    }
++    std::vector<const IR::Inst*> todo{value.InstRecursive()};
++    std::unordered_set<const IR::Inst*> seen;
++    bool merge{}, loaded{};
++    while (!todo.empty() && seen.size() < 96) {
++        const IR::Inst* const inst{todo.back()};
++        todo.pop_back();
++        if (!seen.insert(inst).second) {
++            continue;
++        }
++        switch (inst->GetOpcode()) {
++        case IR::Opcode::Phi:
++        case IR::Opcode::SelectU32:
++        case IR::Opcode::SelectU64:
++            merge = true;
++            break;
++        case IR::Opcode::LoadStorage32:
++        case IR::Opcode::LoadStorage64:
++        case IR::Opcode::LoadStorage128:
++        case IR::Opcode::LoadGlobal32:
++        case IR::Opcode::LoadGlobal64:
++        case IR::Opcode::LoadGlobal128:
++            loaded = true;
++            continue;   // (what it loads from is another matter)
++        default:
++            break;
++        }
++        for (size_t i = 0; i < inst->NumArgs(); ++i) {
++            const IR::Value arg{inst->Arg(i)};
++            if (!arg.IsImmediate()) {
++                todo.push_back(arg.InstRecursive());
++            }
++        }
++    }
++    return merge && loaded;
++}
++
++thread_local bool g_follow_stage = false;   // (hookshot: the program being translated is compute, where the page table is)
++
+ /// Collects the storage buffer used by a global memory instruction and the instruction itself
+ void CollectStorageBuffers(IR::Block& block, IR::Inst& inst, StorageInfo& info) {
+     // NVN puts storage buffers in a specific range, we have to bias towards these addresses to
+@@ -433,6 +481,15 @@
+     if (!low_addr_info) {
+         // Failed to track the low address, use NVN fallbacks
+         return;
++    }
++    {
++        // (only where the page table is: compute. A graphics stage reads such a load as 0, and that blanked every menu text)
++        static const bool follow{std::getenv("RX_VK_NO_FOLLOW") == nullptr};
++        const IR::Opcode op{inst.GetOpcode()};
++        if (follow && g_follow_stage && (op == IR::Opcode::LoadGlobal32 || op == IR::Opcode::LoadGlobal64 || op == IR::Opcode::LoadGlobal128) &&
++            MixesLoadedPointer(low_addr_info->value)) {
++            return;   // (left global: MixesLoadedPointer)
++        }
+     }
+     // First try to find storage buffers in the NVN address
+     const IR::U32 low_addr{low_addr_info->value};
+@@ -590,6 +647,7 @@
+ } // Anonymous namespace
+ 
+ void GlobalMemoryToStorageBufferPass(IR::Program& program, const HostTranslateInfo& host_info) {
++    g_follow_stage = program.stage == Stage::Compute;
+     StorageInfo info;
+     for (IR::Block* const block : program.post_order_blocks) {
+         for (IR::Inst& inst : block->Instructions()) {
+--- a/gpu/vk/vk_draw.cpp
++++ b/gpu/vk/vk_draw.cpp
+@@ -270,8 +270,9 @@
+ }
+ 
+ // ---- pipeline layouts and pipelines ----
+-constexpr uint32_t kPushSize =
+-    (uint32_t)(sizeof(Shader::Backend::SPIRV::RescalingLayout) + sizeof(Shader::Backend::SPIRV::RenderAreaLayout));
++constexpr uint32_t kPushSize = Shader::Backend::SPIRV::GUEST_PAGES_PUSH_OFFSET + 8;
++static_assert(Shader::Backend::SPIRV::GUEST_PAGES_PUSH_OFFSET % 8 == 0);
++static_assert(kPushSize <= 128);   // (+ the guest page table's address)
+ 
+ void ensure_layout(Program& p) {
+     if (p.layout) return;
+@@ -312,6 +313,7 @@
+     for (const Stage& st : p.stages) p.uses_render_area |= st.info.uses_render_area;
+     p.uses_push = p.uses_render_area;
+     for (const Stage& st : p.stages) p.uses_push |= st.info.uses_rescaling_uniform;
++    for (const Stage& st : p.stages) p.uses_push |= st.vk_stage == VK_SHADER_STAGE_COMPUTE_BIT && st.info.uses_global_memory;   // (the page table)
+     std::atomic_thread_fence(std::memory_order_release);   // (the layout last: a thread that sees it sees the rest)
+     p.layout = layout;
+ }
+@@ -425,7 +427,7 @@
+     __try {
+         return vkCreateComputePipelines(dev.device, cache, 1, ci, nullptr, pl);
+     } __except (1) {
+-        return VK_ERROR_UNKNOWN;
++        return (VkResult)-77;   // (a fault in the driver, told apart from what it returns)
+     }
+ }
+ VkPipeline build_graphics(const Program& p, const NvnState& s, const Targets& at, VkPrimitiveTopology topo, int part = -1);
+@@ -1578,6 +1580,10 @@
+     uint8_t data[kPushSize]{};
+     const float one = 1.0f;
+     std::memcpy(data + Shader::Backend::SPIRV::RESCALING_LAYOUT_DOWN_FACTOR_OFFSET, &one, 4);
++    if (!at) {   // (a dispatch: guest memory's page table, for the pointers it follows)
++        static const uint64_t pages = memory_guest_pages();
++        std::memcpy(data + Shader::Backend::SPIRV::GUEST_PAGES_PUSH_OFFSET, &pages, 8);
++    }
+     if (p.uses_render_area && at) {
+         // (at the block's own offset, 0, as Eden pushes it: the SPIR-V back end declares RenderAreaInfo at offset 0,
+         // over the rescaling words. Placed after RescalingLayout, the shaders read zeros: every full-screen pass
+@@ -3299,7 +3305,8 @@
+     // (the real network where the card runs it as the console does; on the software multiplies it cost most of a frame on AMD's cards, and a
+     // locked 60 with this in its place: Hookshot issue 52)
+     static const char* keys = getenv("RX_VK_TAAU_KEYS") ? getenv("RX_VK_TAAU_KEYS")
+-                              : Shader::Backend::SPIRV::mma_software ? "fd029a317a9a4b94" : "-";
++                              : Shader::Backend::SPIRV::mma_software || getenv("RX_VK_NO_F16")
++                                    ? "fd029a317a9a4b94" : "-";   // (RX_VK_NO_F16: vk_shader.cpp leaves the network out)
+     char hex[24];
+     snprintf(hex, sizeof hex, "%016llx", (unsigned long long)key);
+     bool match = false;
+@@ -3706,7 +3713,9 @@
+         pin_subgroup(ci.stage, p.workgroup[0]);
+         ci.layout = p.layout;
+         const auto t0 = std::chrono::steady_clock::now();
+-        if (guarded_compute(pcache, &ci, &p.compute_pipeline) != VK_SUCCESS) {
++        if (const VkResult made = guarded_compute(pcache, &ci, &p.compute_pipeline); made != VK_SUCCESS) {
++            static std::atomic<int> told{0};
++            if (told++ < 20) logf("vk: compute pipeline of %016llx not made (%d)", (unsigned long long)p.key, (int)made);
+             p.compute_pipeline = VK_NULL_HANDLE;
+             p.failed = true;
+             SKIP_HERE();
+--- a/gpu/vk/vk_internal.h
++++ b/gpu/vk/vk_internal.h
+@@ -69,6 +69,7 @@
+     }
+ };
+ bool memory_init();                                   // vk_memory.cpp
++uint64_t memory_guest_pages();                        // (hookshot: the device address of guest memory's page table, 0: none)
+ void memory_sync();                                   // (at each submit: pools the game made or let go)
+ BufferRef gpu_buffer(uint64_t gpu, uint64_t size);   // (empty when no pool holds the range)
+ /// A range as a binding of the replay sees it: the pool's VRAM mirror when it has one (vk_memory.cpp), else the
+@@ -142,6 +143,7 @@
+ bool create_buffer_cached(uint64_t size, VkBufferUsageFlags usage, VkBuffer& buffer, VmaAllocation& allocation,
+                           void** mapped);   // (vk_vma.cpp: cached host memory, mapped)
+ void flush_mapped(VmaAllocation allocation, uint64_t size);
++void flush_mapped_range(VmaAllocation allocation, uint64_t offset, uint64_t size);
+ void memory_stamp_gpu(uint64_t guest, uint64_t size);   // (a GPU write: memory_stamp, and the pages noted)
+ /// (vk_replay.cpp) guest memory as the stream's place sees it: as submitted, the stream's uniform updates before it over it
+ bool ub_read(uint64_t addr, void* dst, uint64_t n);
+--- a/gpu/vk/vk_memory.cpp
++++ b/gpu/vk/vk_memory.cpp
+@@ -153,6 +153,50 @@
+ }
+ 
+ } // namespace
++
++// (hookshot) guest memory's page table, for the pointers shaders follow (spirv_emit_context.cpp): a page's device address, 0 for none. Written as
++// pools come and go, before the submissions that can reach them
++VmaAllocation guest_pages_allocation = nullptr;
++uint64_t* guest_pages = nullptr;
++uint64_t guest_pages_address = 0;
++void guest_pages_set(uint64_t lo, uint64_t hi, uint64_t address) {
++    if (!guest_pages) return;
++    const uint64_t base = 0x1000000000ull, end = base + (8ull << 30);
++    const uint64_t first = std::max(lo, base) & ~0xFFFull, last = std::min(hi, end);
++    if (first >= last) return;
++    for (uint64_t a = first; a < last; a += 0x1000)
++        guest_pages[(a - base) >> 12] = address ? address + (a - lo) : 0;
++    // VMA skips the call for coherent memory and aligns the range when needed.
++    flush_mapped_range(guest_pages_allocation, ((first - base) >> 12) * 8, ((last - first + 0xFFF) >> 12) * 8);
++}
++
++uint64_t memory_guest_pages() {
++    static std::mutex mu;
++    std::lock_guard lk(mu);
++    static bool tried = false;
++    if (tried) return guest_pages_address;
++    tried = true;
++    if (getenv("RX_VK_NO_FOLLOW")) return 0;   // (on: Kokiri's lighting. The menus' blank text was the rule in graphics stages, now compute only)
++    VkBuffer b = VK_NULL_HANDLE;
++    VmaAllocation a = nullptr;
++    void* mapped = nullptr;
++    const uint64_t bytes = (8ull << 30 >> 12) * 8;
++    if (!create_buffer(bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, true, b, a, &mapped) || !mapped) {
++        logf("vk: no page table of guest memory: pointers in no bound buffer read as 0");
++        return 0;
++    }
++    std::memset(mapped, 0, bytes);
++    guest_pages_allocation = a;
++    flush_mapped(a, bytes);
++    VkBufferDeviceAddressInfo da{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
++    da.buffer = b;
++    guest_pages_address = vkGetBufferDeviceAddress(dev.device, &da);
++    std::lock_guard pk(pools_mu);
++    guest_pages = (uint64_t*)mapped;
++    for (auto& kv : imported) guest_pages_set(kv.second.lo, kv.second.hi, kv.second.address);
++    logf("vk: page table of guest memory at %#llx (%zu pools)", (unsigned long long)guest_pages_address, imported.size());
++    return guest_pages_address;
++}
+ 
+ bool memory_init() {
+     if (!dev.external_memory_host) {
+@@ -1014,6 +1058,7 @@
+         }
+         if (imp != imported.end()) retire_pool(imp);
+         imported.emplace(lo, p);
++        guest_pages_set(p.lo, p.hi, p.address);
+     }
+ }
+ 
+@@ -1111,6 +1156,7 @@
+             if (o != imported.end()) retire_pool(o);
+         }
+         imp = imported.emplace(p.lo, p).first;
++        guest_pages_set(p.lo, p.hi, p.address);
+         if (overlapped.size() > 1) {
+             static int logged_merge;
+             if (logged_merge++ < 16)
+@@ -1174,6 +1220,7 @@
+ 
+ void retire_pool(std::map<uint64_t, Pool>::iterator it) {
+     Pool* old = &it->second;
++    guest_pages_set(old->lo, old->hi, 0);
+     old->retired_value = std::max(old->last_value, mem_rec_value);
+     std::erase(mirror_wanted, old);   // (the new pool gets the mirror)
+     if (old->mstate == Pool::MIRROR_WANTED) old->mstate = Pool::MIRROR_NONE;
+@@ -1415,6 +1462,11 @@
+ uint64_t st_mirror_bytes_freed = 0;
+ void mirror_free(Pool& p) {
+     p.was_mirrored = true;
++    {   // (the table back to guest memory, for a pool still in use only: a retired one's range is another pool's now, and its
++        // address there sent the foliage culling into freed memory, a device lost)
++        const auto live = imported.find(p.lo);
++        if (live != imported.end() && &live->second == &p) guest_pages_set(p.lo, p.hi, p.address);
++    }
+     destroy_buffer(p.mirror, p.mirror_alloc);
+     p.mirror = VK_NULL_HANDLE, p.mirror_alloc = nullptr;
+     mirror_bytes -= p.hi - p.lo;
+@@ -1502,9 +1554,14 @@
+                      (unsigned long long)(mirror_budget() >> 20));
+             return false;
+         }
+-        if (!create_device_buffer(n, kUsage & ~VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, p->mirror, p->mirror_alloc)) {
++        if (!create_device_buffer(n, kUsage, p->mirror, p->mirror_alloc)) {
+             p->mstate = Pool::MIRROR_REFUSED;
+             return false;
++        }
++        {   // (hookshot) the page table points at the mirror: what the GPU wrote is there, and guest memory has it only after the write-back
++            VkBufferDeviceAddressInfo da{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
++            da.buffer = p->mirror;
++            guest_pages_set(p->lo, p->hi, vkGetBufferDeviceAddress(dev.device, &da));
+         }
+         const VkBufferCopy all{0, 0, n};
+         vkCmdCopyBuffer(upload_command_buffer(), p->buffer, p->mirror, 1, &all);   // (all of it, at this generation)
+--- a/gpu/vk/vk_shader.cpp
++++ b/gpu/vk/vk_shader.cpp
+@@ -424,7 +424,9 @@
+ Shader::HostTranslateInfo host_info() {
+     Shader::HostTranslateInfo h{};
+     h.support_float64 = true;
+-    h.support_float16 = true;
++    // (RX_VK_NO_F16, a test: the game's f16 math lowered to f32, as a card without f16 shaders would need (GTX 10xx, issue 98). Eden's
++    // lowering made a picture of noise of Kokiri on an RTX card, so it is not used by itself)
++    h.support_float16 = !getenv("RX_VK_NO_F16");
+     h.support_int64 = true;
+     h.needs_demote_reorder = false;
+     h.support_snorm_render_buffer = true;
+@@ -719,7 +721,7 @@
+ void oot_visual(Shader::IR::Program& program, uint64_t key) {
+     static const bool on = !getenv("RX_VK_OOT_VISUAL") || atoi(getenv("RX_VK_OOT_VISUAL")) != 0;
+     if (!on) return;
+-    static const float fog = getenv("RX_VK_OOT_FOG") ? (float)atof(getenv("RX_VK_OOT_FOG")) : 0.08f;
++    static const float fog = getenv("RX_VK_OOT_FOG") ? (float)atof(getenv("RX_VK_OOT_FOG")) : 0.08f;   // (0.25, Orchid's, left a white forest once the game no longer lost its start)
+     static const float exposure = getenv("RX_VK_OOT_EXPOSURE") ? (float)atof(getenv("RX_VK_OOT_EXPOSURE")) : 0.65f;
+     if (const size_t n = Shader::Optimization::ApplyOotVisualWorkaround(program, fog, exposure))
+         logf("vk: OoT visual workaround: %s program %016llx, %zu edits", program.stage == Shader::Stage::Compute ? "fog" : "exposure",
+@@ -758,7 +760,7 @@
+         (uint32_t)dev.sg32_stages, (uint32_t)Shader::Backend::SPIRV::mma_software};
+     add(target, sizeof target);
+     for (char** e = _environ; e && *e; e++)
+-        for (const char* pre : {"RX_VK_OOT", "RX_VK_MMA", "RX_VK_NATIVE", "RX_VK_NAN", "RX_VK_TASK_CAP", "RX_VK_NETWORK", "EDEN_"})
++        for (const char* pre : {"RX_VK_OOT", "RX_VK_MMA", "RX_VK_NATIVE", "RX_VK_NAN", "RX_VK_TASK_CAP", "RX_VK_NETWORK", "RX_VK_GP", "RX_VK_FOLLOW", "RX_VK_NO_FOLLOW", "RX_VK_NO_F16", "EDEN_"})
+             if (!strncmp(*e, pre, strlen(pre))) add(*e, strlen(*e));
+     return h;
+ }
+@@ -987,10 +989,20 @@
+                     kept_one = !k.empty() && !strncmp(hex, k.c_str(), k.size());
+                     at = e == std::string::npos ? keep.size() : e + 1;
+                 }
+-                if (!kept_one && (Shader::Backend::SPIRV::mma_software || dev.props.vendorID != 0x10DE))
++                if ((!kept_one && (Shader::Backend::SPIRV::mma_software || dev.props.vendorID != 0x10DE)) || getenv("RX_VK_NO_F16"))
+                     throw std::runtime_error("a network left out on this card");
+             }
+             const std::vector<uint32_t> spirv = Shader::Backend::SPIRV::EmitSPIRV(profile(), rt, t->program, bindings);
++            if (const char* d = getenv("RX_VK_IR")) {   // (the SPIR-V too, for spirv-val)
++                char name[64];
++                snprintf(name, sizeof name, "spv_%016llx.spv", (unsigned long long)p.key);
++                if (std::string(d).find(std::string(name + 4, 16)) != std::string::npos) {
++                    if (FILE* f = fopen(name, "wb")) {
++                        fwrite(spirv.data(), 4, spirv.size(), f);
++                        fclose(f);
++                    }
++                }
++            }
+             Stage st;
+             st.nvn_stage = 5;
+             st.info = t->program.info;
+--- a/gpu/vk/vk_vma.cpp
++++ b/gpu/vk/vk_vma.cpp
+@@ -75,7 +75,16 @@
+         pai.usage = VMA_MEMORY_USAGE_UNKNOWN;
+         if (vmaCreateImage(vma, &ci, &pai, &image, &allocation, nullptr) == VK_SUCCESS) return true;
+     }
+-    return vmaCreateImage(vma, &ci, &ai, &image, &allocation, nullptr) == VK_SUCCESS;
++    if (vmaCreateImage(vma, &ci, &ai, &image, &allocation, nullptr) == VK_SUCCESS) return true;
++    // (hookshot) VRAM is full (a 4 GB card at a high resolution, #96): an image left unmade is a black screen, so it goes
++    // to system memory instead, slow but drawn
++    if (getenv("RX_VK_IMAGES_VRAM_ONLY")) return false;
++    VmaAllocationCreateInfo sai{};
++    sai.usage = VMA_MEMORY_USAGE_AUTO;
++    if (vmaCreateImage(vma, &ci, &sai, &image, &allocation, nullptr) != VK_SUCCESS) return false;
++    static std::atomic<int> told{0};
++    if (told++ < 4) logf("vk: VRAM full: a %ux%u image (format %d) in system memory", ci.extent.width, ci.extent.height, (int)ci.format);
++    return true;
+ }
+ void destroy_image(VkImage image, VmaAllocation allocation) {
+     vmaDestroyImage(vma, image, allocation);
+@@ -110,6 +119,9 @@
+ }
+ void flush_mapped(VmaAllocation allocation, uint64_t size) {
+     if (size) vmaFlushAllocation(vma, allocation, 0, size);
++}
++void flush_mapped_range(VmaAllocation allocation, uint64_t offset, uint64_t size) {
++    if (size) vmaFlushAllocation(vma, allocation, offset, size);
+ }
+ void destroy_buffer(VkBuffer buffer, VmaAllocation allocation) {
+     vmaDestroyBuffer(vma, buffer, allocation);
+--- a/host/nn_applet.c
++++ b/host/nn_applet.c
+@@ -46,9 +46,18 @@
+                 whole = strchr(line, 10) != NULL;
+                 if (!starts) continue;
+                 const char *p = line;
++                if ((unsigned char)p[0] == 0xEF && (unsigned char)p[1] == 0xBB && (unsigned char)p[2] == 0xBF) p += 3;   /* (a BOM: Notepad's UTF-8) */
+                 while (*p == ' ' || *p == '\t') p++;
+                 if (*p == '#' || *p == '\r' || *p == '\n' || !*p) continue;
+-                snprintf(want, sizeof want, "%s", p);
++                /* (only a code the game has: a stray line was taken before, and the game stayed in English, Hookshot issue 75) */
++                char code[32];
++                snprintf(code, sizeof code, "%s", p);
++                code[strcspn(code, " \t\r\n")] = 0;
++                int known = 0;
++                for (size_t i = 0; i < sizeof languages / sizeof *languages; i++)
++                    if (!_stricmp(code, languages[i].code)) snprintf(code, sizeof code, "%s", languages[i].code), known = 1;
++                if (!known) continue;
++                snprintf(want, sizeof want, "%s", code);
+                 from = "language.txt";
+                 break;
+             }
+--- a/nx2/build.py
++++ b/nx2/build.py
+@@ -37,6 +37,7 @@
+ import toolchain
+ from ocarina.build_support import object_key, link_options, video_libraries, is_mingw
+ from ocarina.config import compile_jobs
++from ocarina.power import no_throttle
+ 
+ NX2_RT = os.path.join(kit.HERE, "rt")
+ HOST = os.path.join(kit.HERE, "..", "host")
+@@ -161,7 +162,11 @@
+         return src, 0.0, None
+     t = time.time()
+     temporary = obj + ".building"
+-    r = subprocess.run([cc] + fl + ["-c", src, "-o", temporary], capture_output=True, text=True)
++    with subprocess.Popen([cc] + fl + ["-c", src, "-o", temporary],
++                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as child:
++        no_throttle(getattr(child, "_handle", None))
++        stdout, stderr = child.communicate()
++    r = subprocess.CompletedProcess(child.args, child.returncode, stdout, stderr)
+     if r.returncode:
+         if os.path.exists(temporary):
+             os.remove(temporary)
+--- a/ocarina/__init__.py
++++ b/ocarina/__init__.py
+@@ -1,3 +1,3 @@
+ """Build and diagnostic tools for the Hookshot-based Ocarina fork."""
+ 
+-__version__ = "0.3.2-dev.1"
++__version__ = "0.3.3-dev.1"
+--- a/ocarina/build.py
++++ b/ocarina/build.py
+@@ -17,6 +17,8 @@
+ from .game import verify_version, verify_nup
+ from .hot import configure_hot, has_fresh_hot_source
+ from .progress import CompileProgress
++from .power import keep_awake
++from .crash_report import preserve_previous_crash
+ 
+ REQUIRED_OUTPUTS = ("hookshot.exe", "hookshot_vk.dll")
+ 
+@@ -72,6 +74,7 @@
+                     [
+                         sys.executable,
+                         "-I",
++                        "-u",
+                         str(ROOT / "nx2/unpack.py"),
+                         str(stage / "exefs"),
+                     ],
+@@ -106,6 +109,7 @@
+                 [
+                     sys.executable,
+                     "-I",
++                    "-u",
+                     str(ROOT / "nx2/nup.py"),
+                     str(request.nup),
+                     "--extract",
+@@ -128,6 +132,7 @@
+             [
+                 sys.executable,
+                 "-I",
++                "-u",
+                 str(ROOT / "nx2/nup.py"),
+                 str(request.nup),
+                 "--extract",
+@@ -196,12 +201,13 @@
+ 
+ def build(request: BuildRequest, report: Callable[[str], None] = print) -> dict:
+     request.validate()
+-    with workspace_lock(request.work):
++    with workspace_lock(request.work), keep_awake():
+         return _build_locked(request, report)
+ 
+ 
+ def _build_locked(request: BuildRequest, report: Callable[[str], None]) -> dict:
+     check_output(request.output)
++    preserve_previous_crash(request.output, request.work, report)
+     report("@@stage read Verificando arquivos e ferramentas")
+     report("Verificando compilador, bibliotecas e Python...")
+     environment = require_tools(request.tools)
+@@ -236,6 +242,7 @@
+         [
+             sys.executable,
+             "-I",
++            "-u",
+             str(ROOT / "nx2/lift.py"),
+             "--standalone",
+             "--write",
+@@ -254,6 +261,7 @@
+             [
+                 sys.executable,
+                 "-I",
++                "-u",
+                 str(ROOT / "nx2/split_hot.py"),
+                 str(request.work / "sa/gen"),
+             ],
+@@ -281,6 +289,7 @@
+         [
+             sys.executable,
+             "-I",
++            "-u",
+             str(ROOT / "nx2/build.py"),
+             "--standalone",
+             "--jobs",
+--- a/ocarina/cli.py
++++ b/ocarina/cli.py
+@@ -10,6 +10,7 @@
+ from .environment import PROFILES
+ from .errors import ProjectError
+ from .launch import launch
++from .crash_report import collect_run
+ from .preflight import inspect_tools
+ 
+ 
+@@ -54,6 +55,13 @@
+     player.add_argument("--profile", choices=tuple(PROFILES), default="original")
+     player.add_argument("--diagnostic", action="store_true")
+     player.add_argument("--dry-run", action="store_true")
++    player.add_argument("--short-romfs", action="store_true", help="Testa o runtime com um alias curto de RomFS.")
++    player.add_argument("--trace-files", action="store_true", help="Registra arquivos abertos, sem ativar validacao Vulkan.")
++    player.add_argument("--collect-crash", action="store_true", help="Empacota esta execucao e o mapa correspondente ao fechar.")
++    player.add_argument("--work", type=absolute, default=ROOT / "work")
++    collector = commands.add_parser("collect-crash", help="Empacota a ultima execucao existente, sem abrir ou compilar o jogo.")
++    collector.add_argument("--out", type=absolute, default=ROOT / "jogo")
++    collector.add_argument("--work", type=absolute, default=ROOT / "work")
+     return result
+ 
+ 
+@@ -74,6 +82,12 @@
+             if not failures:
+                 print("Ferramentas verificadas. Isso nao constitui um teste do jogo ou da GPU.")
+             return int(bool(failures))
++        if args.command == "collect-crash":
++            try:
++                print("Diagnostico para compartilhar:", collect_run(args.out, args.work))
++            except OSError as error:
++                raise ProjectError(f"Nao foi possivel coletar o diagnostico: {error}") from error
++            return 0
+         if args.command == "build":
+             if args.check:
+                 if bool(args.nup) == bool(args.exefs):
+@@ -95,7 +109,9 @@
+             )
+             build(request)
+             return 0
+-        return launch(args.out, args.profile, args.diagnostic, args.dry_run)
++        return launch(args.out, args.profile, args.diagnostic, args.dry_run,
++                      short_paths=args.short_romfs, trace_files=args.trace_files,
++                      collect_crash=args.collect_crash, work=args.work)
+     except ProjectError as error:
+         print("@@error " + str(error), flush=True)
+         return 1
+--- a/ocarina/crash_report.py
++++ b/ocarina/crash_report.py
+@@ -0,0 +1,159 @@
++"""Collect an existing run and its matching linker map, without recompiling."""
++
++import bisect
++import ntpath
++import os
++from pathlib import Path, PurePosixPath
++import re
++import struct
++import tempfile
++import zipfile
++
++from .errors import ProjectError
++from .files import read_json, sha256
++
++
++def image_base(executable: Path) -> int:
++    with executable.open("rb") as stream:
++        head = stream.read(64)
++        if len(head) < 64 or head[:2] != b"MZ":
++            raise ValueError("not a PE image")
++        stream.seek(struct.unpack_from("<I", head, 60)[0])
++        pe = stream.read(56)
++    if len(pe) < 56 or pe[:4] != b"PE\0\0" or struct.unpack_from("<H", pe, 24)[0] != 0x20B:
++        raise ValueError("not a PE32+ image")
++    return struct.unpack_from("<Q", pe, 48)[0]
++
++
++def map_offsets(map_file: Path, base: int, offsets: list[int]) -> list[str]:
++    rows = []
++    with map_file.open(encoding="utf-8", errors="replace") as stream:
++        for line in stream:
++            match = re.match(r"\s*[0-9a-fA-F]{4}:[0-9a-fA-F]{8}\s+(\S+)\s+([0-9a-fA-F]{8,16})\b", line)
++            if match:
++                rows.append((int(match[2], 16), match[1]))
++                continue
++            match = re.match(r"\s*0x([0-9a-fA-F]+)\s+([A-Za-z_?$@][\w?$@.:]*)\s*$", line)
++            if match:
++                rows.append((int(match[1], 16), match[2]))
++                continue
++            # LLVM-MinGW/lld's COFF map uses an RVA, zero size and alignment,
++            # then the symbol; object/section rows have a different alignment.
++            match = re.match(r"\s*([0-9a-fA-F]{8,16})\s+0+\s+0\s+([A-Za-z_?$@][\w?$@.:]*)\s*$", line)
++            if match:
++                rows.append((base + int(match[1], 16), match[2]))
++    if not rows:
++        return ["Formato do mapa nao reconhecido; mapa completo incluido para analise."]
++    rows.sort()
++    keys = [row[0] for row in rows]
++    lines = []
++    for offset in dict.fromkeys(offsets):
++        target = base + offset
++        at = bisect.bisect_right(keys, target) - 1
++        if at < 0 or target - rows[at][0] > 0x100000:
++            lines.append(f"hookshot.exe+{offset:#x}: sem simbolo proximo")
++        else:
++            address, symbol = rows[at]
++            lines.append(f"hookshot.exe+{offset:#x}: simbolo anterior {symbol}+{target-address:#x}")
++    return lines
++
++
++def path_findings(metadata: dict, errors: str) -> list[str]:
++    root = metadata.get("build", {}).get("romfs", "")
++    runtime = metadata.get("runtime_romfs", root)
++    findings = [f"RomFS original: {root}", f"Comprimento da raiz original: {len(root)} caracteres",
++                f"RomFS passado ao runtime: {runtime}"]
++    seen = set()
++    for match in re.finditer(r"fs: OpenFile\(([^\r\n]+?)\)([^\r\n]*)", errors):
++        guest, result = match[1], match[2]
++        mount, sep, relative = guest.partition(":/")
++        rel = PurePosixPath(relative)
++        if not sep or mount not in {"content", "rom", "romfs"} or ".." in rel.parts or rel.is_absolute():
++            continue
++        full = ntpath.join(root, *rel.parts)
++        if guest in seen or (len(full) < 260 and "not found" not in result):
++            continue
++        seen.add(guest)
++        exists = "nao verificado neste sistema"
++        if os.name == "nt":
++            wide = full if full.startswith("\\\\?\\") else (
++                "\\\\?\\UNC\\" + full[2:] if full.startswith("\\\\") else "\\\\?\\" + full)
++            try:
++                exists = str(Path(wide).is_file())
++            except OSError as error:
++                exists = str(error)
++        findings.append(f"{guest}: caminho original {len(full)} caracteres; "
++                        f"resultado no runtime {result.strip() or 'aberto'}; existe via caminho longo: {exists}")
++        if len(seen) >= 50:
++            findings.append("Lista limitada aos primeiros 50 caminhos relevantes.")
++            break
++    return findings
++
++
++def collect_run(folder: Path, work: Path, logs: Path | None = None) -> Path:
++    if logs is None:
++        runs = sorted(path for path in (folder / "diagnosticos").glob("*")
++                      if path.is_dir() and (path / "execucao.json").is_file())
++        if not runs:
++            raise ProjectError("Nenhuma execucao registrada na pasta selecionada.")
++        logs = runs[-1]
++    metadata = read_json(logs / "execucao.json")
++    errors_path = logs / "erros.log"
++    if errors_path.stat().st_size > 64 << 20:
++        raise ProjectError("O log excede 64 MiB; preserve-o para analise separada.")
++    errors = errors_path.read_text(encoding="utf-8", errors="replace")
++    status = metadata.get("exit_code")
++    lines = ["DIAGNOSTICO OCARINA / HOOKSHOT", f"Versao do lancador: {metadata.get('launcher_version')}",
++             f"Perfil: {metadata.get('profile')}", f"Codigo: {status}"]
++    if isinstance(status, int):
++        lines.append(f"Codigo NTSTATUS (32 bits): {status & 0xffffffff:#010x}")
++    lines.extend(line for line in errors.splitlines() if "CRASH:" in line)
++    lines.extend(["", "CAMINHOS"] + path_findings(metadata, errors))
++    mapped = work / "sa/build/hookshot.map"
++    built = work / "sa/build/hookshot.exe"
++    expected = metadata.get("build", {}).get("files", {}).get("hookshot.exe")
++    matching = False
++    try:
++        matching = bool(expected and mapped.is_file() and built.is_file() and sha256(built) == expected)
++    except OSError as error:
++        lines.append(f"Nao foi possivel conferir o build do mapa: {error}")
++    lines.extend(["", "SIMBOLOS", f"Executavel ao lado do mapa corresponde ao crash: {matching}"])
++    if matching:
++        offsets = [int(match, 16) for match in re.findall(r"hookshot\.exe\+0x([0-9a-fA-F]+)", errors)]
++        try:
++            lines.extend(map_offsets(mapped, image_base(built), offsets))
++        except (OSError, ValueError, struct.error) as error:
++            lines.append(f"Nao foi possivel interpretar o mapa: {error}")
++    else:
++        lines.append("Mapa ausente ou executavel diferente. Nao foram atribuidos simbolos a outro build.")
++    report = logs / "diagnostico-crash.txt"
++    report.write_text("\n".join(lines) + "\n", encoding="utf-8")
++    descriptor, temporary_name = tempfile.mkstemp(prefix="diagnostico-", suffix=".tmp", dir=logs.parent)
++    os.close(descriptor)
++    temporary = Path(temporary_name)
++    archive = logs.with_suffix(".zip")
++    try:
++        with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as bundle:
++            for name in ("execucao.json", "saida.log", "erros.log", "diagnostico-crash.txt"):
++                if (logs / name).is_file():
++                    bundle.write(logs / name, name)
++            if matching:
++                bundle.write(mapped, "hookshot.map")
++        temporary.replace(archive)
++    finally:
++        temporary.unlink(missing_ok=True)
++    return archive
++
++
++def preserve_previous_crash(folder: Path, work: Path, report=print) -> None:
++    """Save the old map before a new link replaces it; collection is best effort."""
++    runs = sorted(path for path in (folder / "diagnosticos").glob("*")
++                  if path.is_dir() and (path / "execucao.json").is_file())
++    if not runs or runs[-1].with_suffix(".zip").is_file():
++        return
++    try:
++        metadata = read_json(runs[-1] / "execucao.json")
++        if metadata.get("exit_code") not in (None, 0):
++            report("Diagnostico anterior preservado: " + str(collect_run(folder, work, runs[-1])))
++    except (OSError, ProjectError) as error:
++        report("Nao foi possivel preservar o diagnostico anterior: " + str(error))
+--- a/ocarina/launch.py
++++ b/ocarina/launch.py
+@@ -1,12 +1,15 @@
+ """Launch only a complete build, with a unique diagnostic record per run."""
+ 
++from contextlib import nullcontext
+ import datetime as dt
+ import os
+ import subprocess
+ from pathlib import Path
+ 
+ from . import __version__
+-from .config import MANIFEST
++from .config import MANIFEST, ROOT
++from .crash_report import collect_run
++from .windows_paths import short_romfs
+ from .environment import PROFILES, runtime_environment
+ from .errors import ProjectError
+ from .files import read_json, sha256, write_json
+@@ -46,9 +49,16 @@
+     profile: str = "original",
+     diagnostic: bool = False,
+     dry_run: bool = False,
++    *,
++    short_paths: bool = False,
++    trace_files: bool = False,
++    collect_crash: bool = False,
++    work: Path | None = None,
+ ) -> int:
+     manifest = verify_build(folder)
+     environment = runtime_environment(os.environ, profile, diagnostic)
++    if trace_files:
++        environment["HOS_FS_TRACE"] = "1"
+     command = [
+         str(folder / "hookshot.exe"),
+         str(folder / "image.bin"),
+@@ -73,6 +83,9 @@
+         "launcher_version": __version__,
+         "profile": profile,
+         "diagnostic": diagnostic,
++        "trace_files": trace_files,
++        "short_romfs": short_paths,
++        "runtime_helper": "crash-paths-1",
+         "started": dt.datetime.now().astimezone().isoformat(),
+         "command": command,
+         "build": manifest,
+@@ -89,18 +102,32 @@
+         (logs / "erros.log").open("wb") as errors,
+     ):
+         try:
+-            child = subprocess.Popen(
+-                command, cwd=folder, env=environment, stdout=output, stderr=errors
+-            )
+-            status = child.wait()
+-        except OSError as error:
++            alias = short_romfs(manifest["romfs"]) if short_paths else nullcontext(manifest["romfs"])
++            with alias as runtime_romfs:
++                command[3] = runtime_romfs
++                metadata["runtime_romfs"] = runtime_romfs
++                write_json(logs / "execucao.json", metadata)
++                if short_paths:
++                    print("RomFS com caminho curto:", runtime_romfs, "(arquivos originais preservados)", flush=True)
++                child = subprocess.Popen(
++                    command, cwd=folder, env=environment, stdout=output, stderr=errors
++                )
++                try:
++                    status = child.wait()
++                except KeyboardInterrupt:
++                    child.terminate()
++                    status = child.wait()
++        except (OSError, ProjectError) as error:
+             metadata["launch_error"] = str(error)
+             write_json(logs / "execucao.json", metadata)
+             raise ProjectError(f"Nao foi possivel abrir o jogo: {error}") from error
+-        except KeyboardInterrupt:
+-            child.terminate()
+-            status = child.wait()
+     metadata.update({"exit_code": status, "finished": dt.datetime.now().astimezone().isoformat()})
+     write_json(logs / "execucao.json", metadata)
+-    print("Codigo de encerramento:", status)
++    print("Codigo de encerramento:", status, f"({status & 0xffffffff:#010x})")
++    if collect_crash:
++        try:
++            archive = collect_run(folder, work or ROOT / "work", logs)
++            print("Diagnostico para compartilhar:", archive, flush=True)
++        except (OSError, ProjectError) as error:
++            print("Nao foi possivel empacotar o diagnostico:", error, flush=True)
+     return status
+--- a/ocarina/power.py
++++ b/ocarina/power.py
+@@ -0,0 +1,49 @@
++"""Windows build power requests, scoped to this process and build duration.
++
++Adapted from the supplied Hookshot pointer-lighting-2 builder. No power-plan
++or priority setting is changed. Missing APIs do not prevent compilation.
++"""
++
++from contextlib import contextmanager
++import ctypes
++import os
++
++
++def no_throttle(handle=None) -> bool:
++    if os.name != "nt":
++        return False
++    try:
++        class State(ctypes.Structure):
++            _fields_ = [(name, ctypes.c_uint32) for name in ("version", "control", "state")]
++
++        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
++        kernel.GetCurrentProcess.restype = ctypes.c_void_p
++        setter = kernel.SetProcessInformation
++        setter.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
++        setter.restype = ctypes.c_int
++        process = ctypes.c_void_p(int(handle)) if handle is not None else kernel.GetCurrentProcess()
++        state = State(1, 1, 0)
++        return bool(setter(process, 4, ctypes.byref(state), ctypes.sizeof(state)))
++    except (AttributeError, OSError, TypeError, ValueError):
++        return False
++
++
++@contextmanager
++def keep_awake(*, setter=None):
++    if setter is None:
++        if os.name != "nt":
++            yield
++            return
++        try:
++            setter = ctypes.WinDLL("kernel32", use_last_error=True).SetThreadExecutionState
++            setter.argtypes = [ctypes.c_uint32]
++            setter.restype = ctypes.c_uint32
++        except (AttributeError, OSError):
++            yield
++            return
++    previous = setter(0x80000001)  # ES_CONTINUOUS | ES_SYSTEM_REQUIRED
++    try:
++        yield
++    finally:
++        if previous:
++            setter(previous)
+--- a/ocarina/process.py
++++ b/ocarina/process.py
+@@ -8,6 +8,7 @@
+ from pathlib import Path
+ 
+ from .errors import ProjectError
++from .power import no_throttle
+ 
+ 
+ def stop(child: subprocess.Popen) -> None:
+@@ -55,6 +56,7 @@
+             )
+         except OSError as error:
+             raise ProjectError(f"Nao foi possivel iniciar {command[0]}: {error}") from error
++        no_throttle(getattr(child, "_handle", None))
+         try:
+             assert child.stdout is not None
+             for raw in child.stdout:
+--- a/ocarina/windows_paths.py
++++ b/ocarina/windows_paths.py
+@@ -0,0 +1,80 @@
++"""Opt-in short RomFS path for the inherited ANSI/MAX_PATH runtime.
++
++Only the DOS device name is temporary. No game file is moved or copied.
++Removal matches our exact target and never removes another mapping.
++"""
++
++from contextlib import contextmanager
++import ctypes
++import ntpath
++import os
++
++from .errors import ProjectError
++
++
++def nt_target(path: str) -> str:
++    path = ntpath.normpath(path)
++    if path.startswith("\\\\?\\UNC\\"):
++        return "\\??\\UNC\\" + path[8:]
++    if path.startswith("\\\\?\\"):
++        path = path[4:]
++    if path.startswith("\\\\"):
++        return "\\??\\UNC\\" + path[2:]
++    drive, rest = ntpath.splitdrive(path)
++    if len(drive) != 2 or not rest.startswith("\\"):
++        raise ProjectError("O caminho de RomFS deve ser absoluto para criar um alias.")
++    return "\\??\\" + path
++
++
++class WindowsDrives:
++    def __init__(self):
++        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
++        self.query = kernel.QueryDosDeviceW
++        self.query.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
++        self.query.restype = ctypes.c_uint32
++        self.define = kernel.DefineDosDeviceW
++        self.define.argtypes = [ctypes.c_uint32, ctypes.c_wchar_p, ctypes.c_wchar_p]
++        self.define.restype = ctypes.c_int
++        self.logical = kernel.GetLogicalDrives
++        self.logical.argtypes = []
++        self.logical.restype = ctypes.c_uint32
++
++    def available(self, letter: str) -> bool:
++        if self.logical() & (1 << (ord(letter) - ord("A"))):
++            return False
++        buf = ctypes.create_unicode_buffer(32768)
++        if self.query(letter + ":", buf, len(buf)):
++            return False
++        # An inaccessible or disconnected device is not an available name.
++        return ctypes.get_last_error() == 2
++
++    def create(self, letter: str, target: str) -> bool:
++        return bool(self.define(0x1 | 0x8, letter + ":", target))
++
++    def remove(self, letter: str, target: str) -> bool:
++        return bool(self.define(0x1 | 0x2 | 0x4 | 0x8, letter + ":", target))
++
++
++@contextmanager
++def short_romfs(path: str, *, api=None):
++    if api is None:
++        if os.name != "nt":
++            raise ProjectError("O alias de RomFS requer Windows.")
++        api = WindowsDrives()
++    target = nt_target(path)
++    for code in range(ord("Z"), ord("D") - 1, -1):
++        letter = chr(code)
++        if api.available(letter) and api.create(letter, target):
++            try:
++                yield letter + ":\\"
++            finally:
++                if not api.remove(letter, target):
++                    raise ProjectError(
++                        f"Nao foi possivel remover o alias temporario {letter}: de RomFS. "
++                        f"Feche o jogo e remova somente esse alias com subst {letter}: /D."
++                    )
++            return
++    raise ProjectError(
++        "Nao foi possivel reservar uma letra livre para o teste de RomFS. "
++        "Nenhum mapeamento existente foi substituido."
++    )
+--- a/tests/test_crash_recovery.py
++++ b/tests/test_crash_recovery.py
+@@ -0,0 +1,193 @@
++"""Exercise path-alias lifetime and crash collection with real child processes."""
++
++import contextlib
++import io
++import json
++import os
++from pathlib import Path
++import struct
++import sys
++import tempfile
++from types import SimpleNamespace
++import unittest
++from unittest.mock import patch
++import zipfile
++
++ROOT = Path(__file__).resolve().parent.parent
++sys.path.insert(0, str(ROOT))
++
++from ocarina.crash_report import collect_run, image_base, map_offsets, path_findings, preserve_previous_crash
++from ocarina.errors import ProjectError
++from ocarina.files import sha256, write_json
++from ocarina.windows_paths import nt_target, short_romfs
++import ocarina.launch as launcher
++
++
++class FakeDrives:
++    def __init__(self, marker=None):
++        self.removed = []
++        self.created = []
++        self.marker = marker
++
++    def available(self, letter):
++        return letter != "Z"
++
++    def create(self, letter, target):
++        self.created.append((letter, target))
++        if self.marker:
++            self.marker.write_text("mapped")
++        return True
++
++    def remove(self, letter, target):
++        self.removed.append((letter, target))
++        if self.marker:
++            self.marker.unlink()
++        return True
++
++
++def synthetic_pe(path):
++    data = bytearray(256)
++    data[:2] = b"MZ"
++    struct.pack_into("<I", data, 60, 128)
++    data[128:132] = b"PE\0\0"
++    struct.pack_into("<H", data, 152, 0x20B)
++    struct.pack_into("<Q", data, 176, 0x140000000)
++    path.write_bytes(data)
++
++
++class ShortPathsTests(unittest.TestCase):
++    def test_skips_occupied_drive_and_removes_only_own_exact_target_after_exception(self):
++        api = FakeDrives()
++        with self.assertRaisesRegex(ValueError, "child failed"):
++            with short_romfs(r"C:\pasta com espaço\romfs", api=api) as alias:
++                self.assertEqual(alias, "Y:\\")
++                self.assertEqual(api.removed, [])
++                raise ValueError("child failed")
++        self.assertEqual(api.created, [("Y", "\\??\\C:\\pasta com espaço\\romfs")])
++        self.assertEqual(api.removed, api.created)
++
++    def test_no_free_letter_does_not_remove_existing_mapping(self):
++        api = FakeDrives()
++        api.available = lambda letter: False
++        with self.assertRaises(ProjectError):
++            with short_romfs(r"C:\romfs", api=api):
++                self.fail("No alias was available")
++        self.assertEqual(api.created, [])
++        self.assertEqual(api.removed, [])
++
++    def test_raced_creation_tries_another_free_letter(self):
++        api = FakeDrives()
++        original = api.create
++        api.create = lambda letter, target: letter != "Y" and original(letter, target)
++        with short_romfs(r"C:\romfs", api=api) as alias:
++            self.assertEqual(alias, "X:\\")
++        self.assertEqual(api.removed, [("X", "\\??\\C:\\romfs")])
++
++    def test_normalizes_unc_and_extended_paths_without_accepting_relative_input(self):
++        self.assertEqual(nt_target(r"\\server\share\romfs"), "\\??\\UNC\\server\\share\\romfs")
++        self.assertEqual(nt_target(r"\\?\C:\data\romfs"), "\\??\\C:\\data\\romfs")
++        self.assertEqual(nt_target(r"\\?\UNC\server\share"), "\\??\\UNC\\server\\share")
++        for invalid in ("romfs", r"C:romfs", ""):
++            with self.subTest(path=invalid), self.assertRaises(ProjectError):
++                nt_target(invalid)
++
++
++class CrashReportTests(unittest.TestCase):
++    def test_pe_base_and_both_map_formats_resolve_the_same_symbols(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            exe, mapped = root / "host.exe", root / "host.map"
++            synthetic_pe(exe)
++            self.assertEqual(image_base(exe), 0x140000000)
++            for text in (" 0001:00000000 f_80cdf000 0000000140001000 f code.obj\n",
++                         "  0x0000000140001000 f_80cdf000\n",
++                         "Address Size Align Out In Symbol\n00001000 00000000 0 f_80cdf000\n"):
++                mapped.write_text(text)
++                result = map_offsets(mapped, image_base(exe), [0x1014, 0x500])
++                self.assertIn("f_80cdf000+0x14", result[0])
++                self.assertIn("sem simbolo", result[1])
++
++    def test_path_audit_reports_overflow_and_ignores_traversal(self):
++        root = "C:\\" + "a" * 155
++        metadata = {"build": {"romfs": root}, "runtime_romfs": "Y:\\"}
++        guest = "System/" + "b" * 130 + ".byml"
++        errors = f"fs: OpenFile(content:/{guest}): not found\nfs: OpenFile(content:/../../outside): not found\n"
++        result = "\n".join(path_findings(metadata, errors))
++        self.assertIn(guest, result)
++        self.assertIn("Y:\\", result)
++        self.assertNotIn("outside", result)
++
++    def test_bundle_contains_only_logs_and_matching_map_never_game_or_saves(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            logs = root / "game/diagnosticos/20261107-001"
++            built = root / "work/sa/build"
++            logs.mkdir(parents=True)
++            built.mkdir(parents=True)
++            synthetic_pe(built / "hookshot.exe")
++            (built / "hookshot.map").write_text(" 0001:00000000 f_80cdf000 0000000140001000 f code.obj\n")
++            metadata = {"exit_code": -1073741819, "build": {"romfs": r"C:\romfs", "files": {
++                "hookshot.exe": sha256(built / "hookshot.exe")}}}
++            write_json(logs / "execucao.json", metadata)
++            (logs / "erros.log").write_text("CRASH: exception 0xc0000005 at hookshot.exe+0x1014\n")
++            (logs / "save.dat").write_text("never include")
++            preserve_previous_crash(root / "game", root / "work", lambda line: None)
++            archive = logs.with_suffix(".zip")
++            original_report = archive.read_bytes()
++            with zipfile.ZipFile(archive) as bundle:
++                self.assertEqual(set(bundle.namelist()), {"execucao.json", "erros.log", "diagnostico-crash.txt", "hookshot.map"})
++                self.assertIn("f_80cdf000+0x14", bundle.read("diagnostico-crash.txt").decode())
++            (built / "hookshot.exe").write_bytes(b"different build")
++            preserve_previous_crash(root / "game", root / "work", lambda line: None)
++            self.assertEqual(archive.read_bytes(), original_report)
++            archive = collect_run(root / "game", root / "work")
++            with zipfile.ZipFile(archive) as bundle:
++                self.assertNotIn("hookshot.map", bundle.namelist())
++                self.assertIn("False", bundle.read("diagnostico-crash.txt").decode())
++            self.assertEqual((logs / "save.dat").read_text(), "never include")
++
++
++@unittest.skipIf(os.name == "nt", "POSIX recording-child fixture")
++class RecoveryLaunchTests(unittest.TestCase):
++    def test_real_child_runs_with_alias_and_trace_and_parent_collects_after_cleanup(self):
++        with tempfile.TemporaryDirectory(prefix="recovery launch ") as temporary:
++            root = Path(temporary)
++            romfs = root / "romfs"
++            romfs.mkdir()
++            marker = root / "alias-active"
++            exe = root / "hookshot.exe"
++            exe.write_text("#!" + sys.executable + "\nimport json,os,sys\nfrom pathlib import Path\n"
++                           "assert Path(os.environ['RECOVERY_MARKER']).is_file()\n"
++                           "print(json.dumps({'args':sys.argv[1:],'trace':os.environ.get('HOS_FS_TRACE'),"
++                           "'validation':os.environ.get('RX_VK_VALIDATION')}))\n")
++            exe.chmod(0o755)
++            for name in ("hookshot_vk.dll", "image.bin"):
++                (root / name).write_bytes(b"synthetic")
++            write_json(root / "ocarina-build.json", {"schema": 1, "project": "ocarina-hookshot", "romfs": str(romfs),
++                       "files": {name: sha256(root / name) for name in ("hookshot.exe", "hookshot_vk.dll", "image.bin")}})
++            api = FakeDrives(marker)
++            fake_os = SimpleNamespace(name="nt", environ={**os.environ, "RECOVERY_MARKER": str(marker)}, getpid=os.getpid)
++            with patch.object(launcher, "os", fake_os), patch.object(launcher, "short_romfs",
++                    side_effect=lambda path: short_romfs(r"C:\synthetic\romfs", api=api)), contextlib.redirect_stdout(io.StringIO()):
++                self.assertEqual(launcher.launch(root, short_paths=True, trace_files=True, collect_crash=True), 0)
++            self.assertFalse(marker.exists())
++            self.assertEqual(api.removed, api.created)
++            logs = next(path for path in (root / "diagnosticos").iterdir() if path.is_dir())
++            child = json.loads((logs / "saida.log").read_text())
++            self.assertEqual(child["args"][2], "Y:\\")
++            self.assertEqual(child["trace"], "1")
++            self.assertIsNone(child["validation"])
++            self.assertEqual(json.loads((logs / "execucao.json").read_text())["exit_code"], 0)
++            self.assertTrue(logs.with_suffix(".zip").is_file())
++            with patch.object(launcher, "os", fake_os), patch.object(launcher, "short_romfs",
++                    side_effect=lambda path: short_romfs(r"C:\synthetic\romfs", api=api)), \
++                    patch.object(launcher.subprocess, "Popen", side_effect=PermissionError("denied")), \
++                    contextlib.redirect_stdout(io.StringIO()):
++                with self.assertRaisesRegex(ProjectError, "denied"):
++                    launcher.launch(root, short_paths=True)
++            self.assertFalse(marker.exists())
++            self.assertEqual(api.removed, api.created)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/tests/test_hot_pipeline.py
++++ b/tests/test_hot_pipeline.py
+@@ -37,7 +37,7 @@
+             calls, messages = [], []
+ 
+             def run(command, cwd, environment, log, report):
+-                script = Path(command[2]).name
++                script = Path(next(arg for arg in command[1:] if not arg.startswith("-"))).name
+                 calls.append(script)
+                 generated = request.work / "sa/gen"
+                 if script == "lift.py":
+--- a/tests/test_power.py
++++ b/tests/test_power.py
+@@ -0,0 +1,49 @@
++"""Check build power-request restoration and the Windows EcoQoS ABI."""
++
++import ctypes
++from pathlib import Path
++import sys
++from types import SimpleNamespace
++import unittest
++from unittest.mock import patch
++
++sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
++import ocarina.power as power
++
++
++class PowerTests(unittest.TestCase):
++    def test_build_exception_restores_previous_execution_state(self):
++        calls = []
++        def setter(state):
++            calls.append(state)
++            return 0x80000002
++        with self.assertRaisesRegex(RuntimeError, "interrupted"):
++            with power.keep_awake(setter=setter):
++                raise RuntimeError("interrupted")
++        self.assertEqual(calls, [0x80000001, 0x80000002])
++
++    def test_failed_power_request_does_not_change_restore_state(self):
++        calls = []
++        def setter(state):
++            calls.append(state)
++            return 0
++        with power.keep_awake(setter=setter):
++            pass
++        self.assertEqual(calls, [0x80000001])
++
++    def test_throttling_request_uses_only_the_supplied_child_handle(self):
++        calls = []
++        def setter(handle, kind, state, size):
++            words = list(ctypes.cast(state, ctypes.POINTER(ctypes.c_uint32 * 3)).contents)
++            calls.append((handle.value, kind, words, size))
++            return 1
++        current = lambda: self.fail("The explicit child handle should be used")
++        kernel = SimpleNamespace(SetProcessInformation=setter, GetCurrentProcess=current)
++        with patch.object(power, "os", SimpleNamespace(name="nt")), \
++                patch.object(power.ctypes, "WinDLL", return_value=kernel, create=True):
++            self.assertTrue(power.no_throttle(0x5678))
++        self.assertEqual(calls, [(0x5678, 4, [1, 1, 0], 12)])
++
++
++if __name__ == "__main__":
++    unittest.main()

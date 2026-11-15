@@ -1,0 +1,49 @@
+OCARINA HOOKSHOT 0.3.9-dev.1 - ATUALIZACAO DO RENDERIZADOR
+
+Para a sua instalacao atual, nao e necessario recompilar o jogo inteiro.
+
+1. Feche o jogo e o launcher.
+2. Extraia Ocarina-0.3.9-atualizacao.zip DENTRO da pasta que ja contem
+   manage.py, ferramentas, OcarinaBuilder.exe, work e jogo. Substitua os
+   arquivos correspondentes. Nao crie uma segunda pasta dentro dela.
+3. Execute Atualizar-Renderizador.cmd. Aguarde a confirmacao de hash.
+4. Execute Preparar-Shaders.cmd uma vez. A leitura de shaders de 8/16 bits
+   mudou; o cache traduzido antigo sera reconstruido. Isso nao recompila C.
+   O processo agora termina apos preparar e salvar o cache, sem entrar na
+   partida. Depois execute Jogar.cmd para testar o perfil Original.
+
+Mantenha work, jogo e os saves nos mesmos caminhos. O EXE e image.bin do
+jogo sao preservados pela atualizacao isolada. A interface WPF publicada
+continua na versao 0.3.2; motor e scripts passam para 0.3.9-dev.1.
+
+O ZIP de atualizacao e para a base 0.3.8 ja aplicada. Para uma instalacao
+nova, use Ocarina-Builder-0.3.9-windows.zip completo. Nao e preciso baixar
+os dois. Builds locais compativeis 0.3.6/0.3.7/0.3.8 aceitam a nova DLL
+quando os fontes/scripts cumulativos correspondem. A base 0.3.5 exige build
+atual completo; nao force uma DLL sobre uma ABI desconhecida.
+
+O QUE MUDOU
+
+- Alteracoes da tabela de enderecos entram na ordem das submissoes GPU,
+  depois de inicializar as copias de memoria. Corrige o caminho da corrida
+  associada ao shader 53caac5f nos seus logs de device lost.
+- Copias da GPU deixam intactos os contadores escritos pelo replay na CPU,
+  evitando que dados antigos restaurem flags de limpeza/iluminacao.
+- Leituras globais assinadas/nao assinadas de 8 e 16 bits foram implementadas;
+  alguns shaders de mesh antes eram rejeitados como LoadGlobalS16 ausente.
+- Leituras fora das atualizacoes de uniformes reaproveitam a faixa consultada,
+  evitando percorrer a mesma lista de novo. A faixa e invalidada ao mudar a lista.
+- Uma perda do dispositivo encerra com erro 70 e diagnostico. Uma janela preta
+  depois dessa falha nao continua sendo registrada como sucesso com FPS ativo.
+- Preparar-Shaders termina apos o preparo. Banco ausente/invalido retorna 71.
+
+As mudancas foram compiladas para Windows e passaram nos testes sinteticos.
+Ainda precisam ser confirmadas no seu PC; nao ha promessa de 60 FPS constantes,
+de eliminar todas as piscadas ou de suporte completo a GPUs sem mesh shaders.
+
+Se Original ainda apresentar problema, preserve a pasta de diagnostico dessa
+tentativa. O perfil Jogar-8GB.cmd continua disponivel como comparacao, com
+texturas reduzidas. O novo log distingue device lost de crash de CPU e de
+falha de leitura do EXE. Nao e necessario limpar o cache global do driver.
+
+Detalhes e instrucoes para outra IA: docs/HANDOFF-OUTRA-IA.md.

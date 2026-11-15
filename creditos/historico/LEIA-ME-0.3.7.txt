@@ -1,0 +1,58 @@
+OCARINA BUILDER 0.3.7-dev.1 - PACOTE COMPLETO WINDOWS
+
+Inclui interface, Python, LLVM-MinGW, dependencias, fontes e DLL Vulkan
+generica pronta. Sua propria copia do jogo continua necessaria.
+Nao contem jogo, chaves, saves, shaders extraidos ou codigo gerado do jogo.
+
+ATUALIZAR UMA INSTALACAO EXISTENTE
+1. Feche o jogo e Builder. Guarde uma copia de jogo\user\save.
+2. Extraia este ZIP separadamente. Copie O CONTEUDO da pasta
+   Ocarina-Hookshot-0.3.7 sobre a pasta existente que contem manage.py.
+3. Preserve work, jogo e o nome/caminho da pasta existente.
+4. Abra OcarinaBuilder.exe e repita Criar com a mesma entrada e destino.
+   Os blocos ja salvos nao sao reagrupados. Objetos validos sao reutilizados.
+5. Comece pelo perfil Original. O limite de mirrors da classe de 12 GiB
+   e automatico; os perfis experimentais continuam opcionais.
+
+INSTALACAO NOVA
+Extraia tudo para uma pasta curta e gravavel, por exemplo C:\OcarinaHookshot.
+Rode Verificar.cmd, abra OcarinaBuilder.exe, selecione sua copia e Criar.
+Para entradas em pastas, a raiz RomFS deve conter System e Pack diretamente.
+O alvo de 6 MiB vale para limites novos; uma funcao inteira pode supera-lo.
+O modo Automatico continua reservando RAM para o sistema.
+
+COMPARAR UMA COMPILACAO LIMPA SEM APAGAR A REFERENCIA
+No terminal, a partir da pasta extraida:
+  .\Compilar.cmd -Trabalho "C:\OcarinaHookshot\work-teste037" -Destino "C:\OcarinaHookshot\jogo-teste037" -BlocoMiB 6 -Jobs 2
+A janela pede o NUP se -Jogo nao for informado. Para comparar com seu teste
+0.3.6, manter dois processos evita misturar granularidade com mais jobs.
+Os limites antigos permanecem na pasta work anterior. Nao e preciso apaga-la.
+
+ACESSO NEGADO / CACHE INCOMPLETO
+Auditar-RomFS.cmd agora mostra INACESSIVEL quando o erro e de acesso.
+Nao muda permissoes nem repara conteudo do jogo. Se houver acesso negado,
+confira o caminho e acesso nessa conta antes de reextrair ou recompilar.
+Uma entrada privada incompleta e recusada antes de copiar outros 26 GB.
+
+REGISTROS
+  work\build-timings.json
+  work\build-request.json
+  work\logs\compile-summary.json
+  work\logs\compile.log
+  jogo\diagnosticos\DATA-HORA-PID\execucao.json, erros.log, saida.log
+Um tempo arredondado de 0s nao e, sozinho, prova de acerto no cache.
+O JSON novo registra local_hits, shared_hits, compiled e failed.
+
+ESTADO REAL
+85 testes descobertos: 78 passaram e sete PowerShell nao executados.
+182 unidades do backend compiladas e DLL Windows x64 ligada; export
+mkwvk_init conferido. A DLL inclui somente o motor generico, sem jogo.
+Nao houve execucao local do jogo, janela WPF, som ou GPU fisica.
+A interface e a publicacao anterior 0.3.2; motor/orquestracao sao 0.3.7.
+O cache de shaders da 0.3.6 pode ser reaproveitado se GPU/driver/opcoes
+conferem. O da 0.3.5 continua incompativel com a mudanca feita na 0.3.6.
+
+O estudo completo, pontos aproveitados e pendencias estao em
+docs\HANDOFF-OUTRA-IA.md. Folhagem, iluminacao e pausas continuam exigindo
+validacao no jogo. Nao ha promessa de instalacao em 1 minuto ou FPS fixo.
+Escopo Windows. Linux/AppImage e atualizador oficial nao foram integrados.

@@ -1,0 +1,9 @@
+PASS graphics settings roundtrip, exact arguments and corrupt settings rejection
+PASS experimental scales and balanced cache persist and reach the CLI
+PASS every language contains all interface messages
+PASS local tool discovery from a nested folder
+PASS spaces and metacharacters remain one argument; both pipes drain
+PASS check success requires a zero exit code
+PASS cancellation terminates an active process
+PASS cancel before start does not spawn the child
+8 runner checks passed.

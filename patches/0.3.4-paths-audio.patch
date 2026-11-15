@@ -1,0 +1,1862 @@
+--- a/Jogar-Nitido.cmd
++++ b/Jogar-Nitido.cmd
+@@ -0,0 +1,5 @@
++@echo off
++"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --profile nitido %*
++set "ocarina_exit=%errorlevel%"
++if not "%ocarina_exit%"=="0" pause
++exit /b %ocarina_exit%
+--- a/Jogar-Suporte.cmd
++++ b/Jogar-Suporte.cmd
+@@ -0,0 +1,6 @@
++@echo off
++"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --trace-runtime --collect-crash %*
++set "ocarina_exit=%errorlevel%"
++echo.
++pause
++exit /b %ocarina_exit%
+--- a/LEIA-ME-ATUALIZACAO-0.3.4.txt
++++ b/LEIA-ME-ATUALIZACAO-0.3.4.txt
+@@ -0,0 +1,47 @@
++OCARINA BUILDER 0.3.4-dev.1 - CAMINHOS LONGOS E AUDIO
++
++Baixe somente o ZIP de atualizacao se ja usa a versao 0.3.2 ou 0.3.3.
++O nome da sua pasta pode continuar dizendo 0.3.1; nao precisa renomear.
++
++1. Feche o jogo e o Builder. Por precaucao, guarde uma copia de jogo\user\save.
++2. Extraia TODO o conteudo deste ZIP na pasta existente que contem
++   OcarinaBuilder.exe, manage.py, ferramentas e work. Aceite substituir.
++3. Preserve work, jogo e as entradas. Nao extraia sobre os arquivos a partir
++   de dentro do ZIP nem compacte work/jogo junto da atualizacao.
++4. Abra OcarinaBuilder.exe. Selecione a MESMA entrada e destino. Clique Criar.
++   E necessario recompilar para aplicar as alteracoes C/C++; copiar o ZIP
++   e clicar Jogar diretamente ainda executaria o binario anterior.
++   Objetos de jogo inalterados continuam elegiveis ao cache. Nao apague work.
++5. Ao terminar, teste pelo botao Jogar, em Original. O suporte nativo a
++   caminhos longos deve dispensar o alias do antigo Jogar-Teste-Crash.cmd.
++6. Para comparar os borroes em movimento, feche o jogo e abra Jogar-Nitido.cmd.
++   Usa a alternativa espacial existente no backend e resolucao 100%.
++   Pode haver mais serrilhado; a resolucao fixa pode exigir mais da GPU.
++   Para voltar ao caminho temporal padrao, abra pelo botao Jogar/Original.
++7. Se ainda houver silencio, crash ou pausas, feche o jogo e execute
++   Jogar-Suporte.cmd. Reproduza o problema, encerre o jogo e envie o novo
++   ZIP em jogo\diagnosticos. O terminal informa o caminho exato.
++   Para comparar Nitido com registros: Jogar-Suporte.cmd --profile nitido
++
++Se escolheu uma pasta de jogo diferente, use --out "D:\SuaPasta\Jogo" nos CMDs.
++
++IMPLEMENTADO
++- RomFS: caminhos longos sem truncamento silencioso e I/O Win32 UTF-16.
++- Audio: WASAPI compartilhado, fallback waveOut, nova tentativa em 2 segundos
++  quando a saida falta/desconecta, e volume de dispositivo com retorno float.
++- Diagnostico: opcoes graficas antes/depois e pausas acima de 500 ms.
++- Nitido: comparacao explicita para investigar rastros/borroes de camera.
++
++O programa escolhe audio automaticamente. Comparacao opcional:
++  Jogar.cmd --audio-backend waveout
++  Jogar.cmd --audio-backend wasapi
++Nenhum dos comandos altera volume ou dispositivo padrao do Windows.
++
++LIMITES
++Nao houve teste do jogo, audio fisico ou GPU neste host de desenvolvimento.
++Os testes de codigo e o link Windows nao comprovam o resultado visual/sonoro.
++Folhagem ausente, sombras piscando e iluminacao ainda nao estao resolvidas.
++Primeiras visitas a areas novas ainda podem compilar pipelines e causar pausas.
++Nao se promete eliminar todas as quedas nem um numero fixo de FPS/VRAM.
++Os caches de shaders/pipelines existentes nao sao apagados por esta atualizacao.
++A janela WPF foi mantida; a versao dos componentes esta em upstream.json.
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # Ocarina Hookshot — base independente
+ 
+-Versao **0.3.3-dev.1**, construida a partir dos fontes de `Hookshot-Release.zip` enviados pelo usuario. Mantem o lifter ARM64, o runtime e o renderizador Vulkan desse projeto como um conjunto. A orquestracao de compilacao, os perfis e os registros desta versao ficam no pacote Python `ocarina/`.
++Versao **0.3.4-dev.1**, construida a partir dos fontes de `Hookshot-Release.zip` enviados pelo usuario. Mantem o lifter ARM64, o runtime e o renderizador Vulkan desse projeto como um conjunto. A orquestracao de compilacao, os perfis e os registros desta versao ficam no pacote Python `ocarina/`.
+ 
+ Esta e uma base de desenvolvimento experimental. A compilacao do renderizador para Windows foi verificada; o jogo completo ainda precisa ser compilado e testado no PC de destino. Nao ha promessa de FPS, de consumo fixo de VRAM ou de resolucao de todos os crashes. O status do projeto original esta arquivado em `docs/upstream/`.
+ 
+@@ -126,3 +126,13 @@
+ Aplique Ocarina-Builder-0.3.3-atualizacao.zip na instalacao 0.3.2 existente e repita Criar com a mesma entrada/destino. Preserve work e jogo/user/save. Depois use Jogar-Teste-Crash.cmd para testar o caminho curto de RomFS e reunir diagnosticos. Coletar-Crash.cmd reune a ultima execucao sem abrir o jogo. Veja LEIA-ME-ATUALIZACAO-0.3.3.txt e docs/atualizacao-0.3.3.md.
+ 
+ A integracao nao comprova correcao do ultimo crash de CPU 0xC0000005. O mapa e os novos logs permitem verificar sua origem. A interface WPF e mantida; os fontes e o motor foram atualizados.
++
++## Atualizacao 0.3.4 — caminhos longos, audio e comparacao de movimento
++
++O novo log permitiu reproduzir um defeito concreto: a raiz de extracao tinha 160 caracteres e arquivos de iluminacao ultrapassavam o buffer antigo de 260 bytes. O filesystem nativo agora usa buffers de 4096 bytes, rejeita overflow e chama APIs Windows UTF-16 com caminhos estendidos. Isso trata a diferenca entre abrir pelo launcher e pelo script que abrevia RomFS; ainda precisa ser confirmado no jogo apos recompilar.
++
++O audio usa WASAPI compartilhado com conversao de formato pelo Windows, fallback waveOut e reconexao. GetAudioDeviceOutputVolume deixou de ser um stub e devolve o float no registrador correto. As mudancas valem para AMD e NVIDIA, pois pertencem ao host Windows.
++
++Aplique Ocarina-Builder-0.3.4-atualizacao.zip na instalacao 0.3.2/0.3.3 existente, mantenha work e jogo, e repita Criar com a mesma entrada/destino. Teste primeiro pelo botao Jogar. Jogar-Nitido.cmd oferece uma comparacao sem a rede temporal de gameplay, a 100% de resolucao; pode mostrar mais serrilhado. Jogar-Suporte.cmd registra audio e pausas, sem ativar validacao Vulkan ou trace de todos os arquivos.
++
++Folhas ausentes, iluminacao incorreta e sombras piscando continuam pendentes de validacao/correcao do renderizador. O modo Nitido nao e apresentado como conserto desses problemas. A identidade do tradutor de shaders desta atualizacao e igual a 0.3.3: os caches existentes continuam elegiveis na mesma GPU/driver/perfil. Areas novas ainda podem apresentar stutter de compilacao. Veja LEIA-ME-ATUALIZACAO-0.3.4.txt e docs/atualizacao-0.3.4.md.
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.3.3-dev.1
++0.3.4-dev.1
+--- a/docs/arquitetura.md
++++ b/docs/arquitetura.md
+@@ -51,3 +51,7 @@
+ ## Integracao 0.3.3
+ 
+ A tabela de paginas de memoria guest e usada somente nos shaders compute e seu endereco e enviado por push constants. ocarina/power.py concentra as solicitacoes Windows de energia para o build; windows_paths.py cria o alias DOS opt-in de RomFS. crash_report.py confere o hash do executavel junto do mapa antes de coletar simbolos e preserva o diagnostico anterior ao proximo build. O fluxo normal de execucao nao ativa o alias nem o trace; Jogar-Teste-Crash.cmd ativa ambos explicitamente.
++
++## Correcao 0.3.4
++
++host/win_path.c concentra I/O Win32 com caminhos UTF-16 estendidos; path_join.h recusa truncamento. O filesystem guest usa esses adaptadores com capacidade explicita de 4096 bytes. host/audio_wasapi.c pertence ao thread do mixer: inicializacao/uso/liberacao COM ficam nesse thread; nn_audio.c escolhe WASAPI/waveOut e aplica volume. O lancador preserva snapshots do arquivo de opcoes, e oferece trace de audio/frames separado da validacao Vulkan. O perfil Nitido seleciona uma alternativa de renderizacao ja existente e nao altera Original.
+--- a/docs/atualizacao-0.3.4.md
++++ b/docs/atualizacao-0.3.4.md
+@@ -0,0 +1,47 @@
++# Atualizacao 0.3.4
++
++## Evidencias recebidas
++
++Foram analisados o video Hookshot 2026-11-07 09-56-58.mp4, os logs de build e as duas tentativas registradas pelo launcher 0.3.3. As analises nao exigiram dados do jogo, chaves ou saves.
++
++| Evidencia | Conclusao e limite |
++|---|---|
++| Mesmo SHA-256 do EXE/DLL; abertura normal falha, teste com RomFS Z:\\ termina com codigo 0 apos cerca de 17 minutos | Caminho de acesso aos recursos diferencia as duas tentativas; nao e um simples caso de VRAM esgotada |
++| Raiz RomFS de 160 caracteres; mais de 600 caminhos relativos distintos no trace excedem os 98 bytes que restam no buffer antigo | Truncamento demonstravel no filesystem, inclusive no arquivo LocationalLightMgrInitializeParam ligado ao ponto da falha |
++| audio: no output device; GetAudioDeviceOutputVolume aparece como import nao implementado | Falha de saida confirmada; o stub tambem nao fornecia retorno float valido. O mixer ja convertia o sink de seis canais para stereo, portanto a quantidade de canais do jogo nao prova um problema de 5.1 no Windows |
++| slow dispatch 2482.5 ms; criacao de pipeline domina o tempo | Parte das pausas vem da compilacao do driver; caches estavam frios no inicio desta tentativa |
++| Interpolacao registrada em 1x | O video nao demonstra custo/artefato de geracao de quadros adicionais |
++| 971 programas, zero falhas de traducao ao fim | Folhas ausentes nao podem ser tratadas apenas como shaders que falharam em compilar |
++| compile(2).log: compilacao em 108 segundos, zero falhas | O cache ja evitou repetir boa parte do trabalho; esse e o tempo da etapa de compilacao, sem prometer o mesmo em outro PC |
++
++Os rastros vistos na camera sao compativeis com reconstrucao temporal incorreta, mas o video nao determina sozinho a causa. A gravacao usa 240 quadros/s; isso nao equivale ao FPS do jogo. A faixa AAC tem sinal baixo e nao foi usada como prova de audio do jogo funcionando.
++
++## Alteracoes
++
++### Filesystem
++
++host/nn_fs.c passa a usar buffers de 4096 bytes no lugar de MAX_PATH. host/path_join.h recusa overflow. host/win_path.c normaliza caminhos absolutos para as APIs UTF-16 estendidas, inclusive UNC, e preserva o erro Win32. OpenFile registra erros reais quando relevantes. Nao exige administrador, mudanca no registro ou unidade DOS no fluxo normal.
++
++O escopo e o acesso aos arquivos do filesystem guest; outros caminhos de ferramentas/carregamento de DLLs continuam sujeitos aos limites anteriores. O limite interno de 4096 bytes e explicito, e componentes de diretorio ainda respeitam as estruturas Win32 usadas pelo runtime. Isso nao e suporte ilimitado a qualquer nome de arquivo Windows.
++
++### Audio
++
++host/audio_wasapi.c implementa saida compartilhada PCM16 stereo 48 kHz. O motor Windows faz a conversao para o formato do endpoint. O mixer usa WASAPI primeiro, e waveOut como alternativa; no caminho antigo tenta o mapper e dispositivos enumerados. Falha ou desconexao gera nova tentativa em dois segundos, no thread de audio. HRESULT/MMRESULT sao registrados. HOS_AUDIO=0 continua sendo respeitado quando selecionado explicitamente no runtime.
++
++GetAudioDeviceOutputVolume e implementado como HLE, com retorno float em v0; SetAudioDeviceOutputVolume e o ganho final compartilham o mesmo valor limitado a [0,1]. O gerador passa a excluir o stub correspondente. Nenhum codigo gerado do jogo foi editado manualmente.
++
++A opcao CLI --audio-backend permite auto, wasapi e waveout. A interface usa auto. Nenhuma dessas opcoes modifica configuracao de som do Windows.
++
++### Movimento e desempenho
++
++O perfil opcional nitido seleciona RX_VK_TAAU_KEYS=fd029a317a9a4b94 e HOS_DYNRES=0. Expoe a alternativa espacial que ja existe no Hookshot, sem habilitar o clamp de historico que pode borrar movimento. Na NVIDIA do log, permite comparar com a rede temporal; em placas AMD que ja usam essa alternativa, a diferenca pode ser apenas a resolucao fixa. Pode aumentar serrilhado e custo de pixels. O perfil Original nao e substituido.
++
++Nenhuma mudanca de exposicao ou traducao de shaders foi feita nesta entrega. A identidade do tradutor foi comparada byte a byte com 0.3.3 e permanece igual. Os caches de programa e pipeline nao sao apagados. A reutilizacao depende da GPU/driver e das configuracoes compativeis. O primeiro encontro com novas pipelines ainda pode travar o frame; esperar compilacao nao elimina seu custo, e pular desenhos nao foi usado como otimizacao.
++
++Jogar-Suporte.cmd ativa apenas estatisticas de audio e slow-frame log a partir de 25 ms, e coleta ao encerrar. O filtro anterior descartava frames de 500 ms ou mais; agora tambem inclui esses eventos. Nao ativa validacao Vulkan, trace de arquivos nem alias de unidade. Cada tentativa guarda copias limitadas a 64 KiB de hookshot_options.ini antes/depois, sem editar o arquivo. O menu do proprio jogo continua podendo salvar opcoes quando o usuario as altera.
++
++## Uso e pendencias
++
++A atualizacao e cumulativa para 0.3.2/0.3.3. Extraia sobre a instalacao existente, mantenha o nome da pasta/work/jogo e repita Criar com a mesma entrada/destino. Teste primeiro pelo launcher Original; depois compare Jogar-Nitido.cmd na mesma cena. Para destinos personalizados use --out.
++
++Folhagem ausente continua reportada na origem: https://github.com/NotRexed/Hookshot/issues/35. Escuridao e sombras piscando tambem nao foram demonstradas como corrigidas. A nova abertura e o audio precisam de confirmacao no computador de destino. Os testes e suas limitacoes estao em validacao.md.
+--- a/docs/origem.md
++++ b/docs/origem.md
+@@ -47,3 +47,9 @@
+ ## Integracao 0.3.3
+ 
+ Renderizador e parser de idioma atualizados do HookshotBuilder(3).zip da release pointer-lighting-2, cujo hash coincide com o asset da API oficial. Mantidos os avisos Hookshot/Eden/Lichii. Energia e saida do build adaptadas a orquestracao local, sem a dependencia de MSVC do builder original. Acrescentados flush da tabela, coleta de crash e teste opcional de alias RomFS. Escopo e limites em atualizacao-0.3.3.md.
++
++## Alteracoes locais 0.3.4
++
++Adaptadores Win32 UTF-16/caminhos estendidos, backend de audio WASAPI compartilhado, recuperacao waveOut e HLE de volume foram escritos para esta base a partir dos diagnosticos recebidos. Nao vieram de outro emulador nem de uma nova release Hookshot. As APIs de som/caminhos foram conferidas na documentacao Microsoft; a interface de volume tambem foi conferida nas referencias de audio NXNative/Switchbrew.
++
++O perfil Nitido apenas seleciona o stand-in espacial preexistente de gpu/vk/vk_draw.cpp. O registro de frames lentos foi corrigido sem trocar a traducao de shaders ou os defaults visuais. O patch local, os componentes mantidos e os hashes estao registrados em upstream.json. Nao foram incorporados jogo, saves, caches ou simbolos do jogo nos pacotes.
+--- a/docs/perfis.md
++++ b/docs/perfis.md
+@@ -12,7 +12,18 @@
+ 
+ Limiares de textura menores podem reduzir qualidade. Os caches trabalham com recursos em uso e trabalho em voo; seus budgets nao se somam a um teto absoluto de consumo do processo.
+ 
+-## Conferencia do script sugerido na conversa
++## Comparacao de movimento em 0.3.4
++
++Desde 0.3.4, `nitido` e uma comparacao de movimento, disponivel em Jogar-Nitido.cmd:
++
++| Ajuste Nitido | Valor | Escopo |
++|---|---|---|
++| RX_VK_TAAU_KEYS | fd029a317a9a4b94 | Seleciona a alternativa espacial de gameplay ja implementada; perde o antialiasing temporal |
++| HOS_DYNRES | 0 | Resolucao 100%; pode custar mais pixels que Auto |
++
++Nao habilita clamp de historico, nao altera exposicao, nao pula pipelines e nao limita texturas. Em AMD que ja usa o caminho espacial, o principal efeito pode ser a resolucao fixa. O perfil nao promete resolver folhas ou sombras. Os perfis Original/8GB da interface permanecem disponiveis.
++
++## Conferencia do script sugerido na conversa (historico)
+ 
+ Nos fontes Ocarina 0.2.1 recebidos, nenhuma das nove variaveis `RX_VK_*` abaixo e lida pelo runtime. Elas pertencem ao Hookshot; defini-las no lancador antigo nao implementa essas politicas naquele motor.
+ 
+--- a/docs/resultado-native-0.3.4.txt
++++ b/docs/resultado-native-0.3.4.txt
+@@ -0,0 +1,358 @@
++354 files, 4 jobs, -D_CRT_SECURE_NO_WARNINGS -O1 -DA64_POLLING -DA64_WRITE_TRACK
++  a64_table.c         0 MB       0s  (0s)
++  a64_hooks.c         0 MB       0s  (0s)
++  a64_suyu.c          0 MB       0s  (0s)
++  a64_rt.c            0 MB       0s  (0s)
++  a64_stubs.c         0 MB       0s  (0s)
++  nvn2_exports.c      0 MB       0s  (0s)
++  display.c           0 MB       0s  (0s)
++  audio_wasapi.c      0 MB       0s  (0s)
++  hos_hostcall.c      0 MB       0s  (0s)
++  hos_image.c         0 MB       0s  (0s)
++  hos_setjmp.c        0 MB       0s  (0s)
++  hos_main.c          0 MB       0s  (0s)
++  hos_mem.c           0 MB       0s  (0s)
++  hos_svc.c           0 MB       0s  (0s)
++  mkw_glue.c          0 MB       0s  (0s)
++  mf_av1.c            0 MB       0s  (0s)
++  hos_thread.c        0 MB       0s  (0s)
++  nn_applet.c         0 MB       0s  (0s)
++  nn_codec.c          0 MB       0s  (0s)
++  nn_gs.c             0 MB       0s  (0s)
++  nn_diag.c           0 MB       0s  (0s)
++  nn_libc.c           0 MB       0s  (0s)
++  nn_hid.c            0 MB       0s  (0s)
++  nn_os_sync.c        0 MB       0s  (0s)
++  nn_syncpt.c         0 MB       0s  (0s)
++  nn_vi.c             0 MB       0s  (0s)
++  nn_video.c          0 MB       0s  (0s)
++  nvdrv.c             0 MB       0s  (0s)
++  nvn_native.c        0 MB       0s  (0s)
++  nvn_layout.c        0 MB       0s  (0s)
++  pad_sdl.c           0 MB       0s  (0s)
++  rx_backend.c        0 MB       0s  (0s)
++  win_path.c          0 MB       0s  (0s)
++  bands.c             0 MB       0s  (0s)
++  celt.c              0 MB       0s  (0s)
++  celt_encoder.c      0 MB       0s  (0s)
++  celt_decoder.c      0 MB       0s  (0s)
++  entcode.c           0 MB       0s  (0s)
++  cwrs.c              0 MB       0s  (0s)
++  entenc.c            0 MB       0s  (0s)
++  entdec.c            0 MB       0s  (0s)
++  kiss_fft.c          0 MB       0s  (0s)
++  mathops.c           0 MB       0s  (0s)
++  mdct.c              0 MB       0s  (0s)
++  modes.c             0 MB       0s  (0s)
++  laplace.c           0 MB       0s  (0s)
++  pitch.c             0 MB       0s  (0s)
++  celt_lpc.c          0 MB       0s  (0s)
++  rate.c              0 MB       0s  (0s)
++  quant_bands.c       0 MB       0s  (0s)
++  vq.c                0 MB       0s  (0s)
++  CNG.c               0 MB       0s  (0s)
++  init_decoder.c      0 MB       0s  (0s)
++  decode_core.c       0 MB       0s  (0s)
++  decode_frame.c      0 MB       0s  (0s)
++  decode_parameters.c    0 MB       0s  (0s)
++  decode_indices.c    0 MB       0s  (0s)
++  code_signs.c        0 MB       0s  (0s)
++  decode_pulses.c     0 MB       0s  (0s)
++  decoder_set_fs.c    0 MB       0s  (0s)
++  dec_API.c           0 MB       0s  (0s)
++  enc_API.c           0 MB       0s  (0s)
++  encode_pulses.c     0 MB       0s  (0s)
++  encode_indices.c    0 MB       0s  (0s)
++  gain_quant.c        0 MB       0s  (0s)
++  interpolate.c       0 MB       0s  (0s)
++  LP_variable_cutoff.c    0 MB       0s  (0s)
++  NLSF_decode.c       0 MB       0s  (0s)
++  NSQ.c               0 MB       0s  (0s)
++  PLC.c               0 MB       0s  (0s)
++  NSQ_del_dec.c       0 MB       0s  (0s)
++  tables_gain.c       0 MB       0s  (0s)
++  shell_coder.c       0 MB       0s  (0s)
++  tables_LTP.c        0 MB       0s  (0s)
++  tables_NLSF_CB_WB.c    0 MB       0s  (0s)
++  tables_other.c      0 MB       0s  (0s)
++  tables_pitch_lag.c    0 MB       0s  (0s)
++  tables_pulses_per_block.c    0 MB       0s  (0s)
++  tables_NLSF_CB_NB_MB.c    0 MB       0s  (0s)
++  VAD.c               0 MB       0s  (0s)
++  control_audio_bandwidth.c    0 MB       0s  (0s)
++  quant_LTP_gains.c    0 MB       0s  (0s)
++  VQ_WMat_EC.c        0 MB       0s  (0s)
++  HP_variable_cutoff.c    0 MB       0s  (0s)
++  NLSF_encode.c       0 MB       0s  (0s)
++  NLSF_VQ.c           0 MB       0s  (0s)
++  NLSF_unpack.c       0 MB       0s  (0s)
++  NLSF_del_dec_quant.c    0 MB       0s  (0s)
++  process_NLSFs.c     0 MB       0s  (0s)
++  stereo_LR_to_MS.c    0 MB       0s  (0s)
++  check_control_input.c    0 MB       0s  (0s)
++  stereo_MS_to_LR.c    0 MB       0s  (0s)
++  control_SNR.c       0 MB       0s  (0s)
++  init_encoder.c      0 MB       0s  (0s)
++  control_codec.c     0 MB       0s  (0s)
++  ana_filt_bank_1.c    0 MB       0s  (0s)
++  biquad_alt.c        0 MB       0s  (0s)
++  bwexpander_32.c     0 MB       0s  (0s)
++  bwexpander.c        0 MB       0s  (0s)
++  debug.c             0 MB       0s  (0s)
++  decode_pitch.c      0 MB       0s  (0s)
++  A2NLSF.c            0 MB       0s  (0s)
++  inner_prod_aligned.c    0 MB       0s  (0s)
++  lin2log.c           0 MB       0s  (0s)
++  log2lin.c           0 MB       0s  (0s)
++  LPC_analysis_filter.c    0 MB       0s  (0s)
++  LPC_inv_pred_gain.c    0 MB       0s  (0s)
++  NLSF2A.c            0 MB       0s  (0s)
++  NLSF_stabilize.c    0 MB       0s  (0s)
++  NLSF_VQ_weights_laroia.c    0 MB       0s  (0s)
++  table_LSF_cos.c     0 MB       0s  (0s)
++  pitch_est_tables.c    0 MB       0s  (0s)
++  resampler_down2_3.c    0 MB       0s  (0s)
++  resampler_down2.c    0 MB       0s  (0s)
++  resampler.c         0 MB       0s  (0s)
++  resampler_private_AR2.c    0 MB       0s  (0s)
++  resampler_private_IIR_FIR.c    0 MB       0s  (0s)
++  resampler_private_down_FIR.c    0 MB       0s  (0s)
++  resampler_private_up2_HQ.c    0 MB       0s  (0s)
++  sigm_Q15.c          0 MB       0s  (0s)
++  sort.c              0 MB       0s  (0s)
++  sum_sqr_shift.c     0 MB       0s  (0s)
++  resampler_rom.c     0 MB       0s  (0s)
++  stereo_decode_pred.c    0 MB       0s  (0s)
++  stereo_find_predictor.c    0 MB       0s  (0s)
++  stereo_quant_pred.c    0 MB       0s  (0s)
++  stereo_encode_pred.c    0 MB       0s  (0s)
++  LPC_fit.c           0 MB       0s  (0s)
++  apply_sine_window_FLP.c    0 MB       0s  (0s)
++  encode_frame_FLP.c    0 MB       0s  (0s)
++  corrMatrix_FLP.c    0 MB       0s  (0s)
++  find_LPC_FLP.c      0 MB       0s  (0s)
++  find_LTP_FLP.c      0 MB       0s  (0s)
++  find_pitch_lags_FLP.c    0 MB       0s  (0s)
++  find_pred_coefs_FLP.c    0 MB       0s  (0s)
++  LTP_analysis_filter_FLP.c    0 MB       0s  (0s)
++  LTP_scale_ctrl_FLP.c    0 MB       0s  (0s)
++  LPC_analysis_filter_FLP.c    0 MB       0s  (0s)
++  noise_shape_analysis_FLP.c    0 MB       0s  (0s)
++  regularize_correlations_FLP.c    0 MB       0s  (0s)
++  residual_energy_FLP.c    0 MB       0s  (0s)
++  process_gains_FLP.c    0 MB       0s  (0s)
++  warped_autocorrelation_FLP.c    0 MB       0s  (0s)
++  wrappers_FLP.c      0 MB       0s  (0s)
++  burg_modified_FLP.c    0 MB       0s  (0s)
++  autocorrelation_FLP.c    0 MB       0s  (0s)
++  bwexpander_FLP.c    0 MB       0s  (0s)
++  inner_product_FLP.c    0 MB       0s  (0s)
++  k2a_FLP.c           0 MB       0s  (0s)
++  energy_FLP.c        0 MB       0s  (0s)
++  LPC_inv_pred_gain_FLP.c    0 MB       0s  (0s)
++  scale_copy_vector_FLP.c    0 MB       0s  (0s)
++  pitch_analysis_core_FLP.c    0 MB       0s  (0s)
++  scale_vector_FLP.c    0 MB       0s  (0s)
++  sort_FLP.c          0 MB       0s  (0s)
++  schur_FLP.c         0 MB       0s  (0s)
++  opus.c              0 MB       0s  (0s)
++  opus_encoder.c      0 MB       0s  (0s)
++  opus_decoder.c      0 MB       0s  (0s)
++  opus_multistream.c    0 MB       0s  (0s)
++  extensions.c        0 MB       0s  (0s)
++  opus_multistream_decoder.c    0 MB       0s  (0s)
++  opus_multistream_encoder.c    0 MB       0s  (0s)
++  repacketizer.c      0 MB       0s  (0s)
++  opus_projection_decoder.c    0 MB       0s  (0s)
++  opus_projection_encoder.c    0 MB       0s  (0s)
++  mapping_matrix.c    0 MB       0s  (0s)
++  mlp.c               0 MB       0s  (0s)
++  analysis.c          0 MB       0s  (0s)
++  mlp_data.c          0 MB       0s  (0s)
++  astc.cpp            0 MB       0s  (0s)
++  decoders.cpp        0 MB       0s  (0s)
++  rx_webgpu_unavailable.c    0 MB       0s  (0s)
++  emit_spirv.cpp      0 MB       0s  (0s)
++  emit_spirv_barriers.cpp    0 MB       0s  (0s)
++  emit_spirv_atomic.cpp    0 MB       0s  (0s)
++  emit_spirv_bitwise_conversion.cpp    0 MB       0s  (0s)
++  emit_spirv_composite.cpp    0 MB       0s  (0s)
++  emit_spirv_context_get_set.cpp    0 MB       0s  (0s)
++  emit_spirv_control_flow.cpp    0 MB       0s  (0s)
++  emit_spirv_convert.cpp    0 MB       0s  (0s)
++  emit_spirv_image.cpp    0 MB       0s  (0s)
++  emit_spirv_floating_point.cpp    0 MB       0s  (0s)
++  emit_spirv_image_atomic.cpp    0 MB       0s  (0s)
++  emit_spirv_logical.cpp    0 MB       0s  (0s)
++  emit_spirv_memory.cpp    0 MB       0s  (0s)
++  emit_spirv_integer.cpp    0 MB       0s  (0s)
++  emit_spirv_mesh.cpp    0 MB       0s  (0s)
++  emit_spirv_shared_memory.cpp    0 MB       0s  (0s)
++  emit_spirv_special.cpp    0 MB       0s  (0s)
++  emit_spirv_select.cpp    0 MB       0s  (0s)
++  emit_spirv_undefined.cpp    0 MB       0s  (0s)
++  emit_spirv_warp.cpp    0 MB       0s  (0s)
++  spirv_emit_context.cpp    0 MB       0s  (0s)
++  basic_block.cpp     0 MB       0s  (0s)
++  condition.cpp       0 MB       0s  (0s)
++  ir_emitter.cpp      0 MB       0s  (0s)
++  microinstruction.cpp    0 MB       0s  (0s)
++  patch.cpp           0 MB       0s  (0s)
++  opcodes.cpp         0 MB       0s  (0s)
++  post_order.cpp      0 MB       0s  (0s)
++  type.cpp            0 MB       0s  (0s)
++  program.cpp         0 MB       0s  (0s)
++  value.cpp           0 MB       0s  (0s)
++  decode.cpp          0 MB       0s  (0s)
++  control_flow.cpp    0 MB       0s  (0s)
++  indirect_branch_table_track.cpp    0 MB       0s  (0s)
++  structured_control_flow.cpp    0 MB       0s  (0s)
++  opcodes.cpp         0 MB       0s  (0s)
++  atomic_operations_global_memory.cpp    0 MB       0s  (0s)
++  atomic_operations_shared_memory.cpp    0 MB       0s  (0s)
++  attribute_memory_to_physical.cpp    0 MB       0s  (0s)
++  bitfield_extract.cpp    0 MB       0s  (0s)
++  bitfield_insert.cpp    0 MB       0s  (0s)
++  barrier_operations.cpp    0 MB       0s  (0s)
++  branch_indirect.cpp    0 MB       0s  (0s)
++  common_funcs.cpp    0 MB       0s  (0s)
++  condition_code_set.cpp    0 MB       0s  (0s)
++  double_add.cpp      0 MB       0s  (0s)
++  double_compare_and_set.cpp    0 MB       0s  (0s)
++  double_min_max.cpp    0 MB       0s  (0s)
++  double_fused_multiply_add.cpp    0 MB       0s  (0s)
++  double_multiply.cpp    0 MB       0s  (0s)
++  exit_program.cpp    0 MB       0s  (0s)
++  find_leading_one.cpp    0 MB       0s  (0s)
++  double_set_predicate.cpp    0 MB       0s  (0s)
++  floating_point_add.cpp    0 MB       0s  (0s)
++  floating_point_compare_and_set.cpp    0 MB       0s  (0s)
++  floating_point_conversion_floating_point.cpp    0 MB       0s  (0s)
++  floating_point_compare.cpp    0 MB       0s  (0s)
++  floating_point_conversion_integer.cpp    0 MB       0s  (0s)
++  floating_point_min_max.cpp    0 MB       0s  (0s)
++  floating_point_fused_multiply_add.cpp    0 MB       0s  (0s)
++  floating_point_multi_function.cpp    0 MB       0s  (0s)
++  floating_point_range_reduction.cpp    0 MB       0s  (0s)
++  floating_point_multiply.cpp    0 MB       0s  (0s)
++  floating_point_set_predicate.cpp    0 MB       0s  (0s)
++  floating_point_swizzled_add.cpp    0 MB       0s  (0s)
++  half_floating_point_add.cpp    0 MB       0s  (0s)
++  half_floating_point_fused_multiply_add.cpp    0 MB       0s  (0s)
++  half_floating_point_multiply.cpp    0 MB       0s  (0s)
++  half_floating_point_set.cpp    0 MB       0s  (0s)
++  half_floating_point_set_predicate.cpp    0 MB       0s  (0s)
++  impl.cpp            0 MB       0s  (0s)
++  integer_add.cpp     0 MB       0s  (0s)
++  half_floating_point_helper.cpp    0 MB       0s  (0s)
++  integer_compare.cpp    0 MB       0s  (0s)
++  integer_add_three_input.cpp    0 MB       0s  (0s)
++  integer_compare_and_set.cpp    0 MB       0s  (0s)
++  integer_floating_point_conversion.cpp    0 MB       0s  (0s)
++  integer_minimum_maximum.cpp    0 MB       0s  (0s)
++  integer_funnel_shift.cpp    0 MB       0s  (0s)
++  integer_popcount.cpp    0 MB       0s  (0s)
++  integer_scaled_add.cpp    0 MB       0s  (0s)
++  integer_shift_left.cpp    0 MB       0s  (0s)
++  integer_set_predicate.cpp    0 MB       0s  (0s)
++  integer_shift_right.cpp    0 MB       0s  (0s)
++  integer_short_multiply_add.cpp    0 MB       0s  (0s)
++  integer_to_integer_conversion.cpp    0 MB       0s  (0s)
++  internal_stage_buffer_entry_read.cpp    0 MB       0s  (0s)
++  load_constant.cpp    0 MB       0s  (0s)
++  load_effective_address.cpp    0 MB       0s  (0s)
++  load_store_local_shared.cpp    0 MB       0s  (0s)
++  load_store_attribute.cpp    0 MB       0s  (0s)
++  load_store_memory.cpp    0 MB       0s  (0s)
++  logic_operation_three_input.cpp    0 MB       0s  (0s)
++  logic_operation.cpp    0 MB       0s  (0s)
++  move_predicate_to_register.cpp    0 MB       0s  (0s)
++  matrix_multiply_nx2.cpp    0 MB       0s  (0s)
++  move_register.cpp    0 MB       0s  (0s)
++  move_register_to_predicate.cpp    0 MB       0s  (0s)
++  move_special_register.cpp    0 MB       0s  (0s)
++  not_implemented.cpp    0 MB       0s  (0s)
++  output_geometry.cpp    0 MB       0s  (0s)
++  pixel_load.cpp      0 MB       0s  (0s)
++  predicate_set_predicate.cpp    0 MB       0s  (0s)
++  predicate_set_register.cpp    0 MB       0s  (0s)
++  register_map_nx2.cpp    0 MB       0s  (0s)
++  surface_atomic_operations.cpp    0 MB       0s  (0s)
++  select_source_with_predicate.cpp    0 MB       0s  (0s)
++  surface_load_store.cpp    0 MB       0s  (0s)
++  texture_fetch.cpp    0 MB       0s  (0s)
++  texture_fetch_swizzled.cpp    0 MB       0s  (0s)
++  texture_gather.cpp    0 MB       0s  (0s)
++  texture_gather_swizzled.cpp    0 MB       0s  (0s)
++  texture_gradient.cpp    0 MB       0s  (0s)
++  texture_load.cpp    0 MB       0s  (0s)
++  texture_load_swizzled.cpp    0 MB       0s  (0s)
++  texture_mipmap_level.cpp    0 MB       0s  (0s)
++  video_helper.cpp    0 MB       0s  (0s)
++  texture_query.cpp    0 MB       0s  (0s)
++  video_minimum_maximum.cpp    0 MB       0s  (0s)
++  video_multiply_add.cpp    0 MB       0s  (0s)
++  video_set_predicate.cpp    0 MB       0s  (0s)
++  warp_shuffle.cpp    0 MB       0s  (0s)
++  translate.cpp       0 MB       0s  (0s)
++  translate_program.cpp    0 MB       0s  (0s)
++  vote.cpp            0 MB       0s  (0s)
++  collect_shader_info_pass.cpp    0 MB       0s  (0s)
++  conditional_barrier_pass.cpp    0 MB       0s  (0s)
++  constant_propagation_pass.cpp    0 MB       0s  (0s)
++  dual_vertex_pass.cpp    0 MB       0s  (0s)
++  dead_code_elimination_pass.cpp    0 MB       0s  (0s)
++  geometry_compaction_pass.cpp    0 MB       0s  (0s)
++  identity_removal_pass.cpp    0 MB       0s  (0s)
++  global_memory_to_storage_buffer_pass.cpp    0 MB       0s  (0s)
++  layer_pass.cpp      0 MB       0s  (0s)
++  lower_fp16_to_fp32.cpp    0 MB       0s  (0s)
++  lower_fp64_to_fp32.cpp    0 MB       0s  (0s)
++  position_pass.cpp    0 MB       0s  (0s)
++  lower_int64_to_int32.cpp    0 MB       0s  (0s)
++  rescaling_pass.cpp    0 MB       0s  (0s)
++  texture_pass.cpp    0 MB       0s  (0s)
++  vendor_workaround_pass.cpp    0 MB       0s  (0s)
++  ssa_rewrite_pass.cpp    0 MB       0s  (0s)
++  verification_pass.cpp    0 MB       0s  (0s)
++  arithmetic.cpp      0 MB       0s  (0s)
++  annotation.cpp      0 MB       0s  (0s)
++  atomic.cpp          0 MB       0s  (0s)
++  bit.cpp             0 MB       0s  (0s)
++  constant.cpp        0 MB       0s  (0s)
++  barrier.cpp         0 MB       0s  (0s)
++  conversion.cpp      0 MB       0s  (0s)
++  debug.cpp           0 MB       0s  (0s)
++  derivatives.cpp     0 MB       0s  (0s)
++  flow.cpp            0 MB       0s  (0s)
++  extension.cpp       0 MB       0s  (0s)
++  function.cpp        0 MB       0s  (0s)
++  group.cpp           0 MB       0s  (0s)
++  image.cpp           0 MB       0s  (0s)
++  logical.cpp         0 MB       0s  (0s)
++  memory.cpp          0 MB       0s  (0s)
++  misc.cpp            0 MB       0s  (0s)
++  type.cpp            0 MB       0s  (0s)
++  sirit.cpp           0 MB       0s  (0s)
++  stream.cpp          0 MB       0s  (0s)
++  vk_bank.cpp         0 MB       0s  (0s)
++  vk_coopmat.cpp      0 MB       0s  (0s)
++  vk_dump.cpp         0 MB       0s  (0s)
++  vk_formats.cpp      0 MB       0s  (0s)
++  vk_draw.cpp         0 MB       0s  (0s)
++  vk_gprof.cpp        0 MB       0s  (0s)
++  vk_framegen.cpp     0 MB       0s  (0s)
++  vk_main.cpp         0 MB       0s  (0s)
++  vk_jobs.cpp         0 MB       0s  (0s)
++  vk_memory.cpp       0 MB       0s  (0s)
++  vk_replay.cpp       0 MB       0s  (0s)
++  vk_menu.cpp         0 MB       0s  (0s)
++  vk_shader.cpp       0 MB       0s  (0s)
++  vk_texture.cpp      0 MB       0s  (0s)
++  vk_vma.cpp          0 MB       0s  (0s)
++  vk_xfer.cpp         0 MB       0s  (0s)
++  nn_fs.c             0 MB       1s  (1s)
++  nn_audio.c          0 MB       1s  (1s)
++compiled in 1s, 0 failed
++linked /workspace/scratch/36e73b9fbe85/analysis/pointer-native/work/sa/build/hookshot.exe: 4 MB (0s)
++linked /workspace/scratch/36e73b9fbe85/analysis/pointer-native/work/sa/build/hookshot_vk.dll: 5 MB (0s)
+--- a/docs/resultado-testes.txt
++++ b/docs/resultado-testes.txt
+@@ -5,6 +5,7 @@
+ test_save_creates_shared_metadata_directory (test_chunks.ChunksTests.test_save_creates_shared_metadata_directory) ... ok
+ test_failed_recompile_preserves_previous_object_and_cache (test_compile_cache.CompileCacheTests.test_failed_recompile_preserves_previous_object_and_cache) ... ok
+ test_bundle_contains_only_logs_and_matching_map_never_game_or_saves (test_crash_recovery.CrashReportTests.test_bundle_contains_only_logs_and_matching_map_never_game_or_saves) ... ok
++test_graphics_options_are_snapshotted_without_editing_or_unbounded_reads (test_crash_recovery.CrashReportTests.test_graphics_options_are_snapshotted_without_editing_or_unbounded_reads) ... ok
+ test_path_audit_reports_overflow_and_ignores_traversal (test_crash_recovery.CrashReportTests.test_path_audit_reports_overflow_and_ignores_traversal) ... ok
+ test_pe_base_and_both_map_formats_resolve_the_same_symbols (test_crash_recovery.CrashReportTests.test_pe_base_and_both_map_formats_resolve_the_same_symbols) ... ok
+ test_real_child_runs_with_alias_and_trace_and_parent_collects_after_cleanup (test_crash_recovery.RecoveryLaunchTests.test_real_child_runs_with_alias_and_trace_and_parent_collects_after_cleanup) ... ok
+@@ -19,6 +20,101 @@
+ test_nup_check_does_not_extract_or_change_input (test_gui_bridge.GuiInputTests.test_nup_check_does_not_extract_or_change_input) ... ok
+ test_progress_counts_only_actual_compiler_completions (test_gui_bridge.ProgressTests.test_progress_counts_only_actual_compiler_completions) ... ok
+ test_progress_never_divides_by_zero_and_resets_for_new_batch (test_gui_bridge.ProgressTests.test_progress_never_divides_by_zero_and_resets_for_new_batch) ... ok
++test_audio_volume_import_uses_host_implementation_instead_of_duplicate_stub (test_host_paths.HostPathTests.test_audio_volume_import_uses_host_implementation_instead_of_duplicate_stub) ... /workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/hos_svc.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_video.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_os_sync.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/mkw_glue.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_diag.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_vi.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_syncpt.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_libc.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/win_path.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/hos_mem.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_fs.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/rx_backend.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/hos_thread.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_codec.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nvdrv.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_gs.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/hos_hostcall.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/pgo_rt.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_hid.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/hos_setjmp.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/audio_wasapi.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/pad_sdl.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/mf_av1.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/hos_main.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nvn_native.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nvn_layout.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_audio.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/display.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/nn_applet.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:36: ResourceWarning: unclosed file <_io.TextIOWrapper name='/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/../host/rx_webgpu_unavailable.c' mode='r' encoding='UTF-8'>
++  src = open(os.path.join(host, f), errors="replace").read()
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++/workspace/scratch/36e73b9fbe85/crash-build/Ocarina-Hookshot-0.3.3/nx2/standalone.py:138: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp4ghr8z3p/a64_stubs.c' mode='w' encoding='UTF-8'>
++  open(path, "w", newline="\n").write(text)
++ResourceWarning: Enable tracemalloc to get the object allocation traceback
++ok
++test_lighting_path_is_whole_and_overflow_is_rejected (test_host_paths.HostPathTests.test_lighting_path_is_whole_and_overflow_is_rejected) ... ok
+ test_hot_profile_produces_split_units_and_publishes (test_hot_pipeline.HotPipelineTests.test_hot_profile_produces_split_units_and_publishes) ... ok
+ test_normal_sources_are_preserved_when_stale_hot_files_are_removed (test_hot_pipeline.HotPipelineTests.test_normal_sources_are_preserved_when_stale_hot_files_are_removed) ... ok
+ test_profile_missing_clears_old_environment (test_hot_pipeline.HotPipelineTests.test_profile_missing_clears_old_environment) ... ok
+@@ -55,6 +151,7 @@
+ test_launch_before_first_build_has_actionable_error (test_workflow.WorkflowTests.test_launch_before_first_build_has_actionable_error) ... ok
+ test_low_memory_allows_one_compile (test_workflow.WorkflowTests.test_low_memory_allows_one_compile) ... ok
+ test_module_preparation_uses_a_private_copy (test_workflow.WorkflowTests.test_module_preparation_uses_a_private_copy) ... ok
++test_motion_comparison_keeps_pipeline_wait_and_temporal_clamp_off (test_workflow.WorkflowTests.test_motion_comparison_keeps_pipeline_wait_and_temporal_clamp_off) ... ok
+ test_original_profile_does_not_inherit_experiments (test_workflow.WorkflowTests.test_original_profile_does_not_inherit_experiments) ... ok
+ test_output_cannot_cover_input_data (test_workflow.WorkflowTests.test_output_cannot_cover_input_data) ... ok
+ test_publish_and_tamper_detection (test_workflow.WorkflowTests.test_publish_and_tamper_detection) ... ok
+@@ -63,7 +160,7 @@
+ test_wrong_and_truncated_game_versions_fail_early (test_workflow.WorkflowTests.test_wrong_and_truncated_game_versions_fail_early) ... ok
+ 
+ ----------------------------------------------------------------------
+-Ran 63 tests in 0.550s
++Ran 67 tests in 0.870s
+ 
+ OK (skipped=7)
+   rtld: taken from title 0 (v1)
+--- a/docs/validacao.md
++++ b/docs/validacao.md
+@@ -59,3 +59,12 @@
+ - Testado o parser de mapa com o arquivo real do link LLVM-MinGW e o ImageBase do PE produzido, alem dos formatos MSVC/GNU sinteticos.
+ - Teste de lancamento usa processo filho real em Linux e API DOS simulada: alias permanece durante o filho, e removido apos saida ou falha; logs entram no ZIP e saves/binarios ficam de fora. Isso nao substitui teste de DefineDosDevice no Windows.
+ - Nao houve execucao do jogo, validacao de SPIR-V no driver, teste fisico AMD/NVIDIA ou benchmark. O ultimo crash de CPU do usuario ainda precisa do mapa correspondente/novo log para confirmar sua causa.
++
++## Correcao 0.3.4
++
++- 67 testes descobertos: 60 passaram; sete de PowerShell continuaram ignorados porque esse runtime nao esta instalado neste host. Incluem o construtor C de caminhos com a raiz de 160 bytes e o arquivo de iluminacao real, rejeicao de overflow, exclusao do import de volume do gerador de stubs, perfil de movimento, snapshots de opcoes e passagem dos parametros de audio/trace para um processo filho real.
++- Fixture Windows de filesystem compilado e ligado com LLVM-MinGW 20261020, C11 e -Wall -Wextra -Werror. A parte Win32 do teste cobre criar, ler, enumerar, renomear e apagar um arquivo UTF-8 em caminho maior que 260 caracteres, mas NAO foi executada neste host Linux. O trecho portavel de montagem/rejeicao de caminhos foi executado.
++- Build nativo incremental com 354 unidades configuradas fechou EXE e DLL para Windows x64, zero falhas. Inclui os adaptadores Win32 e WASAPI, o HLE de volume e o registro de frames lentos. Objetos inalterados foram reutilizados. O fixture continua com headers sinteticos e unidades de jogo vazias; nao e o executavel completo do jogo. O simbolo de volume implementado foi conferido no PE ligado.
++- Comparadas 244 entradas que formam a identidade do tradutor com o pacote Windows 0.3.3: stamp 234d9fba458b54ba nas duas versoes. O cache de programas nao e invalidado por essas alteracoes de host/diagnostico ou pelo perfil Nitido.
++- Python validado com compileall. Registros em resultado-testes.txt e resultado-native-0.3.4.txt. O arquivo de teste Windows pode ser recompilado e executado pelo unittest no computador de destino.
++- A comparacao de caminhos/logs e o video do usuario sustentam os defeitos e os testes de comparacao, mas nao comprovam o resultado desta correcao. Nao houve execucao de audio fisico, jogo, GPU AMD/NVIDIA ou janela WPF neste ambiente. Folhagem, escuridao, sombras e pausas em novas areas continuam pendentes.
+--- a/gpu/vk/vk_replay.cpp
++++ b/gpu/vk/vk_replay.cpp
+@@ -1811,7 +1811,7 @@
+     if (!limit) return;
+     static auto last_t = std::chrono::steady_clock::now();
+     static int64_t last[PROF_COUNT];
+-    static int64_t last_pl, last_tr, last_d, last_up;
++    static int64_t last_pl, last_tr, last_d, last_di, last_up;
+     static int logged;
+     const auto now = std::chrono::steady_clock::now();
+     const double ms = std::chrono::duration<double, std::milli>(now - last_t).count();
+@@ -1820,7 +1820,9 @@
+     draw_stats(&d, &sk, &di, &pl);
+     shader_stats(&tr, &fl);
+     texture_stats(&up, &astc, &upb);
+-    if (ms >= limit && ms < 500 && d - last_d >= 500 && logged < 800) {
++    // Keep second-long stalls too. The old <500 ms/500-draw filter hid the
++    // user's pipeline stalls and frames with only a few expensive dispatches.
++    if (ms >= limit && (d > last_d || di > last_di) && logged < 800) {
+         logged++;
+         const auto dp = [](int i) { return (prof_ns[i] - last[i]) / 1e6; };
+         logf("vk: slow frame at present %lld: %.1f ms; submit %.1f, draw %.1f, descriptors %.1f, pipelines %.1f, programs %.1f, "
+@@ -1830,7 +1832,7 @@
+              (long long)(tr - last_tr), (long long)(up - last_up));
+     }
+     for (int i = 0; i < PROF_COUNT; i++) last[i] = prof_ns[i];
+-    last_pl = pl, last_tr = tr, last_d = d, last_up = up;
++    last_pl = pl, last_tr = tr, last_d = d, last_di = di, last_up = up;
+ }
+ 
+ uint64_t made_ring[32];
+--- a/host/audio_wasapi.c
++++ b/host/audio_wasapi.c
+@@ -0,0 +1,103 @@
++/* Shared-mode Windows audio with engine-side format conversion. This avoids
++   depending on a working legacy waveOut mapper or an exact endpoint format. */
++#define WIN32_LEAN_AND_MEAN
++#define COBJMACROS
++#include <windows.h>
++#include <initguid.h>
++#include <mmdeviceapi.h>
++#include <audioclient.h>
++#include <audiosessiontypes.h>
++#include <string.h>
++#include "audio_wasapi.h"
++
++void hos_log(const char *format, ...);
++
++static IAudioClient *client;
++static IAudioRenderClient *renderer;
++static UINT32 capacity;
++static unsigned frame_bytes;
++static int com_owned, started;
++
++void hos_wasapi_close(void) {
++    if (client && started) IAudioClient_Stop(client);
++    if (renderer) IAudioRenderClient_Release(renderer);
++    if (client) IAudioClient_Release(client);
++    renderer = NULL;
++    client = NULL;
++    capacity = 0;
++    started = 0;
++    if (com_owned) CoUninitialize();
++    com_owned = 0;
++}
++
++int hos_wasapi_open(unsigned rate, unsigned channels) {
++    hos_wasapi_close();
++    HRESULT result = CoInitializeEx(NULL, COINIT_MULTITHREADED);
++    if (FAILED(result) && result != RPC_E_CHANGED_MODE) {
++        hos_log("audio: WASAPI COM initialization failed: %#lx", (unsigned long)result);
++        return 0;
++    }
++    com_owned = SUCCEEDED(result);
++    IMMDeviceEnumerator *enumerator = NULL;
++    IMMDevice *device = NULL;
++    result = CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL, CLSCTX_INPROC_SERVER,
++                              &IID_IMMDeviceEnumerator, (void **)&enumerator);
++    if (SUCCEEDED(result)) {
++        result = IMMDeviceEnumerator_GetDefaultAudioEndpoint(enumerator, eRender, eConsole, &device);
++        if (FAILED(result))
++            result = IMMDeviceEnumerator_GetDefaultAudioEndpoint(enumerator, eRender, eMultimedia, &device);
++    }
++    if (SUCCEEDED(result))
++        result = IMMDevice_Activate(device, &IID_IAudioClient, CLSCTX_ALL, NULL, (void **)&client);
++    WAVEFORMATEX format = {0};
++    format.wFormatTag = WAVE_FORMAT_PCM;
++    format.nChannels = (WORD)channels;
++    format.nSamplesPerSec = rate;
++    format.wBitsPerSample = 16;
++    format.nBlockAlign = (WORD)(channels * sizeof(int16_t));
++    format.nAvgBytesPerSec = rate * format.nBlockAlign;
++    if (SUCCEEDED(result))
++        result = IAudioClient_Initialize(client, AUDCLNT_SHAREMODE_SHARED,
++                    AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
++                    500000, 0, &format, NULL); /* 50 ms requested; no exclusive mode */
++    if (SUCCEEDED(result)) result = IAudioClient_GetBufferSize(client, &capacity);
++    if (SUCCEEDED(result))
++        result = IAudioClient_GetService(client, &IID_IAudioRenderClient, (void **)&renderer);
++    if (device) IMMDevice_Release(device);
++    if (enumerator) IMMDeviceEnumerator_Release(enumerator);
++    if (FAILED(result) || !capacity) {
++        hos_log("audio: WASAPI output unavailable: %#lx", (unsigned long)result);
++        hos_wasapi_close();
++        return 0;
++    }
++    frame_bytes = format.nBlockAlign;
++    hos_log("audio: WASAPI shared output: %u Hz, %u channels, %u frames buffered", rate, channels, capacity);
++    return 1;
++}
++
++int hos_wasapi_write(const int16_t *samples, unsigned frames) {
++    if (!client || !renderer) return -1;
++    UINT32 padding = 0;
++    HRESULT result = IAudioClient_GetCurrentPadding(client, &padding);
++    if (SUCCEEDED(result) && (padding > capacity || frames > capacity - padding)) return 0;
++    BYTE *destination = NULL;
++    if (SUCCEEDED(result)) result = IAudioRenderClient_GetBuffer(renderer, frames, &destination);
++    if (SUCCEEDED(result)) {
++        memcpy(destination, samples, (size_t)frames * frame_bytes);
++        result = IAudioRenderClient_ReleaseBuffer(renderer, frames, 0);
++    }
++    if (SUCCEEDED(result) && !started) {
++        unsigned prime = frames * 4;
++        if (prime > capacity / 2) prime = capacity / 2;
++        if (padding + frames >= prime) {
++            result = IAudioClient_Start(client);
++            if (SUCCEEDED(result)) started = 1;
++        }
++    }
++    if (FAILED(result)) {
++        hos_log("audio: WASAPI stream lost: %#lx; output will be retried", (unsigned long)result);
++        hos_wasapi_close();
++        return -1;
++    }
++    return 1;
++}
+--- a/host/audio_wasapi.h
++++ b/host/audio_wasapi.h
+@@ -0,0 +1,7 @@
++#pragma once
++#include <stdint.h>
++
++/* Called only by the audio renderer thread. Input is interleaved PCM16. */
++int hos_wasapi_open(unsigned rate, unsigned channels);
++int hos_wasapi_write(const int16_t *samples, unsigned frames); /* 1 queued, 0 full, -1 lost */
++void hos_wasapi_close(void);
+--- a/host/nn_audio.c
++++ b/host/nn_audio.c
+@@ -20,6 +20,7 @@
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
+ #include <mmsystem.h>
++#include "audio_wasapi.h"
+ 
+ void hos_system_event_init(uint64_t key, int autoclear);
+ void hos_system_event_signal(uint64_t key);
+@@ -90,6 +91,7 @@
+ static Mix mixes[MAX_MIXES];
+ static Splitter splitters[MAX_SPLITTERS];
+ static int sink_mix = -1, sink_n;
++static float device_volume = 1.0f;
+ static float lim_in = 1.0f, lim_out = 1.0f, lim_threshold = 1.0f, lim_env = 1.0f;   /* the light limiter */
+ static int lim_enabled;
+ static int8_t sink_in[8];
+@@ -511,6 +513,7 @@
+                               mixes[m].buffers, mixes[m].dest_kind == DEST_MIX ? mixes[m].dest : -1, mixes[m].volume, e);
+             }
+             hos_log("%s", b);
++            hos_log("audio: device volume %.3f", device_volume);
+             {   /* rate x pitch of the playing voices */
+                 char h[512];
+                 int hn = snprintf(h, sizeof h, "audio:   rate/pitch:");
+@@ -551,7 +554,7 @@
+             r[i] *= lim_in * lim_env * lim_out;
+         }
+     for (int i = 0; i < FRAME; i++) {
+-        float a = l[i] * 32767.0f, b = r[i] * 32767.0f;
++        float a = l[i] * device_volume * 32767.0f, b = r[i] * device_volume * 32767.0f;
+         if (a != a) a = 0;   /* (NaN) */
+         if (b != b) b = 0;
+         if (a > 32767) a = 32767;
+@@ -563,7 +566,7 @@
+     }
+ }
+ 
+-/* ---- output: waveOut, 10 ms blocks; a WAV file with HOS_AUDIO_DUMP ---------------------------------------------- */
++/* ---- output: shared WASAPI, waveOut fallback; a WAV file with HOS_AUDIO_DUMP ------------------------------------ */
+ #define NBLOCKS 10
+ static HWAVEOUT wout;
+ static WAVEHDR hdr[NBLOCKS];
+@@ -571,14 +574,36 @@
+ static int fill_block, fill_frames;
+ static FILE *dump;
+ static uint32_t dump_bytes;
++static int wasapi, output_disabled;
++static ULONGLONG output_retry_at;
++
++static void output_close(void) {
++    hos_wasapi_close();
++    wasapi = 0;
++    if (wout) {
++        waveOutReset(wout);
++        for (int i = 0; i < NBLOCKS; ++i)
++            if (hdr[i].dwFlags & WHDR_PREPARED) waveOutUnprepareHeader(wout, &hdr[i], sizeof hdr[i]);
++        waveOutClose(wout);
++        wout = NULL;
++    }
++    memset(hdr, 0, sizeof hdr);
++    fill_block = fill_frames = 0;
++    output_retry_at = GetTickCount64() + 2000;
++}
+ 
+ static void output_open(void) {
+     const char *d = getenv("HOS_AUDIO_DUMP");
+-    if (d && (dump = fopen(d, "wb")) != NULL) {
++    if (d && !dump && (dump = fopen(d, "wb")) != NULL) {
+         static const uint8_t z[44];
+         fwrite(z, 1, 44, dump);
+     }
+-    if (getenv("HOS_AUDIO") && atoi(getenv("HOS_AUDIO")) == 0) return;
++    output_disabled = getenv("HOS_AUDIO") && atoi(getenv("HOS_AUDIO")) == 0;
++    if (output_disabled) return;
++    output_retry_at = GetTickCount64() + 2000;
++    const char *backend = getenv("HOS_AUDIO_BACKEND");
++    if ((!backend || strcmp(backend, "waveout")) && (wasapi = hos_wasapi_open(RATE, 2))) return;
++    if (backend && !strcmp(backend, "wasapi")) return;
+     WAVEFORMATEX f = {0};
+     f.wFormatTag = WAVE_FORMAT_PCM;
+     f.nChannels = 2;
+@@ -586,11 +611,23 @@
+     f.wBitsPerSample = 16;
+     f.nBlockAlign = 4;
+     f.nAvgBytesPerSec = RATE * 4;
+-    if (waveOutOpen(&wout, WAVE_MAPPER, &f, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR) {
+-        hos_log("audio: no output device");
++    MMRESULT result = waveOutOpen(&wout, WAVE_MAPPER, &f, 0, 0, CALLBACK_NULL | WAVE_ALLOWSYNC);
++    UINT selected = WAVE_MAPPER;
++    if (result != MMSYSERR_NOERROR) {
++        hos_log("audio: waveOut default failed: %u; trying %u devices", result, waveOutGetNumDevs());
++        for (UINT device = 0; device < waveOutGetNumDevs(); ++device) {
++            result = waveOutOpen(&wout, device, &f, 0, 0, CALLBACK_NULL | WAVE_ALLOWSYNC);
++            if (result == MMSYSERR_NOERROR) { selected = device; break; }
++        }
++    }
++    if (result != MMSYSERR_NOERROR) {
++        char message[256] = {0};
++        waveOutGetErrorTextA(result, message, sizeof message);
++        hos_log("audio: no usable output (waveOut %u: %s); retry in 2 seconds", result, message);
+         wout = NULL;
+         return;
+     }
++    hos_log("audio: waveOut stereo output: 48000 Hz, device %u", selected);
+     for (int i = 0; i < NBLOCKS; i++) {
+         hdr[i].lpData = (LPSTR)blocks[i];
+         hdr[i].dwBufferLength = sizeof blocks[i];
+@@ -629,6 +666,12 @@
+             fseek(dump, at, SEEK_SET);
+         }
+     }
++    if (output_disabled) return;
++    if (!wout && !wasapi && GetTickCount64() >= output_retry_at) output_open();
++    if (wasapi) {
++        if (hos_wasapi_write(pcm, FRAME) < 0) output_close();
++        return;
++    }
+     if (!wout) return;
+     WAVEHDR *h = &hdr[fill_block];
+     if (fill_frames == 0) {
+@@ -638,8 +681,13 @@
+     memcpy(blocks[fill_block] + fill_frames * FRAME * 2, pcm, FRAME * 4);
+     if (++fill_frames == 2) {
+         h->dwFlags = 0;
+-        waveOutPrepareHeader(wout, h, sizeof *h);
+-        waveOutWrite(wout, h, sizeof *h);
++        MMRESULT result = waveOutPrepareHeader(wout, h, sizeof *h);
++        if (result == MMSYSERR_NOERROR) result = waveOutWrite(wout, h, sizeof *h);
++        if (result != MMSYSERR_NOERROR) {
++            hos_log("audio: waveOut write failed: %u; output will be retried", result);
++            output_close();
++            return;
++        }
+         fill_frames = 0;
+         fill_block = (fill_block + 1) % NBLOCKS;
+     }
+@@ -860,7 +908,20 @@
+     }
+     RET((int)ARG(1) > 0 ? 1 : 0);
+ }
+-HLE(_ZN2nn5audio26SetAudioDeviceOutputVolumeEPKNS0_15AudioDeviceNameEf) {}
++HLE(_ZN2nn5audio26SetAudioDeviceOutputVolumeEPKNS0_15AudioDeviceNameEf) {
++    const float requested = farg(c, 0);
++    if (!isfinite(requested)) return;
++    au_lock();
++    device_volume = requested < 0.0f ? 0.0f : requested > 1.0f ? 1.0f : requested;
++    au_unlock();
++}
++/* A float return belongs in v0, not x0. Leaving this call in the generic
++   import stub returned stale floating-point state to the game's mixer. */
++HLE(_ZN2nn5audio26GetAudioDeviceOutputVolumeEPKNS0_15AudioDeviceNameE) {
++    au_lock();
++    memcpy(&c->vreg[0][0], &device_volume, sizeof device_volume);
++    au_unlock();
++}
+ 
+ /* GetSampleByteSize(SampleFormat): PcmInt8 1, PcmInt16 2, PcmInt24 3, PcmInt32 4, PcmFloat 4 (ADPCM: no fixed size).
+    The game steps through sample buffers by it: 0 kept the main thread looping (f_089d3588) while Great Sky Island
+--- a/host/nn_fs.c
++++ b/host/nn_fs.c
+@@ -10,6 +10,7 @@
+ #include <stdlib.h>
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
++#include "win_path.h"
+ 
+ const char *hos_romfs_dir, *hos_user_dir;
+ 
+@@ -18,7 +19,7 @@
+ #define R_NOT_MOUNTED 0xCA02            /* fs::ResultInvalidMountName-ish: no such mount */
+ #define R_TARGET_NOT_FOUND 0x7D402      /* fs::ResultTargetNotFound (save data) */
+ 
+-typedef struct { char name[32]; char root[MAX_PATH]; int writable; } Mount;
++typedef struct { char name[32]; char root[HOS_FS_PATH_CAP]; int writable; } Mount;
+ static Mount mounts[16];
+ static int nmounts;
+ static SRWLOCK mount_lock = SRWLOCK_INIT;
+@@ -27,12 +28,20 @@
+     AcquireSRWLockExclusive(&mount_lock);
+     int i;
+     for (i = 0; i < nmounts && strcmp(mounts[i].name, name); i++) {}
+-    if (i == nmounts && nmounts < 16) nmounts++;
++    if (i == nmounts) {
++        if (nmounts == 16) { ReleaseSRWLockExclusive(&mount_lock); hos_fatal(NULL, "fs: too many mounts"); return; }
++        nmounts++;
++    }
++    if (strlen(root) >= sizeof mounts[i].root) {
++        ReleaseSRWLockExclusive(&mount_lock);
++        hos_fatal(NULL, "fs: mount path exceeds %zu bytes", sizeof mounts[i].root);
++        return;
++    }
+     snprintf(mounts[i].name, sizeof mounts[i].name, "%s", name);
+     snprintf(mounts[i].root, sizeof mounts[i].root, "%s", root);
+     mounts[i].writable = writable;
+     ReleaseSRWLockExclusive(&mount_lock);
+-    if (writable) CreateDirectoryA(root, NULL);
++    if (writable) hos_path_mkdir(root, NULL);
+     hos_log("fs: mounted %s: -> %s", name, root);
+ }
+ 
+@@ -51,9 +60,11 @@
+         if (strlen(mounts[i].name) == n && !strncmp(mounts[i].name, guest, n)) {
+             const char *rest = colon + 1;
+             while (*rest == '/') rest++;
+-            if (mounts[i].writable || !hos_mods_romfs(rest, out, cap)) snprintf(out, cap, "%s/%s", mounts[i].root, rest);
++            ok = 1;
++            if (mounts[i].writable || !hos_mods_romfs(rest, out, cap))
++                ok = hos_path_join(out, cap, mounts[i].root, rest);
+             if (writable) *writable = mounts[i].writable;
+-            ok = 1;
++            if (!ok) hos_log("fs: host path exceeds buffer (%zu bytes): %s", cap, guest);
+             break;
+         }
+     }
+@@ -68,16 +79,18 @@
+ static const char *gstr(uint64_t a) { return a ? (const char *)GP(a) : ""; }
+ 
+ static void make_dirs(const char *path) {   /* every parent of path */
+-    char tmp[MAX_PATH];
+-    snprintf(tmp, sizeof tmp, "%s", path);
++    char tmp[HOS_FS_PATH_CAP];
++    if (strlen(path) >= sizeof tmp) { hos_log("fs: parent path exceeds buffer"); return; }
++    memcpy(tmp, path, strlen(path) + 1);
++    for (char *p = tmp; *p; ++p) if (*p == '/') *p = '\\';
+     for (char *p = tmp + 3; *p; p++)
+-        if (*p == '\\') { *p = 0; CreateDirectoryA(tmp, NULL); *p = '\\'; }
++        if (*p == '\\') { *p = 0; hos_path_mkdir(tmp, NULL); *p = '\\'; }
+ }
+ 
+ /* ---- handles: a FileHandle / DirectoryHandle is one pointer-sized value; ours are table indices + 1 ----------- */
+-typedef struct { char name[MAX_PATH]; int is_dir; uint64_t size; } ExtraEntry;   /* (a listed folder's mod-only entries) */
++typedef struct { char name[HOS_FS_PATH_CAP]; int is_dir; uint64_t size; } ExtraEntry;   /* (a listed folder's mod-only entries) */
+ typedef struct {
+-    HANDLE h; int writable; HANDLE find; WIN32_FIND_DATAA fd; int find_done, is_dir; char path[MAX_PATH];
++    HANDLE h; int writable; HANDLE find; WIN32_FIND_DATAA fd; int find_done, is_dir; char path[HOS_FS_PATH_CAP];
+     ExtraEntry *extras; int nextras, extra_pos;
+ } Handle;
+ static Handle *handles[4096];
+@@ -118,19 +131,22 @@
+ }
+ 
+ static void user_mount(const char *name, const char *sub) {
+-    char root[MAX_PATH];
+-    snprintf(root, sizeof root, "%s\\%s", hos_user_dir, sub);
++    char root[HOS_FS_PATH_CAP];
++    if (!hos_path_join(root, sizeof root, hos_user_dir, sub)) {
++        hos_fatal(NULL, "fs: user mount path exceeds buffer");
++        return;
++    }
+     make_dirs(root);
+-    CreateDirectoryA(root, NULL);
++    hos_path_mkdir(root, NULL);
+     mount(name, root, 1);
+ }
+ 
+ /* nn::fs::IsSaveDataExisting(ApplicationId, account::Uid const&) -> bool */
+ HLE(_ZN2nn2fs18IsSaveDataExistingENS_13ApplicationIdERKNS_7account3UidE) {
+-    char root[MAX_PATH];
+-    snprintf(root, sizeof root, "%s\\save\\%016llx%016llx", hos_user_dir, (unsigned long long)G64(ARG(1) + 8),
++    char root[HOS_FS_PATH_CAP], sub[64];
++    snprintf(sub, sizeof sub, "save\\%016llx%016llx", (unsigned long long)G64(ARG(1) + 8),
+              (unsigned long long)G64(ARG(1)));
+-    RET(GetFileAttributesA(root) != INVALID_FILE_ATTRIBUTES);
++    RET(hos_path_join(root, sizeof root, hos_user_dir, sub) && hos_path_attributes(root) != INVALID_FILE_ATTRIBUTES);
+ }
+ /* MountSaveData(char const*, account::Uid const&) */
+ HLE(_ZN2nn2fs13MountSaveDataEPKcRKNS_7account3UidE) {
+@@ -156,8 +172,9 @@
+ }
+ /* CreateCacheStorage(int index, long size, long journal) */
+ HLE(_ZN2nn2fs18CreateCacheStorageEill) {
+-    char root[MAX_PATH];
+-    snprintf(root, sizeof root, "%s\\cache\\%d\\", hos_user_dir, (int)ARG(0));
++    char root[HOS_FS_PATH_CAP], sub[32];
++    snprintf(sub, sizeof sub, "cache\\%d\\", (int)ARG(0));
++    if (!hos_path_join(root, sizeof root, hos_user_dir, sub)) { RET(R_PATH_NOT_FOUND); return; }
+     make_dirs(root);
+     RET(0);
+ }
+@@ -168,9 +185,10 @@
+ HLE(_ZN2nn2fs20ReadCacheStorageListEPiPNS0_16CacheStorageInfoENS0_22CacheStorageListHandleEi) {
+     int n = 0, max = (int)ARG(3);
+     for (; cache_list_pos < 16 && n < max; cache_list_pos++) {
+-        char root[MAX_PATH];
+-        snprintf(root, sizeof root, "%s\\cache\\%d", hos_user_dir, cache_list_pos);
+-        if (GetFileAttributesA(root) != INVALID_FILE_ATTRIBUTES) {
++        char root[HOS_FS_PATH_CAP], sub[32];
++        snprintf(sub, sizeof sub, "cache\\%d", cache_list_pos);
++        if (!hos_path_join(root, sizeof root, hos_user_dir, sub)) { RET(R_PATH_NOT_FOUND); return; }
++        if (hos_path_attributes(root) != INVALID_FILE_ATTRIBUTES) {
+             memset(GP(ARG(1) + 0x20 * n), 0, 0x20);
+             G32(ARG(1) + 0x20 * n) = (uint32_t)cache_list_pos;
+             n++;
+@@ -199,7 +217,7 @@
+ }
+ /* OpenFile(FileHandle*, char const* path, int mode): mode bit 0 read, bit 1 write, bit 2 append */
+ HLE(_ZN2nn2fs8OpenFileEPNS0_10FileHandleEPKci) {
+-    char path[MAX_PATH];
++    char path[HOS_FS_PATH_CAP];
+     int writable = 0;
+     const char *g = gstr(ARG(1));
+     if (!host_path(g, path, sizeof path, &writable)) { hos_log("fs: OpenFile(%s): unknown mount", g); RET(R_PATH_NOT_FOUND); return; }
+@@ -217,16 +235,15 @@
+         }
+     }
+     { int hos_ultrawide_redirect(const char *guest, char *out, size_t cap);   /* (totk_ultrawide_ui.c: the HUD) */
+-      char alt[MAX_PATH];
++      char alt[HOS_FS_PATH_CAP];
+       if (!want_write && hos_ultrawide_redirect(g, alt, sizeof alt)) snprintf(path, sizeof path, "%s", alt); }
+     if (!want_write && hos_blank_cached_icon(g, path)) { RET(R_PATH_NOT_FOUND); return; }
+     {   /* HOS_FS_OVERLAY=<folder> (a test): a file of the game's data found there is read in place of the game's own */
+         const char *ov = getenv("HOS_FS_OVERLAY");
+         const char *rel = !want_write && ov ? strstr(g, ":/") : NULL;
+         if (rel) {
+-            char alt[MAX_PATH];
+-            snprintf(alt, sizeof alt, "%s/%s", ov, rel + 2);
+-            if (GetFileAttributesA(alt) != INVALID_FILE_ATTRIBUTES) {
++            char alt[HOS_FS_PATH_CAP];
++            if (hos_path_join(alt, sizeof alt, ov, rel + 2) && hos_path_attributes(alt) != INVALID_FILE_ATTRIBUTES) {
+                 hos_log("fs: OpenFile(%s): from the overlay", g);
+                 snprintf(path, sizeof path, "%s", alt);
+             }
+@@ -235,11 +252,14 @@
+     /* (mkw-recomp 16bc3bc: the host's file calls block, so the virtual core goes to another thread meanwhile, as
+        Horizon would run another while this one waits for the file system. OoT's ARes loaders held it up to 250 ms) */
+     const int away = hos_vcore_away();
+-    HANDLE h = CreateFileA(path, GENERIC_READ | (want_write ? GENERIC_WRITE : 0), FILE_SHARE_READ | FILE_SHARE_WRITE,
++    HANDLE h = hos_path_open(path, GENERIC_READ | (want_write ? GENERIC_WRITE : 0), FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
++    const DWORD open_error = GetLastError();
+     if (away) hos_vcore_back();
+     if (h == INVALID_HANDLE_VALUE) {
+-        if (hos_trace || fs_trace()) hos_log("fs: OpenFile(%s): not found", g);
++        const DWORD error = open_error;
++        if (hos_trace || fs_trace() || error == ERROR_ACCESS_DENIED || error == ERROR_FILENAME_EXCED_RANGE)
++            hos_log("fs: OpenFile(%s): failed, Win32 error %lu", g, error);
+         RET(R_PATH_NOT_FOUND);
+         return;
+     }
+@@ -338,11 +358,11 @@
+ 
+ /* CreateFile(char const*, long size) */
+ HLE(_ZN2nn2fs10CreateFileEPKcl) {
+-    char path[MAX_PATH];
++    char path[HOS_FS_PATH_CAP];
+     int writable = 0;
+     if (!host_path(gstr(ARG(0)), path, sizeof path, &writable) || !writable) { RET(R_PATH_NOT_FOUND); return; }
+     make_dirs(path);
+-    HANDLE h = CreateFileA(path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
++    HANDLE h = hos_path_open(path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+     if (h == INVALID_HANDLE_VALUE) { RET(GetLastError() == ERROR_FILE_EXISTS ? R_PATH_EXISTS : R_PATH_NOT_FOUND); return; }
+     LARGE_INTEGER sz;
+     sz.QuadPart = (LONGLONG)ARG(1);
+@@ -352,54 +372,54 @@
+     RET(0);
+ }
+ HLE(_ZN2nn2fs10DeleteFileEPKc) {
+-    char path[MAX_PATH];
++    char path[HOS_FS_PATH_CAP];
+     int writable = 0;
+-    if (!host_path(gstr(ARG(0)), path, sizeof path, &writable) || !writable || !DeleteFileA(path)) { RET(R_PATH_NOT_FOUND); return; }
++    if (!host_path(gstr(ARG(0)), path, sizeof path, &writable) || !writable || !hos_path_delete_file(path)) { RET(R_PATH_NOT_FOUND); return; }
+     RET(0);
+ }
+ HLE(_ZN2nn2fs15CreateDirectoryEPKc) {
+-    char path[MAX_PATH];
++    char path[HOS_FS_PATH_CAP];
+     int writable = 0;
+     if (!host_path(gstr(ARG(0)), path, sizeof path, &writable) || !writable) { RET(R_PATH_NOT_FOUND); return; }
+     make_dirs(path);
+-    RET(CreateDirectoryA(path, NULL) ? 0 : GetLastError() == ERROR_ALREADY_EXISTS ? R_PATH_EXISTS : R_PATH_NOT_FOUND);
++    RET(hos_path_mkdir(path, NULL) ? 0 : GetLastError() == ERROR_ALREADY_EXISTS ? R_PATH_EXISTS : R_PATH_NOT_FOUND);
+ }
+ static void delete_tree(const char *dir) {
+-    char pat[MAX_PATH];
++    char pat[HOS_FS_PATH_CAP];
+     WIN32_FIND_DATAA fd;
+-    snprintf(pat, sizeof pat, "%s\\*", dir);
+-    HANDLE f = FindFirstFileA(pat, &fd);
++    if (!hos_path_join(pat, sizeof pat, dir, "*")) { hos_log("fs: directory path exceeds buffer"); return; }
++    HANDLE f = hos_path_find_first(pat, &fd);
+     if (f != INVALID_HANDLE_VALUE) {
+         do {
+             if (!strcmp(fd.cFileName, ".") || !strcmp(fd.cFileName, "..")) continue;
+-            char sub[MAX_PATH];
+-            snprintf(sub, sizeof sub, "%s\\%s", dir, fd.cFileName);
++            char sub[HOS_FS_PATH_CAP];
++            if (!hos_path_join(sub, sizeof sub, dir, fd.cFileName)) { hos_log("fs: child path exceeds buffer"); continue; }
+             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) delete_tree(sub);
+-            else DeleteFileA(sub);
+-        } while (FindNextFileA(f, &fd));
++            else hos_path_delete_file(sub);
++        } while (hos_path_find_next(f, &fd));
+         FindClose(f);
+     }
+-    RemoveDirectoryA(dir);
++    hos_path_remove_dir(dir);
+ }
+ HLE(_ZN2nn2fs26DeleteDirectoryRecursivelyEPKc) {
+-    char path[MAX_PATH];
++    char path[HOS_FS_PATH_CAP];
+     int writable = 0;
+     if (!host_path(gstr(ARG(0)), path, sizeof path, &writable) || !writable) { RET(R_PATH_NOT_FOUND); return; }
+     delete_tree(path);
+     RET(0);
+ }
+ HLE(_ZN2nn2fs10RenameFileEPKcS2_) {
+-    char a[MAX_PATH], b[MAX_PATH];
++    char a[HOS_FS_PATH_CAP], b[HOS_FS_PATH_CAP];
+     int w1 = 0, w2 = 0;
+     if (!host_path(gstr(ARG(0)), a, sizeof a, &w1) || !host_path(gstr(ARG(1)), b, sizeof b, &w2) || !w1 || !w2) { RET(R_PATH_NOT_FOUND); return; }
+-    RET(MoveFileExA(a, b, MOVEFILE_REPLACE_EXISTING) ? 0 : R_PATH_NOT_FOUND);
++    RET(hos_path_move_file(a, b, MOVEFILE_REPLACE_EXISTING) ? 0 : R_PATH_NOT_FOUND);
+ }
+ /* a RomFS folder that only mods have: rom:/x -> some mod entry lies under x */
+ static void count_extra(void *arg, const char *name, int is_dir, uint64_t size) { (void)name, (void)is_dir, (void)size; ++*(int *)arg; }
+ static const char *rom_rel(const char *guest) {   /* the path inside the RomFS mount, or NULL */
+     const char *colon = strchr(guest, ':');
+     if (!colon || !hos_romfs_dir) return NULL;
+-    char root[MAX_PATH];
++    char root[HOS_FS_PATH_CAP];
+     if (!host_path(guest, root, sizeof root, NULL)) return NULL;
+     AcquireSRWLockShared(&mount_lock);
+     int rom = 0;
+@@ -421,10 +441,10 @@
+ 
+ /* GetEntryType(DirectoryEntryType*, char const*): 0 directory, 1 file */
+ HLE(_ZN2nn2fs12GetEntryTypeEPNS0_18DirectoryEntryTypeEPKc) {
+-    char path[MAX_PATH];
++    char path[HOS_FS_PATH_CAP];
+     if (!host_path(gstr(ARG(1)), path, sizeof path, NULL)) { RET(R_PATH_NOT_FOUND); return; }
+     hos_blank_cached_icon(gstr(ARG(1)), path);
+-    DWORD at = GetFileAttributesA(path);
++    DWORD at = hos_path_attributes(path);
+     if (at == INVALID_FILE_ATTRIBUTES && is_mod_dir(gstr(ARG(1)))) at = FILE_ATTRIBUTE_DIRECTORY;   /* (only in mods) */
+     if (fs_trace())
+         hos_log("fs: GetEntryType(%s): %s", gstr(ARG(1)), at == INVALID_FILE_ATTRIBUTES ? "not found"
+@@ -443,13 +463,13 @@
+     e->is_dir = is_dir, e->size = size;
+ }
+ HLE(_ZN2nn2fs13OpenDirectoryEPNS0_15DirectoryHandleEPKci) {
+-    char path[MAX_PATH], pat[MAX_PATH];
++    char path[HOS_FS_PATH_CAP], pat[HOS_FS_PATH_CAP];
+     if (!host_path(gstr(ARG(1)), path, sizeof path, NULL)) { RET(R_PATH_NOT_FOUND); return; }
+-    snprintf(pat, sizeof pat, "%s\\*", path);
++    if (!hos_path_join(pat, sizeof pat, path, "*")) { RET(R_PATH_NOT_FOUND); return; }
+     Handle *dh = (Handle *)calloc(1, sizeof *dh);
+     dh->is_dir = (int)ARG(2);   /* mode: 1 directories, 2 files, 3 both */
+     snprintf(dh->path, sizeof dh->path, "%s", pat);   /* (for GetDirectoryEntryCount) */
+-    dh->find = FindFirstFileA(pat, &dh->fd);
++    dh->find = hos_path_find_first(pat, &dh->fd);
+     if (dh->find == INVALID_HANDLE_VALUE) dh->find_done = 1;
+     if (rom_rel(gstr(ARG(1)))) hos_mods_dir_extras(rom_rel(gstr(ARG(1))), path, add_extra, dh);
+     if (fs_trace())
+@@ -475,7 +495,7 @@
+             G64(e + 0x308) = ((uint64_t)fd->nFileSizeHigh << 32) | fd->nFileSizeLow;
+             n++;
+         }
+-        if (!FindNextFileA(dh->find, &dh->fd)) dh->find_done = 1;
++        if (!hos_path_find_next(dh->find, &dh->fd)) dh->find_done = 1;
+     }
+     while (n < max && dh->find_done && dh->extra_pos < dh->nextras) {   /* then the mods' own entries */
+         const ExtraEntry *x = &dh->extras[dh->extra_pos++];
+@@ -495,14 +515,14 @@
+     Handle *dh = get_handle(c, ARG(1));
+     int64_t n = 0;
+     WIN32_FIND_DATAA fd;
+-    HANDLE f = dh->path[0] ? FindFirstFileA(dh->path, &fd) : INVALID_HANDLE_VALUE;
++    HANDLE f = dh->path[0] ? hos_path_find_first(dh->path, &fd) : INVALID_HANDLE_VALUE;
+     if (f != INVALID_HANDLE_VALUE) {
+         do {
+             int isdir = (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+             if (strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, "..") &&
+                 ((isdir && (dh->is_dir & 1)) || (!isdir && (dh->is_dir & 2))))
+                 n++;
+-        } while (FindNextFileA(f, &fd));
++        } while (hos_path_find_next(f, &fd));
+         FindClose(f);
+     }
+     for (int i = 0; i < dh->nextras; i++)
+--- a/host/path_join.h
++++ b/host/path_join.h
+@@ -0,0 +1,16 @@
++#pragma once
++#include <stddef.h>
++#include <stdio.h>
++
++/* A full host path, including a deep extraction root and a guest asset name.
++   Reject overflow instead of opening a silently truncated resource name. */
++#define HOS_FS_PATH_CAP 4096
++static inline int hos_path_join(char *out, size_t cap, const char *root, const char *relative) {
++    if (!out || !cap || !root || !relative) return 0;
++    const int n = snprintf(out, cap, "%s/%s", root, relative);
++    if (n < 0 || (size_t)n >= cap) {
++        out[0] = 0;
++        return 0;
++    }
++    return 1;
++}
+--- a/host/win_path.c
++++ b/host/win_path.c
+@@ -0,0 +1,135 @@
++/* Long-path Win32 adapters for the guest filesystem. The runtime keeps UTF-8
++   asset names; Windows receives normalized, extended UTF-16 absolute paths. */
++#include "win_path.h"
++#include <stdlib.h>
++#include <string.h>
++#include <wchar.h>
++
++static void free_path(WCHAR *p) {
++    const DWORD error = GetLastError();
++    free(p);
++    SetLastError(error);
++}
++
++static WCHAR *wide_path(const char *path) {
++    if (!path || !*path) { SetLastError(ERROR_INVALID_NAME); return NULL; }
++    UINT page = CP_UTF8;
++    DWORD flags = MB_ERR_INVALID_CHARS;
++    int count = MultiByteToWideChar(page, flags, path, -1, NULL, 0);
++    if (!count) { /* main's legacy argv can still be encoded in the active code page */
++        page = CP_ACP;
++        flags = 0;
++        count = MultiByteToWideChar(page, flags, path, -1, NULL, 0);
++    }
++    if (!count) return NULL;
++    WCHAR *input = (WCHAR *)malloc((size_t)count * sizeof *input);
++    if (!input) { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return NULL; }
++    if (!MultiByteToWideChar(page, flags, path, -1, input, count)) { free_path(input); return NULL; }
++    for (WCHAR *p = input; *p; ++p) if (*p == L'/') *p = L'\\';
++    if (!wcsncmp(input, L"\\\\?\\", 4)) return input;
++    const DWORD required = GetFullPathNameW(input, 0, NULL, NULL);
++    if (!required || required > 32760) {
++        if (required) SetLastError(ERROR_FILENAME_EXCED_RANGE);
++        free_path(input);
++        return NULL;
++    }
++    WCHAR *full = (WCHAR *)malloc((size_t)required * sizeof *full);
++    WCHAR *result = (WCHAR *)malloc(((size_t)required + 8) * sizeof *result);
++    if (!full || !result) {
++        free(full); free(result); free(input);
++        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
++        return NULL;
++    }
++    const DWORD got = GetFullPathNameW(input, required, full, NULL);
++    free_path(input);
++    if (!got || got >= required) {
++        free_path(full); free_path(result);
++        if (got >= required) SetLastError(ERROR_FILENAME_EXCED_RANGE);
++        return NULL;
++    }
++    if (!wcsncmp(full, L"\\\\", 2)) {
++        wcscpy(result, L"\\\\?\\UNC\\");
++        wcscpy(result + 8, full + 2);
++    } else {
++        wcscpy(result, L"\\\\?\\");
++        wcscpy(result + 4, full);
++    }
++    free_path(full);
++    return result;
++}
++
++HANDLE hos_path_open(const char *path, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES security,
++                     DWORD creation, DWORD flags, HANDLE template_file) {
++    WCHAR *wide = wide_path(path);
++    if (!wide) return INVALID_HANDLE_VALUE;
++    HANDLE handle = CreateFileW(wide, access, share, security, creation, flags, template_file);
++    free_path(wide);
++    return handle;
++}
++DWORD hos_path_attributes(const char *path) {
++    WCHAR *wide = wide_path(path);
++    if (!wide) return INVALID_FILE_ATTRIBUTES;
++    DWORD attributes = GetFileAttributesW(wide);
++    free_path(wide);
++    return attributes;
++}
++BOOL hos_path_mkdir(const char *path, LPSECURITY_ATTRIBUTES security) {
++    WCHAR *wide = wide_path(path);
++    if (!wide) return FALSE;
++    BOOL ok = CreateDirectoryW(wide, security);
++    free_path(wide);
++    return ok;
++}
++BOOL hos_path_delete_file(const char *path) {
++    WCHAR *wide = wide_path(path);
++    if (!wide) return FALSE;
++    BOOL ok = DeleteFileW(wide);
++    free_path(wide);
++    return ok;
++}
++BOOL hos_path_remove_dir(const char *path) {
++    WCHAR *wide = wide_path(path);
++    if (!wide) return FALSE;
++    BOOL ok = RemoveDirectoryW(wide);
++    free_path(wide);
++    return ok;
++}
++BOOL hos_path_move_file(const char *from, const char *to, DWORD flags) {
++    WCHAR *wide_from = wide_path(from);
++    if (!wide_from) return FALSE;
++    WCHAR *wide_to = wide_path(to);
++    if (!wide_to) { free_path(wide_from); return FALSE; }
++    BOOL ok = MoveFileExW(wide_from, wide_to, flags);
++    free_path(wide_from); free_path(wide_to);
++    return ok;
++}
++static BOOL find_data(const WIN32_FIND_DATAW *wide, WIN32_FIND_DATAA *out) {
++    memset(out, 0, sizeof *out);
++    out->dwFileAttributes = wide->dwFileAttributes;
++    out->ftCreationTime = wide->ftCreationTime;
++    out->ftLastAccessTime = wide->ftLastAccessTime;
++    out->ftLastWriteTime = wide->ftLastWriteTime;
++    out->nFileSizeHigh = wide->nFileSizeHigh;
++    out->nFileSizeLow = wide->nFileSizeLow;
++    out->dwReserved0 = wide->dwReserved0;
++    out->dwReserved1 = wide->dwReserved1;
++    return WideCharToMultiByte(CP_UTF8, 0, wide->cFileName, -1, out->cFileName, sizeof out->cFileName, NULL, NULL) != 0;
++}
++HANDLE hos_path_find_first(const char *path, WIN32_FIND_DATAA *out) {
++    WCHAR *wide = wide_path(path);
++    if (!wide) return INVALID_HANDLE_VALUE;
++    WIN32_FIND_DATAW data;
++    HANDLE handle = FindFirstFileW(wide, &data);
++    free_path(wide);
++    if (handle != INVALID_HANDLE_VALUE && !find_data(&data, out)) {
++        const DWORD error = GetLastError();
++        FindClose(handle);
++        SetLastError(error);
++        return INVALID_HANDLE_VALUE;
++    }
++    return handle;
++}
++BOOL hos_path_find_next(HANDLE handle, WIN32_FIND_DATAA *out) {
++    WIN32_FIND_DATAW data;
++    return FindNextFileW(handle, &data) && find_data(&data, out);
++}
+--- a/host/win_path.h
++++ b/host/win_path.h
+@@ -0,0 +1,13 @@
++#pragma once
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#include "path_join.h"
++
++HANDLE hos_path_open(const char *, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
++DWORD hos_path_attributes(const char *);
++BOOL hos_path_mkdir(const char *, LPSECURITY_ATTRIBUTES);
++BOOL hos_path_delete_file(const char *);
++BOOL hos_path_remove_dir(const char *);
++BOOL hos_path_move_file(const char *, const char *, DWORD);
++HANDLE hos_path_find_first(const char *, WIN32_FIND_DATAA *);
++BOOL hos_path_find_next(HANDLE, WIN32_FIND_DATAA *);
+--- a/ocarina/__init__.py
++++ b/ocarina/__init__.py
+@@ -1,3 +1,3 @@
+ """Build and diagnostic tools for the Hookshot-based Ocarina fork."""
+ 
+-__version__ = "0.3.3-dev.1"
++__version__ = "0.3.4-dev.1"
+--- a/ocarina/cli.py
++++ b/ocarina/cli.py
+@@ -57,6 +57,9 @@
+     player.add_argument("--dry-run", action="store_true")
+     player.add_argument("--short-romfs", action="store_true", help="Testa o runtime com um alias curto de RomFS.")
+     player.add_argument("--trace-files", action="store_true", help="Registra arquivos abertos, sem ativar validacao Vulkan.")
++    player.add_argument("--trace-runtime", action="store_true", help="Registra audio e pausas de frames, sem validacao Vulkan.")
++    player.add_argument("--audio-backend", choices=("auto", "wasapi", "waveout"), default="auto",
++                        help="Saida de audio: WASAPI com fallback automatico, ou um backend explicito.")
+     player.add_argument("--collect-crash", action="store_true", help="Empacota esta execucao e o mapa correspondente ao fechar.")
+     player.add_argument("--work", type=absolute, default=ROOT / "work")
+     collector = commands.add_parser("collect-crash", help="Empacota a ultima execucao existente, sem abrir ou compilar o jogo.")
+@@ -111,6 +114,7 @@
+             return 0
+         return launch(args.out, args.profile, args.diagnostic, args.dry_run,
+                       short_paths=args.short_romfs, trace_files=args.trace_files,
++                      trace_runtime=args.trace_runtime, audio_backend=args.audio_backend,
+                       collect_crash=args.collect_crash, work=args.work)
+     except ProjectError as error:
+         print("@@error " + str(error), flush=True)
+--- a/ocarina/crash_report.py
++++ b/ocarina/crash_report.py
+@@ -71,7 +71,7 @@
+         if not sep or mount not in {"content", "rom", "romfs"} or ".." in rel.parts or rel.is_absolute():
+             continue
+         full = ntpath.join(root, *rel.parts)
+-        if guest in seen or (len(full) < 260 and "not found" not in result):
++        if guest in seen or (len(full) < 260 and "not found" not in result and "failed" not in result):
+             continue
+         seen.add(guest)
+         exists = "nao verificado neste sistema"
+@@ -134,7 +134,8 @@
+     archive = logs.with_suffix(".zip")
+     try:
+         with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as bundle:
+-            for name in ("execucao.json", "saida.log", "erros.log", "diagnostico-crash.txt"):
++            for name in ("execucao.json", "saida.log", "erros.log", "diagnostico-crash.txt",
++                         "opcoes-inicio.ini", "opcoes-fim.ini"):
+                 if (logs / name).is_file():
+                     bundle.write(logs / name, name)
+             if matching:
+--- a/ocarina/environment.py
++++ b/ocarina/environment.py
+@@ -13,6 +13,12 @@
+         "RX_VK_TEX_MAX_DIM": "1024",  # Mip selection for eligible large textures.
+         "RX_VK_TEX_MAX_MB": "256",  # Size threshold for one texture, not a cache.
+         "RX_VK_IMPORT_CHUNK_MB": "8",  # Power of two: the engine uses bit-mask alignment.
++    },
++    "nitido": {
++        # The backend's existing spatial replacement; no temporal-history clamp.
++        # Compare motion against Original: less history, but more jagged edges.
++        "RX_VK_TAAU_KEYS": "fd029a317a9a4b94",
++        "HOS_DYNRES": "0",  # The menu's 100% resolution option.
+     },
+ }
+ 
+--- a/ocarina/launch.py
++++ b/ocarina/launch.py
+@@ -13,6 +13,22 @@
+ from .environment import PROFILES, runtime_environment
+ from .errors import ProjectError
+ from .files import read_json, sha256, write_json
++
++
++def snapshot_options(folder: Path, logs: Path, phase: str) -> dict:
++    """Keep the small menu config with this run; never edit the user's options."""
++    try:
++        with (folder / "hookshot_options.ini").open("rb") as source:
++            data = source.read((64 << 10) + 1)
++        if len(data) > 64 << 10:
++            return {"status": "too_large"}
++        name = f"opcoes-{phase}.ini"
++        (logs / name).write_bytes(data)
++        return {"status": "saved", "file": name}
++    except FileNotFoundError:
++        return {"status": "absent"}
++    except OSError as error:
++        return {"status": "unavailable", "error": str(error)}
+ 
+ 
+ def verify_build(folder: Path) -> dict:
+@@ -52,13 +68,22 @@
+     *,
+     short_paths: bool = False,
+     trace_files: bool = False,
++    trace_runtime: bool = False,
++    audio_backend: str = "auto",
+     collect_crash: bool = False,
+     work: Path | None = None,
+ ) -> int:
+     manifest = verify_build(folder)
++    if audio_backend not in {"auto", "wasapi", "waveout"}:
++        raise ProjectError(f"Saida de audio desconhecida: {audio_backend}")
+     environment = runtime_environment(os.environ, profile, diagnostic)
++    if audio_backend != "auto":
++        environment["HOS_AUDIO_BACKEND"] = audio_backend
+     if trace_files:
+         environment["HOS_FS_TRACE"] = "1"
++    if trace_runtime:
++        environment["HOS_AUDIO_STATS"] = "1"
++        environment["RX_VK_SLOW_LOG"] = "25"
+     command = [
+         str(folder / "hookshot.exe"),
+         str(folder / "image.bin"),
+@@ -69,6 +94,10 @@
+     ]
+     print("Perfil:", profile, "(validacao ativa)" if diagnostic else "")
+     print("Executavel SHA-256:", manifest["files"]["hookshot.exe"])
++    built_version = manifest.get("version")
++    if built_version and built_version != __version__:
++        print(f"Motor compilado: {built_version}; lancador: {__version__}. "
++              "Para aplicar as correcoes nativas desta atualizacao, repita Criar com a mesma entrada/destino.", flush=True)
+     for key, value in PROFILES[profile].items():
+         print(f"  {key}={value}")
+     if dry_run:
+@@ -84,8 +113,10 @@
+         "profile": profile,
+         "diagnostic": diagnostic,
+         "trace_files": trace_files,
++        "trace_runtime": trace_runtime,
++        "audio_backend": audio_backend,
+         "short_romfs": short_paths,
+-        "runtime_helper": "crash-paths-1",
++        "runtime_helper": "paths-audio-2",
+         "started": dt.datetime.now().astimezone().isoformat(),
+         "command": command,
+         "build": manifest,
+@@ -95,6 +126,7 @@
+             if key.startswith(("RX_", "HOS_", "VK_", "EDEN_"))
+         },
+     }
++    metadata["graphics_options_before"] = snapshot_options(folder, logs, "inicio")
+     write_json(logs / "execucao.json", metadata)
+     print("Registros desta execucao:", logs)
+     with (
+@@ -122,6 +154,7 @@
+             write_json(logs / "execucao.json", metadata)
+             raise ProjectError(f"Nao foi possivel abrir o jogo: {error}") from error
+     metadata.update({"exit_code": status, "finished": dt.datetime.now().astimezone().isoformat()})
++    metadata["graphics_options_after"] = snapshot_options(folder, logs, "fim")
+     write_json(logs / "execucao.json", metadata)
+     print("Codigo de encerramento:", status, f"({status & 0xffffffff:#010x})")
+     if collect_crash:
+--- a/tests/native/test_host_paths.c
++++ b/tests/native/test_host_paths.c
+@@ -0,0 +1,73 @@
++/* Regression: a 160-byte extraction root plus a real relative lighting name
++   exceeded the old 260-byte buffer. Windows additionally exercises the wide
++   filesystem adapters with real create/read/find/rename/delete operations. */
++#include "path_join.h"
++#include <stdlib.h>
++#include <string.h>
++#ifdef _WIN32
++#include "win_path.h"
++#endif
++
++#define CHECK(x) do { if (!(x)) { fprintf(stderr, "path check failed, line %d: %s\n", __LINE__, #x); return 1; } } while (0)
++
++int main(void) {
++    char root[161] = "C:\\";
++    memset(root + 3, 'r', 157);
++    root[160] = 0;
++    const char *relative = "System/GameGraphics/LocationalLightMgrInitializeParam/Main.game__gfx__LocationalLightMgrInitializeParam.bgyml";
++    char legacy[260], full[HOS_FS_PATH_CAP];
++    CHECK(snprintf(legacy, sizeof legacy, "%s/%s", root, relative) >= (int)sizeof legacy);
++    CHECK(hos_path_join(full, sizeof full, root, relative));
++    CHECK(strlen(full) == strlen(root) + 1 + strlen(relative));
++    CHECK(!strcmp(full + strlen(root) + 1, relative));
++    char small[8] = "marker";
++    CHECK(!hos_path_join(small, sizeof small, root, relative) && small[0] == 0);
++    CHECK(hos_path_join(small, sizeof small, "abc", "def") && !strcmp(small, "abc/def"));
++    CHECK(!hos_path_join(small, sizeof small, "abcd", "def") && small[0] == 0);
++    CHECK(!hos_path_join(NULL, 1, "a", "b"));
++    CHECK(!hos_path_join(small, 0, "a", "b"));
++#ifdef _WIN32
++    WCHAR wide_temp[HOS_FS_PATH_CAP];
++    char temporary[HOS_FS_PATH_CAP], base[HOS_FS_PATH_CAP], dirs[3][HOS_FS_PATH_CAP];
++    CHECK(GetTempPathW(HOS_FS_PATH_CAP, wide_temp) > 0);
++    CHECK(WideCharToMultiByte(CP_UTF8, 0, wide_temp, -1, temporary, sizeof temporary, NULL, NULL));
++    char unique[96];
++    snprintf(unique, sizeof unique, "ocarina-path-test-%lu-%llu", GetCurrentProcessId(), GetTickCount64());
++    CHECK(hos_path_join(base, sizeof base, temporary, unique));
++    CHECK(hos_path_mkdir(base, NULL));
++    char component[100];
++    memset(component, 'p', 90);
++    component[90] = 0;
++    for (int i = 0; i < 3; ++i) {
++        component[0] = (char)('a' + i);
++        CHECK(hos_path_join(dirs[i], sizeof dirs[i], i ? dirs[i-1] : base, component));
++        CHECK(hos_path_mkdir(dirs[i], NULL));
++    }
++    CHECK(hos_path_join(full, sizeof full, dirs[2], "ilumina\xc3\xa7\xc3\xa3o.bin"));
++    CHECK(strlen(full) > 260);
++    HANDLE file = hos_path_open(full, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
++    CHECK(file != INVALID_HANDLE_VALUE);
++    DWORD written = 0;
++    CHECK(WriteFile(file, "light", 5, &written, NULL) && written == 5);
++    CHECK(CloseHandle(file));
++    CHECK(hos_path_attributes(full) != INVALID_FILE_ATTRIBUTES);
++    file = hos_path_open(full, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
++    char data[8] = {0}; DWORD read = 0;
++    CHECK(file != INVALID_HANDLE_VALUE && ReadFile(file, data, 5, &read, NULL));
++    CHECK(read == 5 && !strcmp(data, "light") && CloseHandle(file));
++    char pattern[HOS_FS_PATH_CAP], renamed[HOS_FS_PATH_CAP];
++    CHECK(hos_path_join(pattern, sizeof pattern, dirs[2], "*.bin"));
++    WIN32_FIND_DATAA found;
++    HANDLE search = hos_path_find_first(pattern, &found);
++    CHECK(search != INVALID_HANDLE_VALUE && !strcmp(found.cFileName, "ilumina\xc3\xa7\xc3\xa3o.bin"));
++    CHECK(FindClose(search));
++    CHECK(hos_path_join(renamed, sizeof renamed, dirs[2], "renamed.bin"));
++    CHECK(hos_path_move_file(full, renamed, 0));
++    CHECK(hos_path_attributes(full) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_FILE_NOT_FOUND);
++    CHECK(hos_path_delete_file(renamed));
++    for (int i = 2; i >= 0; --i) CHECK(hos_path_remove_dir(dirs[i]));
++    CHECK(hos_path_remove_dir(base));
++#endif
++    puts("host path checks passed");
++    return 0;
++}
+--- a/tests/test_crash_recovery.py
++++ b/tests/test_crash_recovery.py
+@@ -93,6 +93,22 @@
+ 
+ 
+ class CrashReportTests(unittest.TestCase):
++    def test_graphics_options_are_snapshotted_without_editing_or_unbounded_reads(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            logs = root / "logs"
++            logs.mkdir()
++            options = root / "hookshot_options.ini"
++            self.assertEqual(launcher.snapshot_options(root, logs, "inicio"), {"status": "absent"})
++            data = b"frame_generation=0\nresolution=1\nunknown_future_option=7\n"
++            options.write_bytes(data)
++            self.assertEqual(launcher.snapshot_options(root, logs, "inicio")["status"], "saved")
++            self.assertEqual((logs / "opcoes-inicio.ini").read_bytes(), data)
++            self.assertEqual(options.read_bytes(), data)
++            options.write_bytes(b"x" * ((64 << 10) + 1))
++            self.assertEqual(launcher.snapshot_options(root, logs, "fim"), {"status": "too_large"})
++            self.assertFalse((logs / "opcoes-fim.ini").exists())
++
+     def test_pe_base_and_both_map_formats_resolve_the_same_symbols(self):
+         with tempfile.TemporaryDirectory() as temporary:
+             root = Path(temporary)
+@@ -159,17 +175,22 @@
+             exe.write_text("#!" + sys.executable + "\nimport json,os,sys\nfrom pathlib import Path\n"
+                            "assert Path(os.environ['RECOVERY_MARKER']).is_file()\n"
+                            "print(json.dumps({'args':sys.argv[1:],'trace':os.environ.get('HOS_FS_TRACE'),"
+-                           "'validation':os.environ.get('RX_VK_VALIDATION')}))\n")
++                           "'validation':os.environ.get('RX_VK_VALIDATION'),"
++                           "'audio':os.environ.get('HOS_AUDIO_STATS'),'slow':os.environ.get('RX_VK_SLOW_LOG'),"
++                           "'backend':os.environ.get('HOS_AUDIO_BACKEND')}))\n"
++                           "Path('hookshot_options.ini').write_text('resolution=1\\n')\n")
+             exe.chmod(0o755)
+             for name in ("hookshot_vk.dll", "image.bin"):
+                 (root / name).write_bytes(b"synthetic")
++            (root / "hookshot_options.ini").write_text("resolution=0\n")
+             write_json(root / "ocarina-build.json", {"schema": 1, "project": "ocarina-hookshot", "romfs": str(romfs),
+                        "files": {name: sha256(root / name) for name in ("hookshot.exe", "hookshot_vk.dll", "image.bin")}})
+             api = FakeDrives(marker)
+             fake_os = SimpleNamespace(name="nt", environ={**os.environ, "RECOVERY_MARKER": str(marker)}, getpid=os.getpid)
+             with patch.object(launcher, "os", fake_os), patch.object(launcher, "short_romfs",
+                     side_effect=lambda path: short_romfs(r"C:\synthetic\romfs", api=api)), contextlib.redirect_stdout(io.StringIO()):
+-                self.assertEqual(launcher.launch(root, short_paths=True, trace_files=True, collect_crash=True), 0)
++                self.assertEqual(launcher.launch(root, short_paths=True, trace_files=True,
++                                                trace_runtime=True, audio_backend="wasapi", collect_crash=True), 0)
+             self.assertFalse(marker.exists())
+             self.assertEqual(api.removed, api.created)
+             logs = next(path for path in (root / "diagnosticos").iterdir() if path.is_dir())
+@@ -177,8 +198,14 @@
+             self.assertEqual(child["args"][2], "Y:\\")
+             self.assertEqual(child["trace"], "1")
+             self.assertIsNone(child["validation"])
++            self.assertEqual(child["audio"], "1")
++            self.assertEqual(child["slow"], "25")
++            self.assertEqual(child["backend"], "wasapi")
+             self.assertEqual(json.loads((logs / "execucao.json").read_text())["exit_code"], 0)
+             self.assertTrue(logs.with_suffix(".zip").is_file())
++            with zipfile.ZipFile(logs.with_suffix(".zip")) as bundle:
++                self.assertEqual(bundle.read("opcoes-inicio.ini"), b"resolution=0\n")
++                self.assertEqual(bundle.read("opcoes-fim.ini"), b"resolution=1\n")
+             with patch.object(launcher, "os", fake_os), patch.object(launcher, "short_romfs",
+                     side_effect=lambda path: short_romfs(r"C:\synthetic\romfs", api=api)), \
+                     patch.object(launcher.subprocess, "Popen", side_effect=PermissionError("denied")), \
+--- a/tests/test_host_paths.py
++++ b/tests/test_host_paths.py
+@@ -0,0 +1,52 @@
++"""Run the real C path builder; on Windows also exercise extended Win32 I/O."""
++
++import os
++import importlib.util
++from pathlib import Path
++import shutil
++import subprocess
++import tempfile
++import sys
++import unittest
++
++ROOT = Path(__file__).resolve().parent.parent
++
++
++class HostPathTests(unittest.TestCase):
++    def test_lighting_path_is_whole_and_overflow_is_rejected(self):
++        compiler = os.environ.get("OCARINA_TEST_CC") or shutil.which("cc") or shutil.which("clang")
++        if not compiler and os.name == "nt":
++            local = ROOT / "ferramentas/llvm/bin/clang.exe"
++            compiler = str(local) if local.is_file() else None
++        if not compiler:
++            self.skipTest("A C compiler is needed for native path checks")
++        with tempfile.TemporaryDirectory(prefix="host path test ") as directory:
++            exe = Path(directory) / ("paths.exe" if os.name == "nt" else "paths")
++            command = [compiler, "-std=c11", "-I" + str(ROOT / "host"),
++                       str(ROOT / "tests/native/test_host_paths.c")]
++            if os.name == "nt":
++                command.append(str(ROOT / "host/win_path.c"))
++            result = subprocess.run(command + ["-o", str(exe)], capture_output=True, text=True, timeout=60)
++            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
++            result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=20)
++            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
++            self.assertIn("host path checks passed", result.stdout)
++
++    def test_audio_volume_import_uses_host_implementation_instead_of_duplicate_stub(self):
++        sys.path.insert(0, str(ROOT / "nx2"))
++        spec = importlib.util.spec_from_file_location("audio_standalone_test", ROOT / "nx2/standalone.py")
++        standalone = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(standalone)
++        symbol = "_ZN2nn5audio26GetAudioDeviceOutputVolumeEPKNS0_15AudioDeviceNameE"
++        self.assertIn("imp_" + symbol, standalone.implemented())
++        hooks = [{"sym": symbol, "c": "imp_" + symbol},
++                 {"sym": "_ZN2nn5audio7UnknownEv", "c": "imp_unknown_for_test"}]
++        with tempfile.TemporaryDirectory() as directory:
++            self.assertEqual(standalone.gen_stubs(directory, {"hooks": hooks}), 1)
++            stubs = (Path(directory) / "a64_stubs.c").read_text()
++            self.assertNotIn(symbol, stubs)
++            self.assertIn("imp_unknown_for_test", stubs)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/tests/test_workflow.py
++++ b/tests/test_workflow.py
+@@ -89,6 +89,16 @@
+         self.assertNotIn("RX_VK_ASTC_RGBA8", result)
+         self.assertNotIn("RX_VK_ASTC_CPU", result)
+         self.assertNotIn("RX_VK_PIPE_WAIT", result)
++
++    def test_motion_comparison_keeps_pipeline_wait_and_temporal_clamp_off(self):
++        inherited = {"RX_VK_TAAU_CLAMP": "1", "RX_VK_PIPE_SKIP": "1", "RX_VK_OOT_EXPOSURE": "3"}
++        result = runtime_environment(inherited, "nitido")
++        self.assertEqual(result["RX_VK_TAAU_KEYS"], "fd029a317a9a4b94")
++        self.assertEqual(result["HOS_DYNRES"], "0")
++        self.assertNotIn("RX_VK_TAAU_CLAMP", result)
++        self.assertNotIn("RX_VK_PIPE_SKIP", result)
++        self.assertNotIn("RX_VK_OOT_EXPOSURE", result)
++        self.assertEqual(runtime_environment({}, "original"), {"RX_BACKEND": "vulkan"})
+ 
+     def test_diagnostic_validation_is_separate(self):
+         self.assertNotIn("RX_VK_VALIDATION", runtime_environment({}, "original"))

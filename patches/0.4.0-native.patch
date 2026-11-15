@@ -1,0 +1,1043 @@
+--- a/gpu/vk/captured_read_cache.h
++++ b/gpu/vk/captured_read_cache.h
+@@ -0,0 +1,41 @@
++#pragma once
++#include <array>
++#include <cstdint>
++#include <cstring>
++namespace mkwvk {
++struct CapturedReadKey {
++  uint64_t address, size, submission, retired;
++  uint32_t generation;
++  bool operator==(const CapturedReadKey &) const = default;
++};
++class CapturedReadCache {
++  struct Entry {
++    CapturedReadKey key{};
++    std::array<uint8_t, 16> bytes{};
++    bool valid = false;
++  };
++  std::array<Entry, 256> entries{};
++  static size_t index(const CapturedReadKey &k) {
++    return (size_t)(((k.address >> 2) ^ (k.address >> 11) ^ k.size) & 255);
++  }
++
++public:
++  bool read(const CapturedReadKey &k, void *out) const {
++    if (!k.size || k.size > 16)
++      return false;
++    const auto &e = entries[index(k)];
++    if (!e.valid || !(e.key == k))
++      return false;
++    std::memcpy(out, e.bytes.data(), (size_t)k.size);
++    return true;
++  }
++  void remember(const CapturedReadKey &k, const void *in) {
++    if (!k.size || k.size > 16)
++      return;
++    auto &e = entries[index(k)];
++    e.key = k;
++    std::memcpy(e.bytes.data(), in, (size_t)k.size);
++    e.valid = true;
++  }
++};
++} // namespace mkwvk
+--- a/gpu/vk/cpu_breadcrumbs.h
++++ b/gpu/vk/cpu_breadcrumbs.h
+@@ -0,0 +1,33 @@
++// Diagnostic record of CPU recording order. It does not identify GPU completion
++// or the faulting shader.
++#pragma once
++#include <array>
++#include <cstdint>
++#include <mutex>
++#include <vector>
++namespace mkwvk {
++struct CpuBreadcrumb {
++  uint64_t sequence = 0, key = 0, frame = 0;
++  char kind = 0;
++};
++class CpuBreadcrumbs {
++  std::mutex mutex;
++  std::array<CpuBreadcrumb, 64> ring{};
++  uint64_t next = 0;
++
++public:
++  void record(uint64_t key, uint64_t frame, char kind) {
++    std::lock_guard lock(mutex);
++    const uint64_t seq = ++next;
++    ring[(seq - 1) % ring.size()] = {seq, key, frame, kind};
++  }
++  std::vector<CpuBreadcrumb> snapshot() {
++    std::lock_guard lock(mutex);
++    std::vector<CpuBreadcrumb> out;
++    const uint64_t start = next > ring.size() ? next - ring.size() : 0;
++    for (uint64_t i = start; i < next; i++)
++      out.push_back(ring[i % ring.size()]);
++    return out;
++  }
++};
++} // namespace mkwvk
+--- a/gpu/vk/vk_draw.cpp
++++ b/gpu/vk/vk_draw.cpp
+@@ -1,3 +1,4 @@
++#include "cpu_breadcrumbs.h"
+ // Draws and dispatches: a program's pipeline layout (its stages' descriptors in Eden's order, as the SPIR-V back end
+ // numbered them, one push-descriptor set when they fit), graphics pipelines (whatever Vulkan 1.3 and
+ // VK_EXT_extended_dynamic_state3 take as dynamic state is dynamic; the rest is the key), each draw's descriptors
+@@ -5,7 +6,7 @@
+ // and storage images as views of vk_texture.cpp's images, texel buffers), passes kept open while the targets stay,
+ // and the draws themselves.
+ //
+-// Pipelines persist in a VkPipelineCache next to the executable (mkw_vk_pipelines.bin).
++// Pipelines persist in a VkPipelineCache next to the executable (AkynoLeyend_pipelines.bin).
+ #include <algorithm>
+ #include <filesystem>
+ #include <atomic>
+@@ -521,7 +522,7 @@
+     const DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+     std::string dir(exe, n);
+     dir = dir.substr(0, dir.find_last_of("\\/") + 1);
+-    pcache_path = dir + "mkw_vk_pipelines.bin";
++    pcache_path = dir + "AkynoLeyend_pipelines.bin";
+     std::string source_path=pcache_path;
+     if (cache::policy().streaming) {
+         pcache_path=dir+"mkw_vk_pipelines_stream.bin";
+@@ -661,8 +662,8 @@
+ thread_local const Program* cur_program = nullptr;   // (the draw's, for its dynamic write masks)
+ 
+ // ---- (hookshot) The precompile, as TotK Recomp's (runtime/vk_pipeline.c vk_pipeline_prewarm, keys in pipeline-keys.bin): each
+-// pipeline the game asks for is noted in hookshot_pipelines.bin, by what built it; a release build, before the game starts,
+-// makes every kept program ready and builds every noted pipeline on all the CPUs (the driver's own cache, mkw_vk_pipelines.bin,
++// pipeline the game asks for is noted in AkynoLeyend_pipeline_keys.bin, by what built it; a release build, before the game starts,
++// makes every kept program ready and builds every noted pipeline on all the CPUs (the driver's own cache, AkynoLeyend_pipelines.bin,
+ // makes that quick), so that nothing is built during play. RX_VK_PRECOMPILE=1: in any build; =0: off. A build with
+ // RX_RELEASE=1 (nx2/build.py) has it on. The notes are written in every build ----
+ struct PipeNote {
+@@ -678,7 +679,7 @@
+     char exe[MAX_PATH];
+     const DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+     std::string dir(exe, n);
+-    return dir.substr(0, dir.find_last_of("\\/") + 1) + "hookshot_pipelines.bin";
++    return dir.substr(0, dir.find_last_of("\\/") + 1) + "AkynoLeyend_pipeline_keys.bin";
+ }
+ void pipeline_note(uint64_t key, const Program& p, const NvnState& s, const Targets& at, VkPrimitiveTopology topo) {
+     static const bool off = getenv("RX_VK_NO_PROGRAM_CACHE") != nullptr;
+@@ -1229,16 +1230,19 @@
+     const uint32_t version = texture_slot_version((int)(handle & 0xFFFFF));
+     const uint64_t dgen = texture_destroy_generation();
+     const uint64_t key = (uint64_t)(handle & 0xFFFFF) | (uint64_t)want << 20 | (uint64_t)use << 28 | (uint64_t)storage_as << 32;
++    static const bool log_hits = getenv("RX_VK_LOG_HITS") != nullptr;
+     static int64_t st_hit, st_new, st_ver, st_gen, st_n;
+-    if (++st_n % 200000 == 0 && getenv("RX_VK_LOG_HITS"))
+-        logf("vk: handle hits %lld, new %lld, slot re-registered %lld, a texture destroyed %lld", (long long)st_hit,
+-             (long long)st_new, (long long)st_ver, (long long)st_gen);
+-    if (auto it = handle_hits.find(key); it == handle_hits.end()) st_new++;
+-    else if (it->second.version != version) st_ver++;
+-    else if (it->second.destroy_gen != dgen) st_gen++;
+-    else st_hit++;
+-    if (auto it = handle_hits.find(key);
+-        it != handle_hits.end() && it->second.version == version && it->second.destroy_gen == dgen) {
++    const auto it = handle_hits.find(key);
++    if (log_hits) {   // (the counters were a second search of this map on every binding, with the log off)
++        if (++st_n % 200000 == 0)
++            logf("vk: handle hits %lld, new %lld, slot re-registered %lld, a texture destroyed %lld", (long long)st_hit,
++                 (long long)st_new, (long long)st_ver, (long long)st_gen);
++        if (it == handle_hits.end()) st_new++;
++        else if (it->second.version != version) st_ver++;
++        else if (it->second.destroy_gen != dgen) st_gen++;
++        else st_hit++;
++    }
++    if (it != handle_hits.end() && it->second.version == version && it->second.destroy_gen == dgen) {
+         if (it->second.tex && it->second.tex_epoch != texture_epoch()) {   // (once a submission: its age and contents)
+             if (!texture_touch_quick(it->second.tex, it->second.sampling)) {
+                 ParLock lk;
+@@ -1973,7 +1977,10 @@
+              (unsigned long long)v.vendorFaultData);
+ }
+ 
++CpuBreadcrumbs cpu_breadcrumbs;
+ void checkpoint_mark(VkCommandBuffer cmd, uint64_t key, char kind) {
++    static const bool cpu_trace=getenv("RX_VK_FAULT_BREADCRUMBS")!=nullptr;
++    if(cpu_trace)cpu_breadcrumbs.record(key,texture_frame_no(),kind);
+     if (!dev.checkpoints || !vkCmdSetCheckpointNV || !checkpoint_markers()) return;
+     const uint32_t seq = ++checkpoint_n, i = (seq - 1) & 0xFFFF;
+     checkpoints[i] = {key, texture_frame_no(), seq, kind};
+@@ -1985,6 +1992,11 @@
+     static bool done;
+     if (done) return;
+     done = true;
++    const auto cpu=cpu_breadcrumbs.snapshot();
++    if(!cpu.empty()) {
++        logf("vk: CPU submission breadcrumbs only; these are NOT GPU completion checkpoints or proof of the faulting shader:");
++        for(const auto& b:cpu)logf("vk: CPU_BREADCRUMB sequence=%llu kind=%c key=%016llx frame=%llu",(unsigned long long)b.sequence,b.kind,(unsigned long long)b.key,(unsigned long long)b.frame);
++    }
+     {   // (RX_VK_FLASH_RECORD=<program,...>: those programs' last draws, sizes and all)
+         const uint64_t f = texture_frame_no();
+         draw_records_log(f > 6 ? f - 6 : 0, f);
+@@ -2047,6 +2059,7 @@
+     uint64_t first_prog = 0;
+     VkFormat format0 = VK_FORMAT_UNDEFINED;
+     std::vector<const Texture*> sampled;   // (rendered textures its draws sampled: a target among them is a hazard)
++    uint16_t sampled_targets = 0;          // (colour i bit i, depth bit 8: targets earlier draws sampled)
+     uint16_t written = 0;                  // (its targets written so far: colour i bit i, depth bit 8)
+ };
+ thread_local Pass pass;
+@@ -2180,7 +2193,7 @@
+     pass.draws = 0, pass.format0 = at.n ? at.color_format[0] : at.depth_format;
+     pass.wm_or = 0, pass.wm_n = 0;
+     pass.clears = 0, pass.first_prog = 0;
+-    pass.sampled.clear(), pass.written = 0;
++    pass.sampled.clear(), pass.sampled_targets = 0, pass.written = 0;
+     vkCmdBeginRendering(cmd, &ri);
+     pass.open = true;
+     st_passes++;
+@@ -2212,7 +2225,66 @@
+ thread_local bool last_dyn_valid = false;
+ #define DYN_CHANGED(f) (!last_dyn_valid || std::memcmp(&d.f, &last_dyn.f, sizeof d.f))
+ 
++/// The inputs a draw's dynamic state is built from. Most draws repeat the draw before them.
++bool dyn_same(const float* fp, int nf, const uint32_t* up, int nu, const uint8_t* raw, int nb, const float* cfp,
++              const uint32_t* cup, const uint8_t* craw) {
++    if (nf <= 0 || nu <= 0 || nb <= 0) return false;
++    for (int i = 0; i < nf; i++)
++        if (fp[i] != cfp[i]) return false;
++    for (int i = 0; i < nu; i++)
++        if (up[i] != cup[i]) return false;
++    for (int i = 0; i < nb; i++)
++        if (raw[i] != craw[i]) return false;
++    return true;
++}
++constexpr int kDynF = 13, kDynU = 35;
++struct DynFast {
++    bool on = false;
++    float fp[kDynF]{};
++    uint32_t up[kDynU]{};
++    uint8_t raw[160]{};
++    int nb = 0;
++    uint32_t wm0 = 0, wm_n = 0;
++};
++thread_local DynFast dyn_fast;
++int dyn_pack(const NvnState& s, const Targets& at, VkPrimitiveTopology topo, bool mesh, float* fp, uint32_t* up,
++             uint8_t* raw) {
++    fp[0] = s.viewport[0][0], fp[1] = s.viewport[0][1], fp[2] = s.viewport[0][2], fp[3] = s.viewport[0][3];
++    fp[4] = s.depth_near, fp[5] = s.depth_far;
++    std::memcpy(fp + 6, s.blend_color, sizeof s.blend_color);
++    fp[10] = s.poly_offset[0], fp[11] = s.poly_offset[1], fp[12] = s.poly_offset[2];
++    up[0] = (uint32_t)s.scissor[0], up[1] = (uint32_t)s.scissor[1], up[2] = (uint32_t)s.scissor[2], up[3] = (uint32_t)s.scissor[3];
++    up[4] = s.stencil_ref[0], up[5] = s.stencil_ref[1];
++    up[6] = s.stencil_value_mask[0], up[7] = s.stencil_value_mask[1];
++    up[8] = s.stencil_mask[0], up[9] = s.stencil_mask[1];
++    up[10] = at.width, up[11] = at.height, up[12] = (uint32_t)at.n, up[13] = (uint32_t)at.depth_format;
++    up[14] = at.depth != nullptr;
++    up[15] = (uint32_t)s.color.blend_en, up[16] = s.chmask.mask;
++    up[17] = (uint32_t)topo, up[18] = mesh ? 1u : 0u;
++    up[19] = s.restart ? 1u : 0u, up[20] = s.raster_discard ? 1u : 0u, up[21] = s.depth_clamp ? 1u : 0u, up[22] = s.ms.a2c ? 1u : 0u;
++    up[23] = (uint32_t)s.poly.cull, up[24] = (uint32_t)s.poly.front, up[25] = (uint32_t)s.poly.mode, up[26] = (uint32_t)s.poly.offset_en;
++    for (int i = 0; i < 8; i++) up[27 + i] = (uint32_t)at.color_format[i];
++    static_assert(sizeof(s.ds) + sizeof(s.blend) + 8 <= 160);
++    int atb = 0;
++    std::memcpy(raw + atb, &s.ds, sizeof s.ds);
++    atb += (int)sizeof s.ds;
++    std::memcpy(raw + atb, s.blend, sizeof s.blend);
++    atb += (int)sizeof s.blend;
++    const uint64_t prog = (uint64_t)(uintptr_t)cur_program;
++    std::memcpy(raw + atb, &prog, 8);
++    return atb + 8;
++}
++
+ void dynamic_state(VkCommandBuffer cmd, const NvnState& s, const Targets& at, VkPrimitiveTopology topo, bool mesh) {
++    float df[kDynF];
++    uint32_t du[kDynU];
++    uint8_t db[160];
++    const int nb = dyn_pack(s, at, topo, mesh, df, du, db);
++    if (!dump_on() && last_dyn_valid && dyn_fast.on && dyn_fast.nb == nb &&
++        dyn_same(df, kDynF, du, kDynU, db, nb, dyn_fast.fp, dyn_fast.up, dyn_fast.raw)) {
++        pass.wm_or |= dyn_fast.wm0, pass.wm_n = dyn_fast.wm_n;   // (the pass trace still sees the masks)
++        return;
++    }
+     DynState d;
+     std::memset(&d, 0, sizeof d);   // (padding compared too)
+     // (RX_VK_FOOTPRINT=<key>,...: those programs' draws write depth wherever they rasterize, both faces, whatever is
+@@ -2354,7 +2426,12 @@
+     }
+     last_dyn = d;
+     last_dyn_valid = true;
+-    pass.wm_or |= d.n ? (uint32_t)d.wm[0] : 0, pass.wm_n = (uint32_t)d.n;
++    dyn_fast.on = true, dyn_fast.nb = nb;
++    std::memcpy(dyn_fast.fp, df, sizeof df);
++    std::memcpy(dyn_fast.up, du, sizeof du);
++    std::memcpy(dyn_fast.raw, db, (size_t)nb);
++    dyn_fast.wm0 = d.n ? (uint32_t)d.wm[0] : 0, dyn_fast.wm_n = (uint32_t)d.n;
++    pass.wm_or |= dyn_fast.wm0, pass.wm_n = dyn_fast.wm_n;
+ }
+ #undef DYN_CHANGED
+ 
+@@ -2486,6 +2563,9 @@
+ }
+ 
+ int64_t st_pass_hazards;
++bool writes_sampled_target(uint16_t writes, uint16_t sampled_targets) {
++    return (writes & sampled_targets) != 0;
++}
+ /// A draw that samples a target this pass already wrote, or writes a target an earlier draw of this pass sampled: in
+ /// a pass of its own, after a full barrier (begin_pass makes it), as for the clears above: in one pass the GPU orders
+ /// the targets' writes with each other only, not with the draws' texture reads of them. (A draw that samples a target
+@@ -2510,11 +2590,8 @@
+         const int k = slot_of(t);
+         if (k >= 0 && (pass.written >> k & 1) && !(writes >> k & 1)) { kind = "samples a target the pass wrote"; break; }
+     }
+-    if (!kind)
+-        for (const Texture* t : pass.sampled) {
+-            const int k = slot_of(t);
+-            if (k >= 0 && (writes >> k & 1)) { kind = "writes a target an earlier draw sampled"; break; }
+-        }
++    if (!kind && writes_sampled_target(writes, pass.sampled_targets))
++        kind = "writes a target an earlier draw sampled";
+     if (!kind) return writes;
+     static int logged;
+     if (logged++ < 8)
+@@ -3743,6 +3820,18 @@
+     return at + 1;
+ }
+ 
++/// A vertex stream bound earlier this submission, still the same buffer (a mirror made since, or a new submission, is not)
++bool vertex_bind_reuse(uint64_t addr, uint64_t size, uint64_t stamp, uint64_t cached_addr, uint64_t cached_size,
++                       uint64_t cached_stamp, int cached) {
++    return cached && addr && size && addr == cached_addr && size == cached_size && stamp == cached_stamp;
++}
++struct KeptVertex {
++    uint64_t addr = 0, size = 0, stamp = 0;
++    BufferRef ref{};
++    int ok = 0;
++};
++thread_local KeptVertex kept_vb[16];
++
+ void draw(VkCommandBuffer cmd, NvnState& s, const DrawArgs& d) {
+     PROF(PROF_DRAW);
+     stats_tick();
+@@ -3961,8 +4050,15 @@
+     probe_draw(s, p, pass.draws);   // (hookshot: RX_VK_PROBE)
+     pass.prog = p.key;
+     if (!pass.first_prog) pass.first_prog = p.key;
+-    for (const Texture* t : gfx_sampled)
+-        if (std::find(pass.sampled.begin(), pass.sampled.end(), t) == pass.sampled.end()) pass.sampled.push_back(t);
++    for (const Texture* t : gfx_sampled) {
++        if (std::find(pass.sampled.begin(), pass.sampled.end(), t) != pass.sampled.end()) continue;
++        pass.sampled.push_back(t);
++        int slot = -1;
++        for (int i = 0; i < at.n; i++)
++            if (at.color[i] == t) { slot = i; break; }
++        if (slot < 0 && at.depth == t) slot = 8;
++        if (slot >= 0) pass.sampled_targets |= (uint16_t)(1u << slot);
++    }
+     pass.written |= writes;
+     if (pl != last_pipeline) vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pl), last_pipeline = pl;
+     if (!same_desc) {
+@@ -4137,12 +4233,22 @@
+         return;
+     }
+     // vertex streams (from their pools, strides dynamic) and the zero stream
++    // (the same streams are bound for draw after draw: the pool lookup, which was ~8% of a race under the lock, is
++    // skipped until the submission or the mirror changes)
+     VkBuffer vbufs[16];
+     VkDeviceSize voffs[16], vsizes[16], vstrides[16];
+     for (uint32_t b = 0; b < 16; b++) {
+         vbufs[b] = zero_buffer, voffs[b] = 0, vsizes[b] = 65536, vstrides[b] = 0;
+         if (b == 15 || !s.vbuf[b].address) continue;
+-        BufferRef r = gpu_buffer_bind(s.vbuf[b].address, std::max<uint64_t>(s.vbuf[b].size, 1), false);
++        const uint64_t vb_addr = s.vbuf[b].address, vb_size = std::max<uint64_t>(s.vbuf[b].size, 1);
++        const uint64_t vb_stamp = gpu_bind_stamp();
++        BufferRef r;
++        if (vertex_bind_reuse(vb_addr, vb_size, vb_stamp, kept_vb[b].addr, kept_vb[b].size, kept_vb[b].stamp, kept_vb[b].ok))
++            r = kept_vb[b].ref;
++        else {
++            r = gpu_buffer_bind(vb_addr, vb_size, false);
++            kept_vb[b] = {vb_addr, vb_size, gpu_bind_stamp(), r, r ? 1 : 0};
++        }
+         if (!r) continue;
+         vbufs[b] = r.buffer, voffs[b] = r.offset, vsizes[b] = s.vbuf[b].size ? s.vbuf[b].size : VK_WHOLE_SIZE;
+         vstrides[b] = s.vstream[b].stride;
+@@ -4543,7 +4649,7 @@
+     char exe[MAX_PATH];
+     const DWORD exe_n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+     std::string path(exe, exe_n);
+-    path = path.substr(0, path.find_last_of("\\/") + 1) + "hookshot_prepared.bin";
++    path = path.substr(0, path.find_last_of("\\/") + 1) + "AkynoLeyend_prepared.bin";
+     const uint64_t stamp = program_cache_stamp();
+     if (FILE* f = fopen(path.c_str(), "rb")) {
+         uint64_t have = 0;
+--- a/gpu/vk/vk_hangdump.cpp
++++ b/gpu/vk/vk_hangdump.cpp
+@@ -1,7 +1,7 @@
+ // (EvilOOT) RX_VK_HANG_DUMP=<file>: a watchdog for freezes. When no frame has been presented for RX_VK_HANG_SEC seconds
+ // (default 20) after the first, every thread of the process is suspended in turn and its stack unwound with Windows'
+ // own unwinder (the modules' .pdata); the return addresses go to <file> as module+offset, with the thread's name, once
+-// all threads run again. hookshot.map / hookshot_vk.map turn the offsets into functions.
++// all threads run again. AkynoLeyend.map / hookshot_vk.map turn the offsets into functions.
+ // (11-07: a freeze right after Load, every thread waiting, none spinning: which wait is it.)
+ // Nothing is allocated, locked or logged while a thread is suspended: it may hold the heap's or the log's lock.
+ #ifdef _WIN32   // (hookshot: thread stacks through the Win32 debug API; the Linux build has none, see the end)
+--- a/gpu/vk/vk_internal.h
++++ b/gpu/vk/vk_internal.h
+@@ -78,6 +78,8 @@
+ /// A range as a binding of the replay sees it: the pool's VRAM mirror when it has one (vk_memory.cpp), else the
+ /// imported pool. written: the GPU may write it (copied back to guest memory at the submission's end).
+ BufferRef gpu_buffer_bind(uint64_t gpu, uint64_t size, bool written);
++/// Changes when a read binding remembered earlier must be looked up again (a pool left, a mirror was made, a new submission)
++uint64_t gpu_bind_stamp();
+ /// Around each submission's recording: mirrors wanted since the last one are made (begin), what the GPU wrote into
+ /// mirrors goes back to guest memory (end, outside any pass, before the closing barrier)
+ void memory_begin_submission();
+@@ -154,6 +156,7 @@
+ /// [guest, guest + n) as of the submit being replayed: live itself, or scratch holding it with the kept pages over it
+ const uint8_t* memory_as_submitted(uint64_t guest, const uint8_t* live, uint64_t n, std::vector<uint8_t>& scratch);
+ void memory_drop_shadow(uint64_t guest, uint64_t size);   // (a write the capture did not take: the copies go)
++uint64_t memory_writeback_value(uint64_t guest,uint64_t size,bool* ever);
+ uint32_t memory_generation();
+ /// 1: a page of [guest, guest + size) was written after generation gen; 0: none was
+ bool memory_written_since(uint64_t guest, uint64_t size, uint32_t gen);
+--- a/gpu/vk/vk_main.cpp
++++ b/gpu/vk/vk_main.cpp
+@@ -391,7 +391,7 @@
+                 tried = true;
+                 owns_console = AllocConsole() != 0;
+                 if (owns_console) {
+-                    SetConsoleTitleA("Hookshot");
++                    SetConsoleTitleA("AkynoLeyend");
+                 }
+                 console = CreateFileA("CONOUT$", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                       nullptr, OPEN_EXISTING, 0, nullptr);
+@@ -422,6 +422,9 @@
+     return true;
+ }
+ int start(void* hwnd) {
++#ifdef _WIN32
++    if (hwnd) SetWindowTextA((HWND)hwnd, "AkynoLeyend");
++#endif
+     main_window = (HWND)hwnd;
+     if (!hwnd) {   // (HOS_HEADLESS: no window; the frames are rendered all the same, RX_VK_SHOTS writes them out)
+         dev.offscreen = true;
+--- a/gpu/vk/vk_memory.cpp
++++ b/gpu/vk/vk_memory.cpp
+@@ -1,3 +1,4 @@
++#include "captured_read_cache.h"
+ // Guest memory for the GPU: each NVN memory pool imported as host memory (VK_EXT_external_memory_host) with one
+ // buffer over it. The GPU reads the game's memory where it is and its writes land there: no mirrored copies, no
+ // write-backs, no upload streams. A GPU address (a guest address for the native pools) maps to (buffer, offset).
+@@ -554,7 +555,9 @@
+     if (cap_free.size() < 12 && size <= (64ull << 20)) cap_free.push_back({buffer, alloc, map, size});
+     else destroy_buffer(buffer, alloc);
+ }
++uint64_t captured_retired=0;
+ void cap_buf_retire(std::map<uint32_t, CapBuf>::iterator it) {
++    ++captured_retired;
+     cap_bytes -= it->second.size;
+     cap_buf_free(it->second.buffer, it->second.alloc, it->second.map, it->second.size);
+     cap_bufs.erase(it);
+@@ -749,28 +752,41 @@
+ }
+ 
+ bool memory_read_as_submitted(uint64_t gpu, void* dst, uint64_t n) {
+-    if (!host->gpu_read(gpu, dst, n)) return false;
++    // The host still validates every read. Live/partial reads never enter the captured-value cache.
++    if (!host->gpu_read(gpu,dst,n)) return false;
+     if (!n || !capture_on() || !captures_seen.load(std::memory_order_relaxed)) return true;
+-    const uint64_t guest = gpu < (1ull << 40) ? gpu : host->gpu_guest(gpu);
+-    if (!guest) return true;
+-    static std::atomic<int64_t> reads{0}, pages_from{0};
+-    int64_t from = 0;
++    const uint64_t guest=gpu<(1ull<<40)?gpu:host->gpu_guest(gpu);
++    if (!guest || n>UINT64_MAX-guest || guest+n>UINT64_MAX-4095) return true;
++    static const bool cache_on=!(getenv("AKYNO_READ_CACHE")&&!atoi(getenv("AKYNO_READ_CACHE")));
++    static thread_local CapturedReadCache cache;
++    int64_t from=0;
+     {
+-        std::lock_guard lk(pools_mu);
+-        for (uint64_t page = guest >> kPageShift; page < (guest + n + 4095) >> kPageShift; page++) {
+-            const CapEntry e = cap_entry(page);
+-            if (!e.gen || e.gen != page_gen(page)) continue;
+-            auto b = cap_bufs.find(e.gen);
+-            if (b == cap_bufs.end() || !b->second.map) continue;
+-            const uint64_t a = std::max(page << kPageShift, guest), z = std::min((page + 1) << kPageShift, guest + n);
+-            std::memcpy((uint8_t*)dst + (a - guest), (const uint8_t*)b->second.map + (uint64_t)e.slot * 4096 + (a - (page << kPageShift)), z - a);
+-            from++;
+-        }
+-    }
+-    pages_from += from;
+-    if (++reads % 20000 == 0)
+-        logf("vk: replay reads of guest memory as submitted: %lld (%lld pages from the captures)", (long long)reads.load(),
+-             (long long)pages_from.load());
++        std::lock_guard lock(pools_mu);
++        const CapturedReadKey key{guest,n,cur_cap_value,captured_retired,gen_now};
++        if (cache_on&&cache.read(key,dst)) from=(int64_t)(((guest+n-1)>>kPageShift)-(guest>>kPageShift)+1);
++        else {
++            uint64_t covered=0;
++            for(uint64_t page=guest>>kPageShift;page<(guest+n+4095)>>kPageShift;page++) {
++                const CapEntry e=cap_entry(page);
++                if(!e.gen||e.gen!=page_gen(page))continue;
++                auto b=cap_bufs.find(e.gen);if(b==cap_bufs.end()||!b->second.map)continue;
++                const uint64_t a=std::max(page<<kPageShift,guest),z=std::min((page+1)<<kPageShift,guest+n);
++                std::memcpy((uint8_t*)dst+(a-guest),(const uint8_t*)b->second.map+(uint64_t)e.slot*4096+(a-(page<<kPageShift)),z-a);
++                covered+=z-a;from++;
++            }
++            if(cache_on&&covered==n)cache.remember(key,dst);
++        }
++    }
++    // Batch approximate diagnostics instead of two contended atomics on every descriptor word.
++    static std::atomic<int64_t> reads{0},pages_from{0};
++    static thread_local int64_t local_reads=0,local_pages=0;
++    local_reads++,local_pages+=from;
++    if(local_reads==4096){
++        const int64_t pages=pages_from.fetch_add(local_pages,std::memory_order_relaxed)+local_pages;
++        const int64_t before=reads.fetch_add(local_reads,std::memory_order_relaxed);
++        if(before/20000!=(before+local_reads)/20000)logf("vk: replay reads as submitted: %lld (%lld captured pages; batched)",(long long)(before+local_reads),(long long)pages);
++        local_reads=local_pages=0;
++    }
+     return true;
+ }
+ 
+@@ -836,6 +852,42 @@
+     std::lock_guard lk(shadow_mu);
+     shadow_drop_range(guest, guest + size);
+ }
++
++// ---- (EvilBoyce) GPU results by page: the submission that last wrote a page into guest memory ----
++// For invalidate (vk_replay.cpp): a CPU read of GPU results waits until the submission that writes them there is done, as
++// the console's coherent memory has them once that work is. Guest page number -> the recording's timeline value (write-backs
++// from a mirror, and small bindings written in place). RX_VK_NO_READBACK_WAIT=1: none
++namespace {
++std::mutex wb_pages_mu;
++std::unordered_map<uint32_t, uint64_t> wb_pages;
++uint64_t wb_pruned_at = 0;
++void wb_pages_note(uint64_t guest_lo, uint64_t guest_hi, uint64_t value) {
++    static const bool off = getenv("RX_VK_NO_READBACK_WAIT") != nullptr;
++    if (off || !value || guest_hi <= guest_lo) return;
++    std::lock_guard lk(wb_pages_mu);
++    for (uint64_t p = guest_lo >> kPageShift; p <= (guest_hi - 1) >> kPageShift; p++) wb_pages[(uint32_t)p] = value;
++    if (wb_pages.size() > 200000 && mem_completed > wb_pruned_at) {   // (the ones done long ago: kept as "ever" with value 1)
++        for (auto& kv : wb_pages)
++            if (kv.second <= mem_completed) kv.second = 1;
++        wb_pruned_at = mem_completed;
++    }
++}
++} // namespace
++uint64_t memory_writeback_value(uint64_t guest, uint64_t size, bool* ever) {
++    uint64_t v = 0;
++    if (ever) *ever = false;
++    if (!size || size > UINT64_MAX - guest) return 0;
++    std::lock_guard lk(wb_pages_mu);
++    if (wb_pages.empty()) return 0;
++    for (uint64_t p = guest >> kPageShift; p <= (guest + size - 1) >> kPageShift; p++) {
++        auto it = wb_pages.find((uint32_t)p);
++        if (it == wb_pages.end()) continue;
++        if (ever) *ever = true;
++        v = std::max(v, it->second);
++    }
++    return v;
++}
++
+ 
+ /// A copy that fails instead of faulting on a page unmapped meanwhile (structured exception handling: the common case
+ /// costs a memcpy; ReadProcessMemory per page was ~2.3 us each). Not inlined, and the copy a call: without
+@@ -1577,6 +1629,10 @@
+     return p ? p->lo : 0;
+ }
+ 
++uint64_t gpu_bind_stamp() {
++    return pools_gen.load(std::memory_order_relaxed) ^ (mirror_epoch * 0x9E3779B97F4A7C15ull);
++}
++
+ BufferRef gpu_buffer_bind(uint64_t gpu, uint64_t size, bool written) {
+     if (written) texture_gpu_wrote(gpu, size);
+     // (below 1 TB a GPU address is the guest address itself, and a pool holds the whole range or nothing: the host's
+@@ -1635,6 +1691,7 @@
+         auto& e = direct_by_pool[p->lo];
+         e.first++, e.second = (int)p->mstate;
+         if (written) p->direct_write_epoch = mirror_epoch;
++        if (written && size <= (1u << 20)) wb_pages_note(p->lo+off,p->lo+std::min(off+size,p->hi-p->lo),mem_rec_value);
+         return {p->buffer, off, size, 0};
+     }
+     if (p->synced_epoch != mirror_epoch || p->sync_seg > texture_segment()) mirror_sync(*p);
+@@ -1833,6 +1890,7 @@
+             }
+         }
+         p->mstate = Pool::MIRROR_ON;
++        pools_gen.fetch_add(1, std::memory_order_relaxed);   // (the binding's buffer changes: guest memory, then this mirror)
+         p->synced_gen = gen_now;
+         p->synced_epoch = mirror_epoch;
+         p->sync_seg = texture_segment();
+@@ -1918,6 +1976,7 @@
+             checkpoint_mark(cmd, p->lo, 'b');
+             vkCmdCopyBuffer(cmd, p->mirror, p->buffer, (uint32_t)runs.size(), runs.data());
+             for (const VkBufferCopy& r : runs) st_wb_bytes += (int64_t)r.size;
++            for (const VkBufferCopy& r : runs) wb_pages_note(p->lo+r.dstOffset,p->lo+r.dstOffset+r.size,mem_rec_value);
+             {   // (hookshot) RX_VK_LOG_WRITEBACK=1: the pools written back the most, every 600 write-back submissions
+                 static const bool log_wb = getenv("RX_VK_LOG_WRITEBACK") != nullptr;
+                 if (log_wb) {
+--- a/gpu/vk/vk_menu.cpp
++++ b/gpu/vk/vk_menu.cpp
+@@ -82,7 +82,7 @@
+     char exe[MAX_PATH];
+     const DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+     std::string dir(exe, n);
+-    return dir.substr(0, dir.find_last_of("\\/") + 1) + "hookshot_options.ini";
++    return dir.substr(0, dir.find_last_of("\\/") + 1) + "AkynoLeyend_opts.ini";
+ }
+ const char* ini_key(const Row& r) {
+     static char k[32];
+@@ -196,18 +196,18 @@
+     DeleteObject(b);
+ }
+ void paint_menu(HDC dc, uint32_t w, uint32_t h, int s) {
+-    fill(dc, 0, 0, (int)w, (int)h, RGB(16, 20, 18));
+-    fill(dc, 0, 0, (int)w, 2 * s, RGB(96, 176, 112));
++    fill(dc, 0, 0, (int)w, (int)h, RGB(12, 12, 11));
++    fill(dc, 0, 0, (int)w, 2 * s, RGB(214, 173, 81));
+     SetBkMode(dc, TRANSPARENT);
+     HFONT title = font(20 * s, FW_SEMIBOLD), body = font(16 * s, FW_NORMAL);
+     HGDIOBJ old = SelectObject(dc, title);
+-    SetTextColor(dc, RGB(236, 240, 236));
+-    TextOutA(dc, 16 * s, 12 * s, "Hookshot", 8);
++    SetTextColor(dc, RGB(232, 197, 115));
++    TextOutA(dc, 16 * s, 12 * s, "AkynoLeyend", 11);
+     SelectObject(dc, body);
+     const int rh = 28 * s, top = 44 * s;
+     for (int i = 0; i < kRows; i++) {
+         const int y = top + i * rh;
+-        if (i == selected) fill(dc, 8 * s, y, (int)w - 16 * s, rh, RGB(44, 72, 54));
++        if (i == selected) fill(dc, 8 * s, y, (int)w - 16 * s, rh, RGB(66, 52, 27));
+         SetTextColor(dc, i == selected ? RGB(255, 255, 255) : RGB(196, 204, 198));
+         TextOutA(dc, 16 * s, y + 4 * s, rows[i].name, (int)strlen(rows[i].name));
+         char v[40];
+@@ -217,7 +217,7 @@
+         TextOutA(dc, (int)w - 16 * s - sz.cx, y + 4 * s, v, (int)strlen(v));
+     }
+     const int help_top = top + kRows * rh + 8 * s;
+-    fill(dc, 16 * s, help_top - 4 * s, (int)w - 32 * s, std::max(1, s), RGB(52, 64, 56));
++    fill(dc, 16 * s, help_top - 4 * s, (int)w - 32 * s, std::max(1, s), RGB(73, 59, 32));
+     HFONT help = font(14 * s, FW_NORMAL);
+     SelectObject(dc, help);
+     SetTextColor(dc, RGB(176, 186, 180));
+@@ -352,6 +352,9 @@
+     if (const char* e = getenv("RX_VK_UPSCALE")) opts.upscale = atoi(e);
+     if (const char* e = getenv("HOS_REALTIME_STEP")) opts.realtime = atoi(e) != 0;
+     if (const char* e = getenv("HOS_DYNRES")) opts.resolution = atoi(e) != 0 ? 0 : 1;
++    if (const char* e = getenv("AKYNO_RESOLUTION")) opts.resolution = std::clamp(atoi(e), 0, 4);
++    if (const char* e = getenv("AKYNO_FRAMEGEN")) { opts.framegen = std::clamp(atoi(e), 0, 8); if (opts.framegen == 1) opts.framegen = 0; }
++    if (const char* e = getenv("AKYNO_SHARPNESS")) opts.sharpness = std::clamp(atoi(e), 0, 100);
+ }
+ 
+ bool menu_is_open() { return open_now.load(std::memory_order_relaxed); }
+--- a/gpu/vk/vk_menu.h
++++ b/gpu/vk/vk_menu.h
+@@ -1,4 +1,4 @@
+-// The Insert menu (vk_menu.cpp): options that apply while the game runs, kept in hookshot_options.ini beside the executable.
++// The Insert menu (vk_menu.cpp): options that apply while the game runs, kept in AkynoLeyend_opts.ini beside the executable.
+ #pragma once
+ 
+ #include "vk_internal.h"
+--- a/gpu/vk/vk_replay.cpp
++++ b/gpu/vk/vk_replay.cpp
+@@ -1716,6 +1716,16 @@
+         }
+         logf("vk: invalidate %#llx +%#llx:%s", (unsigned long long)gpu, (unsigned long long)size,
+              hits.empty() ? " no texture the GPU wrote" : hits.c_str());
++    }
++    // EvilBoyce / PR296: CPU must read/reset the exposure meter after its GPU writeback.
++    if (size && size <= UINT64_MAX-gpu) {
++        static const bool off=getenv("RX_VK_NO_READBACK_WAIT")!=nullptr;
++        const uint64_t guest=host->gpu_guest(gpu);bool ever=false;
++        if (!off && guest && (memory_writeback_value(guest,size,&ever),ever)) {
++            if (replay_behind()) wait_queue_empty();
++            const uint64_t value=memory_writeback_value(guest,size,nullptr);
++            if (value>completed()) wait_value(value);
++        }
+     }
+     // (textures the GPU wrote there: their texels into memory before the CPU reads it, as vmap_changing does. The game
+     // waited for the work that wrote them; the replay is caught up first)
+--- a/gpu/vk/vk_shader.cpp
++++ b/gpu/vk/vk_shader.cpp
+@@ -782,10 +782,10 @@
+              (unsigned long long)key, n);
+ }
+ 
+-// ---- (hookshot) The program cache, hookshot_programs.bin beside the executable: what translation made, by the key of the
++// ---- (hookshot) The program cache, AkynoLeyend_programs.bin beside the executable: what translation made, by the key of the
+ // stages' code and inputs. A program met for the first time stopped the frame for its translation, 9 s of it each run,
+ // the long stutters when walking somewhere (replay workers in jobs_wait for up to 150 ms). The pipelines themselves were
+-// already kept (mkw_vk_pipelines.bin). Written as made; good for this translator (HOOKSHOT_SHADER_STAMP) and these switches only
++// already kept (AkynoLeyend_pipelines.bin). Written as made; good for this translator (HOOKSHOT_SHADER_STAMP) and these switches only
+ // (a file made by another starts again). RX_VK_NO_PROGRAM_CACHE=1: off ----
+ struct DiskRecord { int64_t at; size_t size; uint32_t kind; };
+ std::mutex disk_mu;
+@@ -837,7 +837,7 @@
+         char exe[MAX_PATH];
+         const DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+         std::string path(exe, n);
+-        path = path.substr(0, path.find_last_of("\\/") + 1) + "hookshot_programs.bin";
++        path = path.substr(0, path.find_last_of("\\/") + 1) + "AkynoLeyend_programs.bin";
+         const uint64_t stamp = disk_stamp();
+         int64_t good = 0, whole = 0;
+         size_t indexed=0, unindexed=0;
+@@ -1619,8 +1619,8 @@
+ }
+ 
+ // ---- (hookshot) Every shader of the game before it starts, as TotK Recomp's tools/prepare_shaders.py and totk.exe --prepare-shaders: the
+-// builder writes hookshot_shaders.bin (nx2/shader_census.py) from the archives, each program's stages, and here each is translated
+-// for the default state (nothing bound, float inputs and outputs) and kept in hookshot_programs.bin. What a draw then asks for is on
++// builder writes AkynoLeyend_shaders.bin (nx2/shader_census.py) from the archives, each program's stages, and here each is translated
++// for the default state (nothing bound, float inputs and outputs) and kept in AkynoLeyend_programs.bin. What a draw then asks for is on
+ // disk, whatever part of the game it is first met in ----
+ namespace {
+ struct SeedStage {
+@@ -1649,7 +1649,7 @@
+ }
+ } // namespace
+ 
+-std::string seed_path() { return beside_exe("hookshot_shaders.bin"); }
++std::string seed_path() { return beside_exe("AkynoLeyend_shaders.bin"); }
+ 
+ size_t seed_open() {
+     if (!seed.bank.open(seed_path().c_str())) {
+--- a/gpu/vk/vk_shader.h
++++ b/gpu/vk/vk_shader.h
+@@ -72,7 +72,7 @@
+ void program_wait(const Program* p);
+ uint64_t program_cache_stamp();   // (what the kept programs and pipelines are good for)
+ size_t program_cache_load_some(const std::unordered_set<uint64_t>& wanted, const std::function<void(Program&)>& fn);
+-/// The precompile of every shader of the game (hookshot_shaders.bin, from nx2/shader_census.py): how many programs it names, 0: none
++/// The precompile of every shader of the game (AkynoLeyend_shaders.bin, from nx2/shader_census.py): how many programs it names, 0: none
+ size_t seed_open();
+ void seed_close();
+ /// Program i of the seed, translated and kept for the default state (null: kept already, or it does not translate); its modules are yours
+--- a/host/display.c
++++ b/host/display.c
+@@ -172,7 +172,7 @@
+     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+     wc.hIcon = LoadIconA(wc.hInstance, MAKEINTRESOURCEA(1));   /* (nx2/make_icon.py; none in a build without the picture) */
+     wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+-    wc.lpszClassName = "Hookshot";
++    wc.lpszClassName = "AkynoLeyend";
+     RegisterClassA(&wc);
+     dpi_aware_thread();
+     extern float hos_aspect_ratio;
+@@ -184,7 +184,7 @@
+     RECT r = {0, 0, win_w, win_h};
+     AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, FALSE);
+     const int noactivate = getenv("HOS_WINDOW_NOACTIVATE") != NULL;
+-    hwnd = CreateWindowA("Hookshot", HOS_GAME_TITLE, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
++    hwnd = CreateWindowA("AkynoLeyend", HOS_GAME_TITLE, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+                          CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, wc.hInstance, NULL);
+     if (window_dpi(hwnd) != 96) {
+         const UINT dpi = window_dpi(hwnd);
+--- a/host/hos.h
++++ b/host/hos.h
+@@ -50,7 +50,7 @@
+ /* (oot-recomp) MKW's own hooks at fixed guest addresses (its frame pacer in nvn_native.c / nn_vi.c, its idle loop in
+    hos_thread.c) run only when the lifted main is Mario Kart World's: any other game has other code there */
+ int hos_game_is_mkw(void);
+-#define HOS_GAME_TITLE "Hookshot"
++#define HOS_GAME_TITLE "AkynoLeyend"
+ void hos_commit(uint64_t addr, uint64_t size);         /* (mkw_glue.c) guest pages made usable by host APIs */
+ #if defined(A64_WRITE_TRACK) && !defined(__EMSCRIPTEN__)
+ void hos_mark_written(const void *p, size_t n);   /* (hos_mem.c: guest memory written by host code, native soft watch) */
+--- a/host/hos_main.c
++++ b/host/hos_main.c
+@@ -274,13 +274,13 @@
+         if (set && !getenv("HOS_DPI_UNAWARE")) set((void *)(intptr_t)-4);
+     }
+ #endif
+-    {   // (started from its icon the game has nowhere to log to: hookshot_log.txt beside it, last run only, for players to send in)
++    {   // (started from its icon the game has nowhere to log to: AkynoLeyend.log beside it, last run only, for players to send in)
+         HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
+         if (!err || err == INVALID_HANDLE_VALUE || GetFileType(err) == FILE_TYPE_UNKNOWN) {
+             char path[MAX_PATH + 32];
+             DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
+             while (n && path[n - 1] != 92 && path[n - 1] != 47) n--;
+-            memcpy(path + n, "hookshot_log.txt", 17);
++            memcpy(path + n, "AkynoLeyend.log", sizeof "AkynoLeyend.log");
+             if (freopen(path, "w", stderr)) setvbuf(stderr, NULL, _IONBF, 0);
+         }
+     }
+@@ -368,7 +368,7 @@
+             const DWORD len = GetModuleFileNameA(NULL, path, MAX_PATH);
+             char *slash = len ? strrchr(path, SEP) : NULL;
+             if (slash) {
+-                snprintf(slash + 1, (size_t)(path + MAX_PATH - slash - 1), "hookshot_options.ini");
++                snprintf(slash + 1, (size_t)(path + MAX_PATH - slash - 1), "AkynoLeyend_opts.ini");
+                 FILE *o = fopen(path, "r");
+                 if (o) {
+                     char line[80];
+--- a/host/mf_av1.c
++++ b/host/mf_av1.c
+@@ -74,9 +74,9 @@
+    intro never ends. Said once, on its own thread (the game goes on), with the way to the Store page. HOS_AV1_MISSING=1: as if it were missing */
+ static DWORD WINAPI av1_missing_notice(LPVOID unused) {
+     (void)unused;
+-    if (MessageBoxA(NULL, "Hookshot's movies need Microsoft's free AV1 Video Extension, which this PC does not have. Without it they show a green "
++    if (MessageBoxA(NULL, "AkynoLeyend movies need Microsoft's free AV1 Video Extension, which this PC does not have. Without it they show a green "
+                           "screen and the game can stop at a black screen.\n\nOpen its Microsoft Store page now? Install it, then restart the game.",
+-                    "Hookshot", MB_YESNO | MB_ICONINFORMATION | MB_TOPMOST) == IDYES)
++                    "AkynoLeyend", MB_YESNO | MB_ICONINFORMATION | MB_TOPMOST) == IDYES)
+         ShellExecuteA(NULL, "open", "ms-windows-store://pdp/?ProductId=9MVZQVXJBQ9V", NULL, NULL, SW_SHOWNORMAL);
+     return 0;
+ }
+--- a/host/nn_applet.c
++++ b/host/nn_applet.c
+@@ -93,7 +93,7 @@
+             const DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
+             char *slash = n ? (strrchr(path, 92) ? strrchr(path, 92) : strrchr(path, 47)) : NULL;   /* (linux: '/') */
+             if (slash) {
+-                snprintf(slash + 1, (size_t)(path + MAX_PATH - slash - 1), "hookshot_options.ini");
++                snprintf(slash + 1, (size_t)(path + MAX_PATH - slash - 1), "AkynoLeyend_opts.ini");
+                 FILE *f = fopen(path, "r");
+                 if (f) {
+                     char line[80];
+--- a/host/posix/win32_posix.c
++++ b/host/posix/win32_posix.c
+@@ -229,7 +229,7 @@
+     t->fn = fn, t->arg = arg, t->refs = 2;   /* (the handle's and the thread's own) */
+     pthread_attr_t a;
+     pthread_attr_init(&a);
+-    /* (Windows' default is the executable's: 8 MB here, as hookshot.exe's /stack; guest threads ask 64 MB) */
++    /* (Windows' default is the executable's: 8 MB here, as AkynoLeyend.exe's /stack; guest threads ask 64 MB) */
+     pthread_attr_setstacksize(&a, stack ? (stack + 0xFFFF) & ~(SIZE_T)0xFFFF : (8u << 20));
+     pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
+     if (flags & CREATE_SUSPENDED) fprintf(stderr, "[win32] CreateThread: CREATE_SUSPENDED is not supported: started at once\n");
+@@ -1218,11 +1218,11 @@
+ }
+ int MessageBoxA(HWND w, LPCSTR text, LPCSTR caption, UINT type) {
+     (void)w, (void)type;
+-    fprintf(stderr, "%s: %s\n", caption ? caption : "Hookshot", text ? text : "");
++    fprintf(stderr, "%s: %s\n", caption ? caption : "AkynoLeyend", text ? text : "");
+     typedef int (*ShowFn)(uint32_t, const char *, const char *, void *);
+     void *sdl = dlopen("libSDL2-2.0.so.0", RTLD_NOW | RTLD_NOLOAD);
+     ShowFn show = sdl ? (ShowFn)dlsym(sdl, "SDL_ShowSimpleMessageBox") : NULL;
+-    if (show) show(0x10, caption ? caption : "Hookshot", text ? text : "", NULL);
++    if (show) show(0x10, caption ? caption : "AkynoLeyend", text ? text : "", NULL);
+     return 1;
+ }
+ 
+--- a/host/rx_backend.c
++++ b/host/rx_backend.c
+@@ -209,7 +209,7 @@
+     const char *b = getenv("RX_BACKEND");
+     const int eden = b && !_stricmp(b, "eden");
+     if (!b || !_stricmp(b, "vulkan") || eden) {   /* (hookshot: Vulkan unless told otherwise; a started game has no RX_BACKEND) */
+-        const char *dll = eden ? "mkw_eden.dll" : "hookshot_vk.dll";
++        const char *dll = eden ? "mkw_eden.dll" : "AkynoLeyend.dll";
+         const MkwVkRenderer *r = load_vulkan(dll);
+         if (r && r->start(hwnd)) {
+             vk = r;
+--- a/host/rx_webgpu_unavailable.c
++++ b/host/rx_webgpu_unavailable.c
+@@ -1,4 +1,4 @@
+-/* Ocarina Hookshot: explicit failure for a Vulkan-only distribution.
++/* AkynoLeyend: explicit failure for a Vulkan-only distribution.
+  * SPDX-License-Identifier: MIT
+  */
+ #include "hos.h"
+--- a/nx2/build.py
++++ b/nx2/build.py
+@@ -1,4 +1,4 @@
+-"""Compile the lifted game (work/gen, from `lift.py --write`) into work/build/hookshot_game.dll (or a static library).
++"""Compile the lifted game (work/gen, from `lift.py --write`) into work/build/AkynoLeyend_game.dll (or a static library).
+ 
+ The flags are a64-kit's for lifted code (its build.py, cmd_native): -O1, LoopRotate's header copies capped (most of
+ the compile time in goto-dense giant functions otherwise), capture tracking past LLVM's 100 uses (the context
+@@ -6,20 +6,20 @@
+ vendored rt/, with the loop-header interrupt polls on (A64_POLLING, nx2/poll.py). Incremental: an object is rebuilt
+ only when its source or the flags changed.
+ 
+-hookshot_game.dll = the lifted chunks + a64-kit's tables and runtime + nx2/rt/eden_shim.c (the emulator ABI, mkw_host.h)
++AkynoLeyend_game.dll = the lifted chunks + a64-kit's tables and runtime + nx2/rt/eden_shim.c (the emulator ABI, mkw_host.h)
+ + mkw_info.c (the image base and main's build id, generated here from work/image/image.json). Linking it is also the
+ check that the whole lifted game closes over itself: any unresolved symbol fails the link.
+ 
+ Heavy: 44 chunks of ~25 MB, ~100-200 s and ~2-3.5 GB each at -O1. The PC is shared with games: run it when the
+ machine is idle, and keep --jobs low otherwise.
+ 
+---standalone builds work/sa/build/hookshot.exe instead: the standalone lift (work/sa/gen, `lift.py --standalone --write`)
++--standalone builds work/sa/build/AkynoLeyend.exe instead: the standalone lift (work/sa/gen, `lift.py --standalone --write`)
+ + the native runtime in host/ (TOTKPort's hos/, adapted). Objects are cached by their key in work/objcache, shared by
+ both builds: the two lifts share their chunk boundaries, so every chunk without a hooked function is the same source
+ and is not compiled twice.
+ 
+ Usage:  python -I nx2/build.py [--jobs 1] [--only 0,7] [--opt O1] [--no-polls] [--dll] [--lib] [--standalone]
+-  --only: just these code_NNN.c chunks (to measure); --dll: link hookshot_game.dll; --lib: archive hookshot_game.lib
++  --only: just these code_NNN.c chunks (to measure); --dll: link AkynoLeyend_game.dll; --lib: archive AkynoLeyend_game.lib
+ """
+ import argparse
+ import concurrent.futures
+@@ -37,11 +37,11 @@
+ import kit
+ import rtgen
+ import toolchain
+-from ocarina.build_support import object_key, link_options, video_libraries, is_mingw, shader_cache_stamp
+-from ocarina.config import compile_jobs
+-from ocarina.files import write_json
+-from ocarina.prebuilt import renderer_prebuilt
+-from ocarina.power import no_throttle
++from akynoleyend.build_support import object_key, link_options, video_libraries, is_mingw, shader_cache_stamp
++from akynoleyend.config import compile_jobs
++from akynoleyend.files import write_json
++from akynoleyend.prebuilt import renderer_prebuilt
++from akynoleyend.power import no_throttle
+ 
+ NX2_RT = os.path.join(kit.HERE, "rt")
+ HOST = os.path.join(kit.HERE, "..", "host")
+@@ -85,7 +85,7 @@
+ 
+ 
+ def vk_sources():
+-    """The Vulkan back end (hookshot_vk.dll, gpu/vk/vk_api.h): Eden's shader recompiler with its SPIR-V back end
++    """The Vulkan back end (AkynoLeyend.dll, gpu/vk/vk_api.h): Eden's shader recompiler with its SPIR-V back end
+     (gpu/vk/eden), sirit with Eden's mesh shader patch (gpu/vk/sirit) and the back end itself (gpu/vk/*.cpp)"""
+     vk = os.path.join(GPU, "vk")
+     out = []
+@@ -339,21 +339,21 @@
+     vk_objs = {j[2] for j in vk_jobs}
+     if ready_renderer:
+         import shutil
+-        shutil.copyfile(ready_renderer, os.path.join(out, "hookshot_vk.dll"))
++        shutil.copyfile(ready_renderer, os.path.join(out, "AkynoLeyend.dll"))
+     objs = [j[2] for j in jobs if j[2] not in vk_objs]
+     rsp = os.path.join(out, "objs.rsp")
+     open(rsp, "w").write("\n".join('"%s"' % o.replace("\\", "/") for o in objs))
+     if a.lib:
+-        lib = os.path.join(out, "hookshot_game.lib")
++        lib = os.path.join(out, "AkynoLeyend_game.lib")
+         subprocess.run([toolchain.lld_link(), "/lib", "/out:" + lib, "@" + rsp], check=True)
+         print("wrote %s (%d objects, %d MB)" % (lib, len(objs), os.path.getsize(lib) >> 20))
+     if a.standalone and not a.only and not vk_only:
+-        exe = os.path.join(out, "hookshot.exe")   # (+ hookshot.map: crash offsets -> f_<guest address>)
++        exe = os.path.join(out, "AkynoLeyend.exe")   # (+ AkynoLeyend.map: crash offsets -> f_<guest address>)
+         t = time.time()
+         r = subprocess.run([cc] + toolchain.native_target() + toolchain.native_link() +
+                            ["-o", exe, "@" + rsp] + link_options(exe[:-4] + ".map", stack=True, windowed=os.environ.get("RX_RELEASE") == "1") + HOT_ORDER() + HOST_LIBS +
+                            (["-Wl,/nodefaultlib:clang_rt.profile.lib"] if PGO == "gen" else []) +
+-                           ([os.path.join(kit.WORK, "hookshot.res")] if os.path.exists(os.path.join(kit.WORK, "hookshot.res")) else []) +   # (nx2/make_icon.py)
++                           ([os.path.join(kit.ROOT,"assets","AkynoLeyend.res")] if os.path.exists(os.path.join(kit.ROOT,"assets","AkynoLeyend.res")) else []) +   # (nx2/make_icon.py)
+                            (video_libraries(FFMPEG) if FFMPEG else []),
+                            capture_output=True, text=True)
+         undefined = sorted({l.strip() for l in (r.stdout + r.stderr).splitlines() if "undefined symbol" in l})
+@@ -368,8 +368,8 @@
+         if os.path.exists(sdl) and (not os.path.exists(sdl_dst) or os.path.getsize(sdl_dst) != os.path.getsize(sdl)):
+             import shutil
+             shutil.copyfile(sdl, sdl_dst)
+-    if vk_jobs:   # (hookshot_vk.dll beside the exe: loaded by host/rx_backend.c with RX_BACKEND=vulkan)
+-        vdll = os.path.join(out, "hookshot_vk.dll")
++    if vk_jobs:   # (AkynoLeyend.dll beside the exe: loaded by host/rx_backend.c with RX_BACKEND=vulkan)
++        vdll = os.path.join(out, "AkynoLeyend.dll")
+         vrsp = os.path.join(out, "vk_objs.rsp")
+         open(vrsp, "w").write("\n".join('"%s"' % j[2].replace("\\", "/") for j in vk_jobs))
+         t = time.time()
+@@ -378,12 +378,12 @@
+                            capture_output=True, text=True)
+         if r.returncode:
+             undefined = sorted({l.strip() for l in (r.stdout + r.stderr).splitlines() if "undefined symbol" in l})
+-            print("hookshot_vk.dll link FAILED, %d undefined symbols" % len(undefined))
++            print("AkynoLeyend.dll link FAILED, %d undefined symbols" % len(undefined))
+             print("\n".join(undefined[:60]) if undefined else (r.stdout + r.stderr)[-3000:])
+             return 1
+         print("linked %s: %d MB (%.0fs)" % (vdll, os.path.getsize(vdll) >> 20, time.time() - t))
+     if a.dll and not a.only:
+-        dll = os.path.join(out, "hookshot_game.dll")   # (+ hookshot_game.map: crash offsets -> f_<guest address>)
++        dll = os.path.join(out, "AkynoLeyend_game.dll")   # (+ AkynoLeyend_game.map: crash offsets -> f_<guest address>)
+         t = time.time()
+         r = subprocess.run([cc] + toolchain.native_target() + toolchain.native_link() +
+                            ["-shared", "-o", dll, "@" + rsp] + link_options(dll[:-4] + ".map"),
+--- a/nx2/dllmap.py
++++ b/nx2/dllmap.py
+@@ -1,4 +1,4 @@
+-"""hookshot_game.dll offset -> lifted function (f_<guest address>) + offset, from the linker map (build.py --dll).
++"""AkynoLeyend_game.dll offset -> lifted function (f_<guest address>) + offset, from the linker map (build.py --dll).
+ 
+ Usage:  python -I nx2/dllmap.py <hex offset> [...]
+ """
+@@ -15,7 +15,7 @@
+ 
+ def load():
+     rows = []
+-    for line in open(os.path.join(kit.WORK, "build", "hookshot_game.map"), errors="replace"):
++    for line in open(os.path.join(kit.WORK, "build", "AkynoLeyend_game.map"), errors="replace"):
+         m = re.match(r"\s*[0-9a-f]{4}:[0-9a-f]{8}\s+(\S+)\s+([0-9a-f]{16})", line)
+         if m:
+             rows.append((int(m.group(2), 16), m.group(1)))
+--- a/nx2/fault.py
++++ b/nx2/fault.py
+@@ -46,7 +46,7 @@
+             if "backtrace" in line or line.startswith("[recomp]   x"):
+                 continue
+             print(line)
+-        m = re.search(r"rip in hookshot_game\.dll\+(0x[0-9a-f]+)", block)
++        m = re.search(r"rip in AkynoLeyend_game\.dll\+(0x[0-9a-f]+)", block)
+         if m:
+             t = dllmap.BASE + int(m.group(1), 16)
+             i = bisect.bisect_right(keys, t) - 1
+--- a/nx2/make_game.py
++++ b/nx2/make_game.py
+@@ -1,7 +1,7 @@
+-"""Compatibility entry point. The build pipeline lives in ocarina/build.py."""
++"""Compatibility entry point. The build pipeline lives in akynoleyend/build.py."""
+ import sys
+ from pathlib import Path
+ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+-from ocarina.cli import main
++from akynoleyend.cli import main
+ if __name__ == "__main__":
+     raise SystemExit(main(["build", *sys.argv[1:]]))
+--- a/nx2/make_icon.py
++++ b/nx2/make_icon.py
+@@ -51,14 +51,14 @@
+         entries += struct.pack("<BBBBHHII", b, b, 0, 0, 1, 32, len(data), offset + len(body))
+         group += struct.pack("<BBBBHHIH", b, b, 0, 0, 1, 32, len(data), i + 1)
+         body += data
+-    with open(os.path.join(out, "hookshot.ico"), "wb") as f:
++    with open(os.path.join(out, "AkynoLeyend.ico"), "wb") as f:
+         f.write(head + entries + body)
+ 
+     res = res_entry(0, 0, b"", 0)   # (a .res file starts with an empty entry)
+     for i, (s, data) in enumerate(images):
+         res += res_entry(3, i + 1, data)   # RT_ICON
+     res += res_entry(14, 1, group, 0x1030)   # RT_GROUP_ICON: resource 1, what the window class loads
+-    with open(os.path.join(out, "hookshot.res"), "wb") as f:
++    with open(os.path.join(out, "AkynoLeyend.res"), "wb") as f:
+         f.write(res)
+     print("make_icon: %d sizes, %d KB" % (len(images), len(res) >> 10))
+ 
+--- a/nx2/samap.py
++++ b/nx2/samap.py
+@@ -1,4 +1,4 @@
+-"""hookshot.exe offset -> lifted function (f_<guest address>) + offset, from work/sa/build/hookshot.map (build.py --standalone).
++"""AkynoLeyend.exe offset -> lifted function (f_<guest address>) + offset, from work/sa/build/AkynoLeyend.map (build.py --standalone).
+ 
+ Usage:  python -I nx2/samap.py <hex offset> [...]
+ """
+@@ -11,7 +11,7 @@
+ import kit
+ 
+ rows = []
+-for line in open(os.path.join(kit.WORK, "sa", "build", "hookshot.map"), errors="replace"):
++for line in open(os.path.join(kit.WORK, "sa", "build", "AkynoLeyend.map"), errors="replace"):
+     m = re.match(r"\s*[0-9a-f]{4}:[0-9a-f]{8}\s+(\S+)\s+([0-9a-f]{16})", line)
+     if m:
+         rows.append((int(m.group(2), 16), m.group(1)))
+--- a/nx2/test_dll.py
++++ b/nx2/test_dll.py
+@@ -1,4 +1,4 @@
+-"""The production build against Unicorn: random functions run from work/build/hookshot_game.dll itself.
++"""The production build against Unicorn: random functions run from work/build/AkynoLeyend_game.dll itself.
+ 
+ test_leaf.py compiles the functions it picks into its own harness. This test picks the same way (self-contained
+ functions, or with --calls whole call trees) and checks them in the real game library instead: built by
+@@ -20,7 +20,7 @@
+ import test_leaf
+ import toolchain
+ 
+-DLL = os.path.join(kit.WORK, "build", "hookshot_game.dll")
++DLL = os.path.join(kit.WORK, "build", "AkynoLeyend_game.dll")
+ 
+ HOST = r"""
+ #include "a64.h"

@@ -1,0 +1,9 @@
+# Already present in the Windows package. Needed only for an external Python.
+numpy==2.5.4
+lz4==4.4.5
+capstone==5.0.6
+unicorn==2.1.4
+zstandard==0.25.0
+
+# Controller artwork, generated once from the user's own RomFS (not per frame).
+-r nx2/prompt_requirements.txt

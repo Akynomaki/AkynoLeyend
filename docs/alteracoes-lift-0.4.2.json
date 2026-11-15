@@ -1,0 +1,22 @@
+{
+  "revision": "0.4.2-rc.1/lift-fix-2026-11-09",
+  "files": [
+    {
+      "path": "third_party/a64-kit/lift/a64_lift.py",
+      "before_sha256": "8d42fd0c7647b34ce1b438e07572119e2da3fa10b04c720cd8e580130b0c1787",
+      "after_sha256": "e75d9967c8ec3911a5ef75e28477ca2ac8b84bfd01f847377f5eaf0b14529946"
+    }
+  ],
+  "tests": {
+    "discovered": 156,
+    "passed": 147,
+    "skipped": 9,
+    "failed": 0,
+    "native_emitter_chunk_write": true,
+    "synthetic_c_executed": true,
+    "synthetic_windows_x64_linked": true,
+    "game_executed": false,
+    "physical_gpu_tested": false
+  },
+  "binary_changes": []
+}

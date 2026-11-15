@@ -1,0 +1,13 @@
+{
+  "version": "0.3.8-dev.2",
+  "tests_discovered": 103,
+  "passed": 94,
+  "skipped": 9,
+  "windows_acl_api_executed_here": false,
+  "powershell_repair_executed_here": false,
+  "game_executed_here": false,
+  "renderer_binary_changed": false,
+  "user_diagnostic": "20261107-205245-647183-1124.zip",
+  "observed": "WinError5 on EXE/DLL/image and ACL query, manifest readable",
+  "probable_cause": "protected Python temporary directory created under elevated default owner; needs owner/DACL confirmation from repair log"
+}

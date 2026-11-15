@@ -1,0 +1,2386 @@
+--- a/README.md
++++ b/README.md
+@@ -1,12 +1,16 @@
+ # AkynoLeyend — desenvolvimento 0.4.3
+ 
+-**Versão Windows de teste: 0.4.3-test.1.** O pacote completo inclui o launcher,
+-o renderizador e as ferramentas para reconstruir sua entrada local. As correções
+-precisam ser conferidas no jogo no computador de destino.
++**Versão Windows de teste: 0.4.3-test.2.** Inclui acesso direto ao AMD FSR 1,
++escala e saída separadas, detecção do hardware e otimizações de samplers/cópias.
+ 
+-Comece pelo [roteiro de teste](docs/TESTE-0.4.3.md). Extraia em uma pasta nova,
+-abra AkynoLeyendBuilder.exe e use **Criar**. O host precisa ser reconstruído para
+-aplicar as mudanças de resolução e pools.
++**Já compilou o Teste 1?** A atualização mantém esse executável, seus saves e
++shaders. Extraia o ZIP de atualização na pasta que contém o Builder e execute
++`suporte/Atualizar-AkynoLeyend.cmd`. Depois use **Gráficos → AMD FSR 1 · desempenho**.
++O [roteiro](docs/TESTE-0.4.3.md) detalha a atualização e a comparação.
++
++Em uma instalação nova, use o pacote completo e **Criar** com sua entrada local.
++O modo Automático consulta CPU e memória deste computador antes da compilação.
++
+ 
+ O projeto usa o compilador ARM64 e o renderizador Vulkan derivados do Hookshot,
+ com launcher Windows e orquestração próprios. Não contém jogo, saves ou caches
+@@ -23,15 +27,15 @@
+ | Verificar.cmd | Conferir ferramentas e dependências |
+ | suporte/ | Diagnóstico, reparos e perfis opcionais |
+ 
+-O pacote Windows inclui os executáveis e SDKs; a cópia separada de fontes não os inclui. Não basta
+-trocar uma DLL de um build antigo: os patches de saída e pools exigem um novo host.
++O pacote Windows inclui os executáveis e SDKs; a cópia separada de fontes não os inclui. A atualização incremental aceita apenas o host exato do Teste 1;
++versões anteriores aos patches de saída e pools exigem um novo host.
+ Uma futura distribuição deve passar pelas verificações de identidade do launcher,
+ renderizador e host antes de ser publicada.
+ 
+ ## Gráficos em desenvolvimento
+ 
+ - FSR 1 oficial AMD: EASU e RCAS separados; não equivale a FSR 3 ou geração de quadros.
+-- Saída 2560×1440 ou 3840×2160 com escala fixa; exige reinício e novo host.
++- Saída 2560×1440 ou 3840×2160 com escala fixa; exige reinício do jogo.
+ - Escalas internas, Lanczos, Catmull-Rom, nitidez e frame pacing no launcher/menu.
+ - Preparação BNSH, BAHS, NDSR e NDVE com banco em disco e leituras limitadas.
+ - Reparos de registradores e dos pontos das sombras da grama provenientes da referência.
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.4.3-test.1
++0.4.3-test.2
+--- a/akynoleyend/__init__.py
++++ b/akynoleyend/__init__.py
+@@ -1 +1 @@
+-__version__ = "0.4.3-test.1"
++__version__ = "0.4.3-test.2"
+--- a/akynoleyend/build.py
++++ b/akynoleyend/build.py
+@@ -23,6 +23,7 @@
+ from .power import keep_awake
+ from .romfs import require_romfs, directory_state
+ from .timing import BuildTimings
++from .hardware import snapshot, recommended_chunk, usable_memory
+ from .crash_report import preserve_previous_crash
+ 
+ REQUIRED_OUTPUTS = ("AkynoLeyend.exe", "AkynoLeyend.dll")
+@@ -251,13 +252,15 @@
+     exefs, romfs = timing.measure("inputs", prepare_inputs, request, environment, report)
+     require_romfs(romfs)
+     identity = verify_version(exefs)
++    hardware = snapshot()
++    chunk_mib = request.chunk_mib or recommended_chunk(hardware)
+     environment.update(
+         {
+             "OOT_WORK": str(request.work),
+             "OOT_EXEFS": str(exefs),
+             "OOT_ROMFS": str(romfs),
+             "RX_RELEASE": "1",
+-            "OCARINA_CHUNK_MIB": str(request.chunk_mib),
++            "OCARINA_CHUNK_MIB": str(chunk_mib),
+         }
+     )
+     configure_hot(ROOT, environment)
+@@ -268,6 +271,8 @@
+             "game_build_id": identity,
+             "jobs_requested": request.jobs,
+             "chunk_mib_requested": request.chunk_mib,
++            "chunk_mib_selected": chunk_mib,
++            "hardware_before_lift": hardware,
+             "chunk_policy": "use requested target for new boundaries; preserve existing boundaries",
+             "renderer_from_source": request.renderer_from_source,
+             "output": str(request.output),
+@@ -316,13 +321,19 @@
+         split_log.write_text(note + "\n", encoding="utf-8")
+     # Choose automatic parallelism after extraction/lifting have released memory.
+     free = available_memory()
+-    jobs = compile_jobs(request.jobs, free_bytes=free)
++    hardware = snapshot()
++    hardware["ram_available"] = free
++    usable = usable_memory(hardware)
++    jobs = compile_jobs(request.jobs, free_bytes=usable, cpus=hardware["logical_cpus"],
++                        chunk_mib=chunk_mib)
+     plan = read_json(request.work / "build-request.json")
+     plan.update(jobs=jobs, available_memory_at_compile=free, cpu_count=os.cpu_count(),
++                hardware_at_compile=hardware,
+                 jobs_mode="automatic" if request.jobs is None else "explicit")
+     write_json(request.work / "build-request.json", plan)
+     report(f"Compilacao: {jobs} processo(s), modo {plan['jobs_mode']}; "
+-           f"RAM disponivel {free / (1 << 30):.1f} GiB; reserva 2 GiB, estimativa 3.5 GiB/processo.")
++           f"RAM disponivel {free / (1 << 30):.1f} GiB; "
++           f"{hardware['logical_cpus']} threads disponiveis; alvo {chunk_mib} MiB por bloco novo.")
+     report(f"@@stage compile Compilando com {jobs} processo(s)")
+     progress = CompileProgress()
+ 
+--- a/akynoleyend/cli.py
++++ b/akynoleyend/cli.py
+@@ -16,7 +16,9 @@
+ from .romfs import audit_romfs, require_romfs
+ from .access import FileAccessError, save_access_report
+ from .shader_prepare import prepare_shaders, update_renderer
+-from .graphics import RESOLUTIONS, SPEEDS, FILTERS, graphics_environment
++from .graphics import RESOLUTIONS, SPEEDS, FILTERS, OUTPUTS, graphics_environment
++from .hardware import snapshot, recommended_chunk, shader_workers, usable_memory
++import json
+ from .legacy import organize_project
+ 
+ 
+@@ -30,6 +32,7 @@
+     )
+     result.add_argument("--version", action="version", version=__version__)
+     commands = result.add_subparsers(dest="command", required=True)
++    commands.add_parser("hardware", help="Mostra CPU, memoria e plano automatico deste computador.")
+     default_tools = ROOT / "ferramentas"
+     doctor = commands.add_parser(
+         "doctor", help="Verifica as ferramentas sem abrir ou compilar o jogo."
+@@ -55,8 +58,8 @@
+         "--chunk-mib",
+         type=int,
+         choices=(3, 6, 12, 24),
+-        default=6,
+-        help="Alvo dos blocos novos de C; limites ja salvos sao preservados.",
++        default=None,
++        help="Alvo dos blocos novos de C; omita para automatico. Limites salvos sao preservados.",
+     )
+     compiler.add_argument(
+         "--renderer-source", action="store_true", help="Recompila tambem o renderizador generico."
+@@ -95,6 +98,7 @@
+     )
+     player.add_argument("--backend", choices=("vulkan", "opengl"), default="vulkan")
+     player.add_argument("--resolution", choices=tuple(RESOLUTIONS))
++    player.add_argument("--output-resolution", choices=tuple(OUTPUTS))
+     player.add_argument("--speed", choices=tuple(SPEEDS))
+     player.add_argument("--upscaling", choices=tuple(FILTERS))
+     player.add_argument("--sharpness", type=int)
+@@ -186,6 +190,13 @@
+ def main(arguments: list[str] | None = None) -> int:
+     args = parser().parse_args(arguments)
+     try:
++        if args.command == "hardware":
++            info = snapshot()
++            target = recommended_chunk(info)
++            info.update(chunk_mib=target, jobs=compile_jobs(None, usable_memory(info),
++                        info["logical_cpus"], chunk_mib=target), shader_workers=shader_workers(info))
++            print("@@hardware " + json.dumps(info, ensure_ascii=False), flush=True)
++            return 0
+         if args.command == "check":
+             identity = verify_nup(args.nup) if args.nup else verify_version(args.exefs)
+             print("@@check ok " + identity, flush=True)
+@@ -194,7 +205,14 @@
+             failures = inspect_tools(args.tools)
+             if args.exefs:
+                 print("Build ID:", verify_version(args.exefs))
+-            print("Processos de compilacao sugeridos:", compile_jobs(None))
++            hardware = snapshot()
++            chunk = recommended_chunk(hardware)
++            print("CPU:", hardware["cpu"], "| threads disponiveis:", hardware["logical_cpus"])
++            print("RAM total/disponivel (GiB):", round(hardware["ram_total"]/(1 << 30), 1),
++                  round(hardware["ram_available"]/(1 << 30), 1))
++            print("Processos de compilacao sugeridos:",
++                  compile_jobs(None, usable_memory(hardware), hardware["logical_cpus"], chunk_mib=chunk))
++            print("Alvo dos blocos novos (MiB):", chunk)
+             for failure in failures:
+                 print("ERRO:", failure)
+             if not failures:
+@@ -261,6 +279,7 @@
+         graphics_environment(
+             backend=args.backend,
+             resolution=args.resolution,
++            output_resolution=args.output_resolution,
+             speed=args.speed,
+             upscaling=args.upscaling,
+             sharpness=args.sharpness,
+@@ -279,6 +298,7 @@
+             trace_lighting=args.trace_lighting,
+             backend=args.backend,
+             resolution=args.resolution,
++            output_resolution=args.output_resolution,
+             speed=args.speed,
+             upscaling=args.upscaling,
+             sharpness=args.sharpness,
+--- a/akynoleyend/coherence.py
++++ b/akynoleyend/coherence.py
+@@ -5,9 +5,27 @@
+ 
+ HOST_REVISION = "directory304-early-texels-regmap759-output849-v2"
+ 
++# Test 2 changes orchestration/UI only. Exact Test 1 sources are known, including
++# the old platform-dependent Path ordering (Windows and POSIX fingerprints).
++PREVIOUS_HOST_SOURCES = {
++    "0.4.3-test.1": {
++        "47ffe71f2ee66633a2430cd6274c8132abdf7361d21d3373c85ce1cf09a07721",
++        "7d2b02f836049915084038c0a5318bb65454db7e4956f658c922c3e6842931ce",
++    }
++}
++
++
++def compatible_previous_host(manifest):
++    if not isinstance(manifest.get("version"), str) or not isinstance(manifest.get("source_sha256"), str):
++        return False
++    return (manifest.get("host_revision") == HOST_REVISION
++            and manifest.get("source_sha256") in PREVIOUS_HOST_SOURCES.get(manifest.get("version"), ())
++            and str(manifest.get("game_build_id", "")).startswith("e0f3ccfa"))
++
+ 
+ def require_host(manifest):
+-    if manifest.get("version") != __version__ or manifest.get("host_revision") != HOST_REVISION:
++    current = manifest.get("version") == __version__ and manifest.get("host_revision") == HOST_REVISION
++    if not current and not compatible_previous_host(manifest):
+         raise ProjectError(
+             "Este build nao corresponde ao host/ABI desta revisao. Use Criar ou "
+             "Compilar.cmd com sua entrada original e aguarde @@done. "
+--- a/akynoleyend/config.py
++++ b/akynoleyend/config.py
+@@ -1,12 +1,12 @@
+ """Validated paths and a memory-aware compile policy."""
+ 
+-import ctypes
+ import os
+ from dataclasses import dataclass
+ from pathlib import Path
+ 
+ from .errors import ProjectError
+ from .files import require_separate
++from .hardware import snapshot
+ 
+ ROOT = Path(__file__).resolve().parent.parent
+ SUPPORTED_BUILD = "e0f3ccfa"
+@@ -32,36 +32,12 @@
+ 
+ 
+ def available_memory() -> int:
+-    if os.name == "nt":
+-
+-        class MemoryStatus(ctypes.Structure):
+-            _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong)] + [
+-                (name, ctypes.c_ulonglong)
+-                for name in (
+-                    "physical",
+-                    "available",
+-                    "page",
+-                    "available_page",
+-                    "virtual",
+-                    "available_virtual",
+-                    "extended",
+-                )
+-            ]
+-
+-        status = MemoryStatus()
+-        status.length = ctypes.sizeof(status)
+-        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+-            return int(status.available)
+-    else:
+-        try:
+-            return int(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_AVPHYS_PAGES"))
+-        except (OSError, ValueError, AttributeError):
+-            pass
+-    return 0
++    return snapshot()["ram_available"]
+ 
+ 
+ def compile_jobs(
+-    requested: int | None, free_bytes: int | None = None, cpus: int | None = None
++    requested: int | None, free_bytes: int | None = None, cpus: int | None = None,
++    *, chunk_mib: int = 6,
+ ) -> int:
+     """Leave 2 GiB for the system; budget 3.5 GiB per O1 compiler process."""
+     if requested is not None:
+@@ -69,10 +45,12 @@
+             raise ProjectError("--jobs deve ser maior que zero.")
+         return requested
+     free = available_memory() if free_bytes is None else free_bytes
+-    cores = max(1, cpus if cpus is not None else (os.cpu_count() or 1))
++    cores = max(1, cpus if cpus is not None else
++                (getattr(os, "process_cpu_count", os.cpu_count)() or 1))
+     if free <= 0:
+         return 1
+-    memory_jobs = max(1, int(max(0, free - (2 << 30)) / (3.5 * (1 << 30))))
++    budget_gib = 3.5 if chunk_mib <= 6 else 4.0 if chunk_mib <= 12 else 6.0
++    memory_jobs = max(1, int(max(0, free - (2 << 30)) / (budget_gib * (1 << 30))))
+     return min(cores, memory_jobs, 8)
+ 
+ 
+@@ -86,11 +64,11 @@
+     romfs: Path | None = None
+     language: str = "pt-BR"
+     jobs: int | None = None
+-    chunk_mib: int = 6
++    chunk_mib: int | None = None
+     renderer_from_source: bool = False
+ 
+     def validate(self) -> None:
+-        if self.chunk_mib not in (3, 6, 12, 24):
++        if self.chunk_mib is not None and self.chunk_mib not in (3, 6, 12, 24):
+             raise ProjectError("--chunk-mib deve ser 3, 6, 12 ou 24.")
+         if bool(self.nup) == bool(self.exefs or self.romfs):
+             raise ProjectError("Use --nup ARQUIVO ou o par --exefs PASTA --romfs PASTA.")
+--- a/akynoleyend/graphics.py
++++ b/akynoleyend/graphics.py
+@@ -28,12 +28,14 @@
+ 
+ SPEEDS = {"realtime": "1", "per-frame": "0"}
+ FILTERS = {"off": "0", "catmull-rom": "1", "lanczos": "2", "fsr": "3"}
++OUTPUTS = {"game": "0", "1440p": "1", "4k": "2"}
+ 
+ 
+ def graphics_environment(
+     *,
+     backend="vulkan",
+     resolution=None,
++    output_resolution=None,
+     speed=None,
+     upscaling=None,
+     sharpness=None,
+@@ -63,6 +65,14 @@
+         if resolution in ("native-1440", "native-4k"):
+             result["HOS_OUTPUT_RES"] = "2" if resolution == "native-4k" else "1"
+             result["HOS_RES_SCALE"] = "1.0"
++    if output_resolution is not None:
++        if output_resolution not in OUTPUTS:
++            raise ProjectError(f"Opcao de saida invalida: {output_resolution}")
++        if resolution in ("native-1440", "native-4k"):
++            expected = "1440p" if resolution == "native-1440" else "4k"
++            if output_resolution != expected:
++                raise ProjectError("Saida e preset nativo pedem resolucoes diferentes.")
++        result["HOS_OUTPUT_RES"] = OUTPUTS[output_resolution]
+     if sharpness is not None:
+         if type(sharpness) is not int or not 0 <= sharpness <= 100:
+             raise ProjectError("Nitidez deve estar entre 0 e 100.")
+--- /dev/null
++++ b/akynoleyend/hardware.py
+@@ -0,0 +1,60 @@
++"""Observe the installing computer; never import another machine's optimizer values."""
++
++import ctypes
++import os
++import platform
++
++GIB = 1 << 30
++
++
++def snapshot() -> dict:
++    total = free = commit = 0
++    if os.name == "nt":
++        class MemoryStatus(ctypes.Structure):
++            _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong)] + [
++                (name, ctypes.c_ulonglong) for name in
++                ("total", "free", "page_total", "page_free", "virtual", "virtual_free", "extended")
++            ]
++
++        status = MemoryStatus()
++        status.length = ctypes.sizeof(status)
++        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
++            total, free, commit = int(status.total), int(status.free), int(status.page_free)
++    else:
++        try:
++            page = int(os.sysconf("SC_PAGE_SIZE"))
++            total = page * int(os.sysconf("SC_PHYS_PAGES"))
++            free = page * int(os.sysconf("SC_AVPHYS_PAGES"))
++        except (OSError, ValueError, AttributeError):
++            pass
++    cpu = platform.processor() or platform.machine()
++    if os.name == "nt":
++        try:
++            import winreg
++            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
++                               r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
++                cpu = winreg.QueryValueEx(key, "ProcessorNameString")[0].strip()
++        except OSError:
++            pass
++    count = getattr(os, "process_cpu_count", os.cpu_count)() or 1
++    return {"cpu": cpu, "logical_cpus": max(1, count), "ram_total": total,
++            "ram_available": free, "commit_available": commit, "system": platform.system()}
++
++
++def recommended_chunk(info: dict) -> int:
++    # New boundaries only. Keep smaller units when memory or CPU concurrency is limited.
++    return 12 if (info["ram_total"] >= 32 * GIB and info["ram_available"] >= 24 * GIB
++                  and info["logical_cpus"] >= 8) else 6
++
++
++def usable_memory(info: dict) -> int:
++    commit = info.get("commit_available", 0)
++    return min(info["ram_available"], commit) if commit else info["ram_available"]
++
++
++def shader_workers(info: dict, *, background: bool = False) -> int:
++    free = usable_memory(info)
++    if free <= 0:
++        return 1
++    memory = max(1, int(max(0, free - 2 * GIB) / (0.75 * GIB)))
++    return min(2 if background else 4, max(1, info["logical_cpus"] // 2), memory)
+--- a/akynoleyend/launch.py
++++ b/akynoleyend/launch.py
+@@ -7,7 +7,8 @@
+ from pathlib import Path
+ 
+ from . import __version__
+-from .coherence import require_host
++from .coherence import require_host, compatible_previous_host
++from .hardware import snapshot, shader_workers as automatic_shader_workers
+ from .config import MANIFEST, ROOT
+ from .crash_report import collect_run
+ from .windows_paths import short_romfs
+@@ -110,6 +111,7 @@
+     work: Path | None = None,
+     backend: str = "vulkan",
+     resolution: str | None = None,
++    output_resolution: str | None = None,
+     speed: str | None = None,
+     upscaling: str | None = None,
+     sharpness: int | None = None,
+@@ -120,6 +122,7 @@
+     graphics = graphics_environment(
+         backend=backend,
+         resolution=resolution,
++        output_resolution=output_resolution,
+         speed=speed,
+         upscaling=upscaling,
+         sharpness=sharpness,
+@@ -131,11 +134,16 @@
+     manifest = checked_build(folder)
+     if require_current_build:
+         from .build import source_identity
+-        if manifest.get("version") != __version__ or manifest.get("source_sha256") != source_identity():
++        current_source = source_identity()
++        current = manifest.get("version") == __version__ and manifest.get("source_sha256") == current_source
++        updated_previous = (compatible_previous_host(manifest)
++                            and manifest.get("renderer_version") == __version__
++                            and manifest.get("runtime_source_sha256") == current_source)
++        if not current and not updated_previous:
+             raise ProjectError(
+                 "Este EXE/DLL nao corresponde aos fontes atuais. "
+-                "Execute Compilar.cmd em uma pasta NOVA, aguarde @@done "
+-                "e so entao teste o jogo. O build anterior nao foi alterado."
++                "Se este e o Teste 1, use Ferramentas > Atualizar AkynoLeyend. "
++                "Outras revisoes precisam de Criar/Compilar.cmd."
+             )
+         require_host(manifest)
+     if resolution in EXPERIMENTAL_SCALES:
+@@ -157,6 +165,10 @@
+     if visual_mode not in VISUAL_MODES:
+         raise ProjectError(f"Modo visual desconhecido: {visual_mode}")
+     environment.update(VISUAL_MODES[visual_mode])
++    if shader_workers is None:
++        info = snapshot()
++        background = cache_mode in {"streaming", "equilibrado"}
++        environment["RX_VK_COMPILE_THREADS"] = str(automatic_shader_workers(info, background=background))
+     if shader_workers is not None:
+         if type(shader_workers) is not int or not 1 <= shader_workers <= 8:
+             raise ProjectError("Workers de shaders devem estar entre 1 e 8.")
+@@ -245,6 +257,7 @@
+         "graphics": {
+             "backend": backend,
+             "resolution": resolution,
++            "output_resolution": output_resolution,
+             "speed": speed,
+             "upscaling": upscaling,
+             "sharpness": sharpness,
+--- a/akynoleyend/shader_prepare.py
++++ b/akynoleyend/shader_prepare.py
+@@ -33,6 +33,7 @@
+ 
+ 
+ def _update_renderer(folder: Path, manifest: dict, report) -> dict:
++    from .build import source_identity
+     require_host(manifest)
+     if not str(manifest.get("game_build_id", "")).startswith(SUPPORTED_BUILD):
+         raise ProjectError(
+@@ -55,6 +56,7 @@
+         files=dict(manifest["files"]),
+         renderer_version=__version__,
+         renderer_source_sha256=identity["source_sha256"],
++        runtime_source_sha256=source_identity(),
+     )
+     updated["files"]["AkynoLeyend.dll"] = identity["binary_sha256"]
+     target = folder / "AkynoLeyend.dll"
+--- a/builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj
++++ b/builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj
+@@ -9,7 +9,7 @@
+     <ImplicitUsings>enable</ImplicitUsings>
+     <AssemblyName>AkynoLeyendBuilder</AssemblyName>
+     <RootNamespace>AkynoLeyendBuilder</RootNamespace>
+-    <Version>0.4.3-test.1</Version>
++    <Version>0.4.3-test.2</Version>
+     <Product>AkynoLeyend</Product>
+     <ApplicationIcon>../../assets/AkynoLeyend.ico</ApplicationIcon>
+     <ApplicationManifest>app.manifest</ApplicationManifest>
+--- a/builder/AkynoLeyendBuilder/LaunchOptions.cs
++++ b/builder/AkynoLeyendBuilder/LaunchOptions.cs
+@@ -4,6 +4,7 @@
+ sealed record GraphicsSettings {
+  public string Backend{get;init;}="vulkan";
+  public string Resolution{get;init;}="saved";
++ public string OutputResolution{get;init;}="saved";
+  public string Speed{get;init;}="saved";
+  public string Upscaling{get;init;}="saved";
+  public string Sharpness{get;init;}="saved";
+@@ -14,8 +15,11 @@
+   if(Backend!="vulkan")throw new InvalidOperationException("OpenGL ainda não está disponível nesta versão.");
+   var args=new List<string>{"--backend",Backend};
+   void Add(string option,string value,params string[] allowed){if(value=="saved")return;if(!allowed.Contains(value))throw new InvalidOperationException($"Opção inválida: {option}={value}");args.Add(option);args.Add(value);}
+-  Add("--resolution",Resolution,"auto","100","75","67","50","125","150","native-1440","native-4k");Add("--speed",Speed,"realtime","per-frame");Add("--upscaling",Upscaling,"off","catmull-rom","lanczos","fsr");Add("--sharpness",Sharpness,"0","10","20","30");Add("--framegen",Framegen,"0","2","3","4","5","6","7","8");Add("--pacing",Pacing,"on","off");Add("--cache-mode",Cache,"original","streaming","equilibrado");return args.ToArray();
++  Add("--resolution",Resolution,"auto","100","75","67","50","125","150","native-1440","native-4k");Add("--output-resolution",OutputResolution,"game","1440p","4k");Add("--speed",Speed,"realtime","per-frame");Add("--upscaling",Upscaling,"off","catmull-rom","lanczos","fsr");Add("--sharpness",Sharpness,"0","10","20","30");Add("--framegen",Framegen,"0","2","3","4","5","6","7","8");Add("--pacing",Pacing,"on","off");Add("--cache-mode",Cache,"original","streaming","equilibrado");return args.ToArray();
+  }
++ public static GraphicsSettings FsrPreset()=>new(){Resolution="67",OutputResolution="game",Speed="realtime",Upscaling="fsr",Sharpness="10",Framegen="0",Pacing="on",Cache="equilibrado"};
++ public GraphicsSettings NormalizeLegacyOutput()=>Resolution=="native-1440"||Resolution=="native-4k"?
++  this with {Resolution="100",OutputResolution=Resolution=="native-1440"?"1440p":"4k"}:this;
+ }
+ sealed record LauncherSettings {
+  public int Schema{get;init;}=1;
+--- a/builder/AkynoLeyendBuilder/MainWindow.xaml
++++ b/builder/AkynoLeyendBuilder/MainWindow.xaml
+@@ -101,6 +101,7 @@
+               <ComboBoxItem Content="7" />
+               <ComboBoxItem Content="8" />
+             </ComboBox>
++            <TextBlock x:Name="HardwareText" Text="Consultando CPU e memória..." Style="{StaticResource Note}" Margin="0,10,0,0" />
+           </StackPanel>
+           <StackPanel Grid.Column="2">
+             <TextBlock x:Name="ProfileLabel" Style="{StaticResource Label}" />
+@@ -182,7 +183,7 @@
+         </StackPanel>
+         <StackPanel Grid.Row="2">
+           <Border Height="1" Background="{StaticResource Line}" Margin="0,0,0,16" />
+-          <TextBlock Text="0.4.3 · TESTE 1" FontSize="10" Foreground="{StaticResource InkFaint}" />
++          <TextBlock Text="0.4.3 · TESTE 2" FontSize="10" Foreground="{StaticResource InkFaint}" />
+           <TextBlock Text="Construído para explorar." Style="{StaticResource Note}" FontSize="11" Margin="0,8,0,0" />
+         </StackPanel>
+       </Grid>
+@@ -193,6 +194,7 @@
+         <TextBlock Text="A imagem do seu jeito." FontSize="23" Margin="0,18,0,8" />
+         <TextBlock Text="Os ajustes são aplicados ao jogar. Compare a mesma cena para avaliar FPS e qualidade." Style="{StaticResource Note}" Margin="0,0,0,22" />
+         <WrapPanel Margin="0,0,0,20">
++          <Button Content="AMD FSR 1 · desempenho" Tag="fsr" Click="Preset" Style="{StaticResource Primary}" Margin="0,0,10,8" />
+           <Button Content="Qualidade" Tag="quality" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+           <Button Content="Equilibrado" Tag="balanced" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+           <Button Content="Fluidez" Tag="smooth" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+@@ -200,6 +202,15 @@
+         </WrapPanel>
+         <Border Style="{StaticResource Card}">
+           <StackPanel>
++            <StackPanel Margin="0,0,0,20">
++              <TextBlock Text="Resolução de saída (reiniciar o jogo)" Style="{StaticResource Label}" />
++              <ComboBox x:Name="OutputBox" Style="{StaticResource Choice}" SelectedIndex="0">
++                <ComboBoxItem Content="Usar opção salva" Tag="saved" />
++                <ComboBoxItem Content="2048×1152 · padrão do jogo" Tag="game" />
++                <ComboBoxItem Content="2560×1440" Tag="1440p" />
++                <ComboBoxItem Content="3840×2160 · exige mais da GPU" Tag="4k" />
++              </ComboBox>
++            </StackPanel>
+             <Grid Margin="0,0,0,20">
+               <Grid.ColumnDefinitions>
+                 <ColumnDefinition />
+@@ -221,8 +232,6 @@
+                   <ComboBoxItem Content="Escala interna · 100% (referencia)" Tag="100" />
+                   <ComboBoxItem Content="125% · escala experimental (exige EXE recompilado)" Tag="125" />
+                   <ComboBoxItem Content="150% · escala experimental (exige EXE recompilado)" Tag="150" />
+-                  <ComboBoxItem Content="Saída 2560×1440 + escala 100% (teste)" Tag="native-1440" />
+-                  <ComboBoxItem Content="Saída 3840×2160 + escala 100% (teste)" Tag="native-4k" />
+                   <ComboBoxItem Content="75% · mais leve" Tag="75" />
+                   <ComboBoxItem Content="67% · mais leve" Tag="67" />
+                   <ComboBoxItem Content="50% · desempenho" Tag="50" />
+@@ -236,7 +245,7 @@
+                 <ColumnDefinition />
+               </Grid.ColumnDefinitions>
+               <StackPanel>
+-                <TextBlock Text="Filtro de ampliação" Style="{StaticResource Label}" />
++                <TextBlock Text="Filtro de ampliação / AMD FSR 1" Style="{StaticResource Label}" />
+                 <ComboBox x:Name="UpscaleBox" Style="{StaticResource Choice}" SelectedIndex="0">
+                   <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                   <ComboBoxItem Content="Desligado" Tag="off" />
+--- a/builder/AkynoLeyendBuilder/MainWindow.xaml.cs
++++ b/builder/AkynoLeyendBuilder/MainWindow.xaml.cs
+@@ -1,6 +1,8 @@
+ using System.ComponentModel;
+ using System.Diagnostics;
+ using System.IO;
++using System.Text;
++using System.Text.Json;
+ using System.Windows;
+ using System.Windows.Controls;
+ using System.Windows.Media;
+@@ -24,6 +26,8 @@
+     readonly DispatcherTimer clock = new() { Interval = TimeSpan.FromSeconds(1) };
+     readonly DispatcherTimer checkDelay = new() { Interval = TimeSpan.FromMilliseconds(500) };
+     readonly Stopwatch elapsed = new();
++    readonly UiLogBuffer pendingLines = new();
++    readonly DispatcherTimer logPump = new() { Interval = TimeSpan.FromMilliseconds(100) };
+     CancellationTokenSource? checkCancellation;
+     Runner? runner;
+     string? current;
+@@ -37,6 +41,8 @@
+     public MainWindow()
+     {
+         InitializeComponent();
++        logPump.Tick += (_, _) => FlushLines();
++        logPump.Start();
+         OutPath.Text = Path.Combine(Tools.Find()?.Root ?? AppContext.BaseDirectory, "jogo");
+         foreach (var (id, text) in Stages)
+         {
+@@ -50,6 +56,7 @@
+         LanguageBox.SelectedItem = lang;
+         ApplyLanguage();
+         LoadSettings();
++        _ = RefreshHardware();
+         NavHome.Foreground=(Brush)FindResource("Accent");
+         Refresh();
+     }
+@@ -71,7 +78,7 @@
+         BuildButton.Content = T(S.Build);
+         ExistingPlay.Content = T(S.Play);
+         JobsLabel.Text = Local("Processos de compilação", "Build processes");
+-        AutoJobs.Content = Local("Automático (usa a RAM disponível)", "Automatic (uses available RAM)");
++        AutoJobs.Content = Local("Automático (CPU e memória atuais)", "Automatic (current CPU and memory)");
+         ProfileLabel.Text = Local("Perfil ao jogar", "Runtime profile");
+         Profile8.Content=Local("8 GB (texturas reduzidas)","8 GB (reduced textures)");
+         ShowLog.Content = T(ShowLog.IsChecked == true ? S.HideDetails : S.ShowDetails);
+@@ -204,6 +211,7 @@
+         if (JobsBox.SelectedIndex > 0) args.AddRange(new[] { "--jobs", JobsBox.SelectedIndex.ToString() });
+         foreach (var row in rows.Values) row.Reset();
+         StageList.Visibility = Visibility.Visible;
++        pendingLines.Clear();
+         Log.Clear();
+         current = null;
+         finished = "";
+@@ -214,7 +222,7 @@
+         SetButtons(cancel: true);
+         elapsed.Restart();
+         runner = new Runner(tools, "build", args);
+-        runner.Line += line => Queue(() => Line(line));
++        runner.Line += pendingLines.Add;
+         runner.Finished += failure => Queue(() => Ended(failure));
+         clock.Start();
+         ShowClock();
+@@ -242,16 +250,48 @@
+                 row.Progress(fraction);
+         }
+         else if (line.StartsWith("@@done ")) finished = line[7..];
+-        if (!line.StartsWith("@@progress"))
+-        {
+-            Log.AppendText(line + "\n");
+-            if (Log.LineCount > 4000) Log.Text = Log.Text[(Log.Text.Length / 2)..];
+-            if (ShowLog.IsChecked == true) Log.ScrollToEnd();
+-        }
++    }
++
++    void FlushLines()
++    {
++        var lines = pendingLines.Drain();
++        if (lines.Length == 0) return;
++        var text = new StringBuilder();
++        foreach (var line in lines)
++        {
++            Line(line);
++            if (!line.StartsWith("@@progress")) text.AppendLine(line);
++        }
++        if (text.Length == 0) return;
++        Log.AppendText(text.ToString());
++        if (Log.Text.Length > 256000) Log.Text = Log.Text[^128000..];
++        if (ShowLog.IsChecked == true) Log.ScrollToEnd();
++    }
++
++    async Task RefreshHardware()
++    {
++        try
++        {
++            var tools = Tools.Find();
++            if (tools == null) { HardwareText.Text = "Extraia a pasta ferramentas completa."; return; }
++            string? payload = null;
++            using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(15));
++            var code = await Runner.Execute(Runner.Info(tools, "hardware", Array.Empty<string>()),
++                line => { if (line.StartsWith("@@hardware ")) payload = line[11..]; }, stop.Token);
++            if (code != 0 || payload == null) throw new IOException("Detecção indisponível.");
++            using var json = JsonDocument.Parse(payload);
++            var h = json.RootElement;
++            HardwareText.Text = $"{h.GetProperty("logical_cpus").GetInt32()} threads · " +
++                $"{h.GetProperty("ram_total").GetInt64() / (double)(1L << 30):F1} GiB RAM · " +
++                $"{h.GetProperty("ram_available").GetInt64() / (double)(1L << 30):F1} GiB disponíveis. " +
++                $"Automático sugere {h.GetProperty("jobs").GetInt32()} processos agora; confere novamente ao compilar.";
++        }
++        catch { HardwareText.Text = "O modo automático consulta CPU e memória antes de compilar."; }
+     }
+ 
+     void Ended(string? failure)
+     {
++        FlushLines();
+         clock.Stop();
+         elapsed.Stop();
+         runner = null;
+@@ -341,6 +381,7 @@
+         operation=null;
+         playing=true;
+         StageList.Visibility = Visibility.Collapsed;
++        pendingLines.Clear();
+         Log.Clear();
+         BuildTitle.Text = Local("Executando o jogo", "Running the game");
+         BuildNote.Foreground = (Brush)FindResource("InkSoft");
+@@ -350,7 +391,7 @@
+         try{args.AddRange(CaptureGraphics().Arguments());}
+         catch(Exception error){playing=false;BuildNote.Text=error.Message;SetButtons(back:true);return;}
+         runner=new Runner(tools,"run",args);
+-        runner.Line += line => Queue(() => Line(line));
++        runner.Line += pendingLines.Add;
+         runner.Finished += failure => Queue(() => Ended(failure));
+         elapsed.Restart();
+         clock.Start();
+@@ -367,22 +408,36 @@
+     }
+     static string Choice(ComboBox b)=>(b.SelectedItem as ComboBoxItem)?.Tag?.ToString()??"saved";
+     static void Select(ComboBox b,string value){b.SelectedIndex=0;for(int i=0;i<b.Items.Count;i++)if(b.Items[i] is ComboBoxItem x&&x.IsEnabled&&x.Tag?.ToString()==value){b.SelectedIndex=i;break;}}
+-    GraphicsSettings CaptureGraphics()=>new(){Backend=Choice(BackendBox),Resolution=Choice(ResolutionBox),Speed=Choice(SpeedBox),Upscaling=Choice(UpscaleBox),Sharpness=Choice(SharpnessBox),Framegen=Choice(FramegenBox),Pacing=Choice(PacingBox),Cache=Choice(CacheBox)};
+-    void ApplyGraphics(GraphicsSettings g){Select(BackendBox,g.Backend);Select(ResolutionBox,g.Resolution);Select(SpeedBox,g.Speed);Select(UpscaleBox,g.Upscaling);Select(SharpnessBox,g.Sharpness);Select(FramegenBox,g.Framegen);Select(PacingBox,g.Pacing);Select(CacheBox,g.Cache);}
++    GraphicsSettings CaptureGraphics()=>new(){Backend=Choice(BackendBox),Resolution=Choice(ResolutionBox),OutputResolution=Choice(OutputBox),Speed=Choice(SpeedBox),Upscaling=Choice(UpscaleBox),Sharpness=Choice(SharpnessBox),Framegen=Choice(FramegenBox),Pacing=Choice(PacingBox),Cache=Choice(CacheBox)};
++    void ApplyGraphics(GraphicsSettings g){g=g.NormalizeLegacyOutput();Select(BackendBox,g.Backend);Select(ResolutionBox,g.Resolution);Select(OutputBox,g.OutputResolution);Select(SpeedBox,g.Speed);Select(UpscaleBox,g.Upscaling);Select(SharpnessBox,g.Sharpness);Select(FramegenBox,g.Framegen);Select(PacingBox,g.Pacing);Select(CacheBox,g.Cache);}
+     void LoadSettings(){try{var s=LauncherSettings.Load(SettingsPath);if(s==null)return;if(!string.IsNullOrWhiteSpace(s.Output))OutPath.Text=s.Output;NupPath.Text=s.Nup;RomfsPath.Text=s.Romfs;ExefsPath.Text=s.Exefs;UseFolders.IsChecked=s.Folders;UseNup.IsChecked=!s.Folders;JobsBox.SelectedIndex=Math.Clamp(s.Jobs,0,8);ProfileBox.SelectedIndex=Math.Clamp(s.Profile,0,3);LanguageBox.SelectedItem=Strings.All.FirstOrDefault(x=>x.Code==s.Language)??lang;ApplyGraphics(s.Graphics);}catch(Exception e){GraphicsNote.Text="Não foi possível ler ajustes anteriores; usando padrões: "+e.Message;}}
+     bool SaveSettings(){try{new LauncherSettings{Output=OutPath.Text,Nup=NupPath.Text,Romfs=RomfsPath.Text,Exefs=ExefsPath.Text,Folders=UseFolders.IsChecked==true,Jobs=JobsBox.SelectedIndex,Profile=ProfileBox.SelectedIndex,Language=lang.Code,Graphics=CaptureGraphics()}.Save(SettingsPath);return true;}catch(Exception e){GraphicsNote.Text="Não foi possível salvar: "+e.Message;return false;}}
+     void SaveGraphics(object sender,RoutedEventArgs e){if(SaveSettings())GraphicsNote.Text="Ajustes salvos. Serão aplicados ao jogar.";}
+-    void Preset(object sender,RoutedEventArgs e){var p=(sender as Button)?.Tag?.ToString();ApplyGraphics(p=="saved"?new GraphicsSettings():new GraphicsSettings{Resolution=p=="quality"?"100":p=="balanced"?"75":"67",Speed="realtime",Upscaling="lanczos",Sharpness="10",Framegen="0",Pacing="on"});ProfileBox.SelectedIndex=0;GraphicsNote.Text=p=="quality"?"100% preserva detalhes e exige mais da GPU. Iluminação original mantida.":p=="saved"?"Os ajustes seguem as opções salvas no jogo.":"Resolução interna menor, com Lanczos. Pode ajudar quando a GPU limita o desempenho.";SaveSettings();}
++    void Preset(object sender,RoutedEventArgs e)
++    {
++        var p=(sender as Button)?.Tag?.ToString();
++        ApplyGraphics(p=="saved"?new GraphicsSettings():p=="fsr"?GraphicsSettings.FsrPreset():
++            new GraphicsSettings{Resolution=p=="quality"?"100":p=="balanced"?"75":"67",
++                OutputResolution="game",Speed="realtime",Upscaling="lanczos",Sharpness="10",
++                Framegen="0",Pacing="on",Cache="equilibrado"});
++        ProfileBox.SelectedIndex=0;
++        GraphicsNote.Text=p=="fsr"?
++            "FSR 1 selecionado: saída padrão, escala 67%, nitidez 10% e geração desligada. Feche e abra o jogo. Para ampliar até a tela do monitor, use F11; se a janela for menor que a entrada, o log informa o downsampling.":
++            p=="saved"?"Os ajustes seguem as opções salvas no jogo.":
++            "Ajustes salvos com saída padrão do jogo. A escala interna e a saída podem ser escolhidas separadamente.";
++        SaveSettings();
++    }
++
+     void RunTool(object sender,RoutedEventArgs e){
+         if(runner!=null||sender is not Button{Tag:string command})return;
+         var tools=Tools.Find();if(tools==null){ToolNote.Text=T(S.ToolsMissing);return;}
+         if(string.IsNullOrWhiteSpace(OutPath.Text))return;
+         try{finished=Path.GetFullPath(OutPath.Text);}catch(Exception ex){ToolNote.Text=ex.Message;return;}
+-        SaveSettings();operation=command;playing=false;StageList.Visibility=Visibility.Collapsed;Log.Clear();
++        SaveSettings();operation=command;playing=false;StageList.Visibility=Visibility.Collapsed;pendingLines.Clear();Log.Clear();
+         BuildTitle.Text=command=="prepare-shaders"?"Preparando shaders":command=="update-renderer"?"Atualizando AkynoLeyend":"Verificando e coletando";
+         BuildNote.Foreground=(Brush)FindResource("InkSoft");ShowPage(true);SetButtons(cancel:true);ShowLog.IsChecked=true;
+         var args=command=="doctor"?Array.Empty<string>():new[]{"--out",finished};
+-        runner=new Runner(tools,command,args);runner.Line+=line=>Queue(()=>Line(line));runner.Finished+=failure=>Queue(()=>Ended(failure));elapsed.Restart();clock.Start();ShowClock();runner.Start();
++        runner=new Runner(tools,command,args);runner.Line+=pendingLines.Add;runner.Finished+=failure=>Queue(()=>Ended(failure));elapsed.Restart();clock.Start();ShowClock();runner.Start();
+     }
+     void OpenGameFolder(object sender,RoutedEventArgs e){try{Process.Start(new ProcessStartInfo(Path.GetFullPath(OutPath.Text)){UseShellExecute=true});}catch(Exception ex){ToolNote.Text=ex.Message;}}
+     void OpenCredits(object sender,RoutedEventArgs e){try{Process.Start(new ProcessStartInfo(Path.Combine(Tools.Find()?.Root??AppContext.BaseDirectory,"creditos")){UseShellExecute=true});}catch(Exception ex){MessageBox.Show(this,ex.Message,"AkynoLeyend");}}
+@@ -403,6 +458,7 @@
+         ++checkSerial;
+         checkDelay.Stop();
+         clock.Stop();
++        logPump.Stop();
+         checkCancellation?.Cancel();
+         runner?.Cancel();
+         base.OnClosing(e);
+--- /dev/null
++++ b/builder/AkynoLeyendBuilder/UiLogBuffer.cs
+@@ -0,0 +1,45 @@
++namespace AkynoLeyendBuilder;
++
++// Keep complete logs in Python's run files; bound only the live UI preview.
++sealed class UiLogBuffer
++{
++    readonly object gate = new();
++    readonly Queue<(long Sequence, string Text)> messages = new();
++    readonly Queue<(long Sequence, string Text)> controls = new();
++    long sequence;
++    int characters;
++    public const int MaximumCharacters = 128000;
++    public const int MaximumLines = 512;
++
++    public void Add(string line)
++    {
++        lock (gate)
++        {
++            if (line.Length > 16000) line = line[..16000];
++            var item = (++sequence, line);
++            if (line.StartsWith("@@")) controls.Enqueue(item);
++            else
++            {
++                messages.Enqueue(item);
++                characters += line.Length;
++                while (messages.Count > MaximumLines || characters > MaximumCharacters)
++                    characters -= messages.Dequeue().Text.Length;
++            }
++        }
++    }
++
++    public string[] Drain()
++    {
++        lock (gate)
++        {
++            var result = controls.Concat(messages).OrderBy(x => x.Sequence).Select(x => x.Text).ToArray();
++            controls.Clear(); messages.Clear(); characters = 0;
++            return result;
++        }
++    }
++
++    public void Clear()
++    {
++        lock (gate) { controls.Clear(); messages.Clear(); characters = 0; }
++    }
++}
+--- a/builder/RunnerChecks/Program.cs
++++ b/builder/RunnerChecks/Program.cs
+@@ -79,6 +79,34 @@
+             Require(language.Text.Length == Enum.GetValues<S>().Length, "Incomplete language: " + language.Code);
+         return Task.CompletedTask;
+     });
++    await Check("FSR preset separates output from internal scale and restores light settings", () =>
++    {
++        var g = GraphicsSettings.FsrPreset();
++        var args = g.Arguments();
++        Require(g.Resolution == "67" && g.OutputResolution == "game" && g.Upscaling == "fsr", "FSR preset mismatch.");
++        Require(g.Sharpness == "10" && g.Framegen == "0" && g.Cache == "equilibrado", "Heavy previous options leaked.");
++        Require(Array.IndexOf(args,"--output-resolution") >= 0 && args.Contains("game"), "Output did not reach CLI.");
++        var path = Path.Combine(folder,"fsr-settings.json");
++        new LauncherSettings { Graphics=g }.Save(path);
++        Require(LauncherSettings.Load(path)?.Graphics == g, "Independent output did not roundtrip.");
++        var legacy = new GraphicsSettings {Resolution="native-4k"}.NormalizeLegacyOutput();
++        Require(legacy.Resolution=="100" && legacy.OutputResolution=="4k", "Legacy native output did not migrate.");
++        return Task.CompletedTask;
++    });
++    await Check("UI log bursts remain bounded and keep completion and errors in order", () =>
++    {
++        var buffer = new UiLogBuffer();
++        buffer.Add("@@stage compile Compiling");
++        for (var i=0;i<50000;i++) buffer.Add("line "+i+new string('x',300));
++        buffer.Add("@@error preserve this error");
++        buffer.Add("@@done completed folder");
++        var lines=buffer.Drain();
++        Require(lines.Length <= UiLogBuffer.MaximumLines+3,"UI queue grew without a bound.");
++        Require(lines.Sum(x=>x.Length) <= UiLogBuffer.MaximumCharacters+100,"UI character budget exceeded.");
++        Require(lines[0].StartsWith("@@stage") && lines[^2].StartsWith("@@error") && lines[^1].StartsWith("@@done"),"Control order was lost.");
++        Require(buffer.Drain().Length==0,"Drain did not clear the pending preview.");
++        return Task.CompletedTask;
++    });
+     File.WriteAllText(Path.Combine(folder, "manage.py"), """
+         import json, sys, time
+         print('UTF8_MODE=' + str(sys.flags.utf8_mode), flush=True)
+--- a/builder/RunnerChecks/RunnerChecks.csproj
++++ b/builder/RunnerChecks/RunnerChecks.csproj
+@@ -9,5 +9,6 @@
+     <Compile Include="../AkynoLeyendBuilder/Runner.cs" Link="Runner.cs"/>
+     <Compile Include="../AkynoLeyendBuilder/Strings.cs" Link="Strings.cs"/>
+     <Compile Include="../AkynoLeyendBuilder/LaunchOptions.cs" Link="LaunchOptions.cs"/>
++    <Compile Include="../AkynoLeyendBuilder/UiLogBuffer.cs" Link="UiLogBuffer.cs"/>
+   </ItemGroup>
+ </Project>
+--- a/builder/launcher-build.json
++++ b/builder/launcher-build.json
+@@ -1,9 +1,9 @@
+ {
+   "schema": 1,
+-  "version": "0.4.3-test.1",
+-  "pe_product_version": "0.4.3-test.1",
+-  "source_sha256": "cc9dc228b4a7ac721f1cd1edb678b93e023d5d1a37d5319009ed96a6dda7addd",
+-  "binary_sha256": "9eb308771625ba239c407837a097ca9ab9cca6f713663e19fa733788ed9b8075",
++  "version": "0.4.3-test.2",
++  "pe_product_version": "0.4.3-test.2",
++  "source_sha256": "c92b52e908d0afd343d943cdc056ebba079f97551d42d0890890348c13852982",
++  "binary_sha256": "d0f3ef12736305b9d42bcc505515b94cbbbfabcd5096a4a1954fdaab847eff02",
+   "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
+   "wpf_window_executed": false
+ }
+--- a/compilar.ps1
++++ b/compilar.ps1
+@@ -8,7 +8,7 @@
+     [string]$Idioma = 'pt-BR',
+     [ValidateRange(1, 64)][int]$Jobs,
+     [switch]$RenderizadorDosFontes,
+-    [ValidateSet(3, 6, 12, 24)][int]$BlocoMiB = 6
++    [ValidateSet(0, 3, 6, 12, 24)][int]$BlocoMiB = 0
+ )
+ $ErrorActionPreference = 'Stop'
+ try {
+@@ -32,8 +32,8 @@
+         throw 'Extraia o pacote completo; a pasta ferramentas deve ficar ao lado deste arquivo.'
+     }
+     $arguments = @('-I', (Join-Path $projectRoot 'manage.py'), 'build',
+-        '--out', $Destino, '--work', $Trabalho, '--language', $Idioma,
+-        '--chunk-mib', [string]$BlocoMiB)
++        '--out', $Destino, '--work', $Trabalho, '--language', $Idioma)
++    if ($BlocoMiB -gt 0) { $arguments += @('--chunk-mib', [string]$BlocoMiB) }
+     if ($Exefs -or $Romfs) {
+         if ($Jogo -or -not $Exefs -or -not $Romfs) {
+             throw 'Use -Jogo ARQUIVO ou o par -Exefs PASTA -Romfs PASTA.'
+--- /dev/null
++++ b/docs/ANALISE-OPTIMIZER-REFERENCIAS-TESTE2.md
+@@ -0,0 +1,76 @@
++# Análise da lentidão, otimizador e referências — 09/11/2026
++
++## Registros do Teste 1
++
++Recebidos Diagnostico.zip, três vídeos, logs de extração/lift/split/compile/census
++e compile-summary.json. O build terminou: 393 unidades, dois processos, zero
++falhas, 2.639,132 s de compilação; o manifesto registra 3.151,07 s no processo total.
++A preparação encontrou 38.809 programas e 42.856 estágios, incluindo 4.128 compute.
++A primeira preparação levou 351,8 s com dois workers; outra reutilizou os programas
++em 1,1 s. Uma partida gastou 22,667 s na preparação inicial de pipelines.
++
++Nos vídeos, a vegetação está presente, há artefatos e a taxa varia muito. As opções
++salvas mostram saída 4K, 150% experimental, nitidez 100% e filtro Off; os logs
++confirmam swapchain 1920×1080 e escala fixa 1,500. Há amostras pesadas com GPU em
++43,3 ms e replay em 22,34 ms, sem espera por compilação de shader naquela amostra.
++Timers podem se sobrepor: não somá-los. Não existe comparação pareada do Teste 2.
++
++## build_optimizer.zip
++
++O ZIP foi lido como material de análise; os seus scripts não foram executados.
++Foram examinados detecção, cálculo, comandos, ambiente e fases.
++
++| Parte | Achado e tratamento |
++|---|---|
++| Hardware salvo | Refere-se a outro PC e a um caminho E: da versão 0.4.0. A instalação consulta o computador atual. |
++| Memória | O cálculo usa RAM total. O plano integrado usa RAM disponível e limite de commit, e mede novamente depois do lift. |
++| CPU | O fallback estima núcleos físicos como metade dos threads. A integração informa os threads disponíveis ao processo. |
++| Disco | A saída de volume não comprova NVMe. Disco não multiplica o limite de CPU. |
++| ISA | O otimizador escolhe v4 pelo nome da CPU. Essa regra não verifica instruções; o pacote mantém seu alvo v3. |
++| Blocos/tempos | A estimativa parte de 44 blocos. O build recebido gerou 212 blocos normais, além das partes quentes; não prometer 22 blocos ou 23,8 min. |
++| Comandos | Há chamadas diretas a cli.py com imports relativos e opções incompatíveis (`--output`, `--folder`, `--renderer-from-source`). A integração usa manage.py e as opções reais. |
++| Fases | Preservada a ideia de fases ordenadas e dados do plano; já existem logs e caches reais na base. Não adicionados scripts duplicados de limpeza. |
++
++O modo Automático escolhe até oito processos por CPU/memória disponível. Alvo novo
++12 MiB somente com pelo menos 32 GiB totais, 24 GiB disponíveis e oito threads;
++nos demais casos usa 6 MiB. Para alvos maiores há orçamento de memória por processo
++mais conservador. São estimativas de admissão, não medições de RSS nem garantias de
++tempo. Valores manuais são respeitados e os limites de chunks existentes são mantidos.
++
++## Hookshot 2.0.10
++
++Fonte recebida no ZIP; tag oficial v2.0.10 resolvida ao commit
++`7f9daf06d902588476102d6650c600bb84f02ce5`. Selecionados o cache por ID/comparação
++com geração de registros de samplers e a união somente de cópias consecutivas dos
++buffers capturados. A construção existente de samplers, incluindo o comportamento
++AMD de comparação de profundidade, foi preservada.
++
++O comentário/código desta versão deixa write-back diff e fila separada de presents
++**desligados por padrão**, após o caso de device lost da issue 1161. O texto de
++v2.0.8 descreve um estado anterior. Esses dois caminhos não foram transplantados
++nem ativados nesta correção. Também não houve importação integral do novo runtime,
++compilador ou menu. O ganho divulgado de 25% não é um benchmark do AkynoLeyend.
++
++Regressões nativas verificam bytes idênticos após unir cópias, bordas, lacunas,
++overflow e agrupamento por buffer; e cache de sampler com gerações, parâmetros
++reescritos, comparação de profundidade e tabelas por thread, ligado/desligado.
++
++## NX2navi 0.6.1
++
++Setup recebido conferido contra tamanho/SHA-256 do NX2navi-update.json. Código do
++commit `78ee0ddb1e29206ec730bbcfb8f5105cb4087499` e avisos foram consultados como
++referência. LICENSE-ADDITIONS reserva as adições posteriores ao import inicial;
++nenhuma dessas adições foi copiada. O estudo de atualizações que preservam o jogo
++é compatível com a atualização local por revisão exata de host, implementada aqui.
++Os executáveis e o AppImage fornecidos não foram executados.
++
++## Preservação e limites
++
++Host, lifter e ABI pública continuam idênticos ao Teste 1; somente três CPP do GPU
++receberam as otimizações selecionadas. O identificador do tradutor de shaders foi
++mantido e seu prefixo de hash compilado foi conferido nas duas DLLs, permitindo
++manter os shaders preparados com a mesma GPU/driver/opções de tradução.
++A atualização exige o host conhecido e mantém seu EXE, imagem e saves; não altera
++código gerado manualmente. GUI Windows publicada e conferida, testes portáteis
++executados, sem execução local do jogo/GPU física. Validação atual em
++`validacao-teste-0.4.3-test2.json`.
+--- a/docs/TESTE-0.4.3.md
++++ b/docs/TESTE-0.4.3.md
+@@ -1,55 +1,58 @@
+-# AkynoLeyend 0.4.3 — Teste 1
++# AkynoLeyend 0.4.3 — Teste 2
+ 
+-Este é o pacote para testar as correções no seu computador. Compilação e testes
+-internos passaram; o resultado visual e o ganho de FPS precisam da execução real.
++## Atualizar o Teste 1 já compilado
+ 
+-## Compilar uma vez
++1. Feche o jogo e o Builder.
++2. Extraia o conteúdo de `AkynoLeyend-0.4.3-Teste-2-Atualizacao.zip` **dentro da pasta
++   do Teste 1 que contém AkynoLeyendBuilder.exe**. Aceite substituir os fontes,
++   launcher e arquivos de suporte do pacote.
++3. Execute `suporte/Atualizar-AkynoLeyend.cmd` e aguarde a confirmação. O comando
++   confere o host e os hashes, aplica a DLL e registra a atualização compatível.
++4. Abra o Builder. A lateral deve mostrar **0.4.3 · TESTE 2**.
+ 
+-1. Extraia todo o ZIP em uma pasta nova, com espaço para o build.
+-2. Abra `AkynoLeyendBuilder.exe`. A lateral deve mostrar **0.4.3 · TESTE 1**.
+-3. Selecione sua entrada local (.nup ou o par ExeFS/RomFS), mantenha o destino
+-   `jogo` desta pasta nova e clique em **Criar**. Aguarde a conclusão.
+-4. Na aba Ferramentas, use **Preparar shaders** e aguarde a preparação terminar.
+-   A primeira preparação pode ser demorada; o total depende da entrada encontrada.
++**Não precisa clicar em Criar novamente nem repetir Preparar shaders no Teste 1.**
++O executável, a imagem, os saves e os objetos de compilação são mantidos. A revisão
++exata do host é conferida; a atualização recusa hosts diferentes. Não copie uma
++DLL isolada para contornar essa conferência.
+ 
+-É necessário gerar um novo host. Trocar apenas a DLL de um executável antigo não
+-aplica os patches de saída, escala e pools. Saves existentes não estão no pacote.
+-Para usar seu progresso, com os jogos fechados, copie a pasta `user` do jogo antigo
+-para a nova pasta `jogo/user`; conserve a cópia antiga como está.
++## Corrigir a configuração pesada e encontrar o FSR
+ 
+-## Teste de imagem e desempenho
++Nos registros recebidos, o jogo usava saída 3840×2160, escala experimental 150%,
++filtro desligado e nitidez 100%, mesmo com janela 1920×1080. A combinação exige
++muito mais renderização e memória que uma saída padrão. Isso não mede o ganho ou
++regressão de uma mudança isolada do renderer.
+ 
+-Use o mesmo save e a mesma posição da câmera em Kokiri/vegetação. Mantenha o modo
+-de energia e a resolução da janela iguais entre as tentativas. Feche o jogo antes
+-de mudar opções que exigem reinício. Faça uma passagem para aquecer e, na segunda,
+-fique 60 segundos na mesma cena. Deixe geração de quadros desligada para medir FPS base.
++1. Na aba **Gráficos**, clique em **AMD FSR 1 · desempenho**.
++2. O botão seleciona saída padrão 2048×1152, escala interna 67%, FSR 1, nitidez 10%,
++   geração de quadros desligada, tempo real e cache Equilibrado. Os ajustes são salvos.
++3. Abra o jogo de novo. Use **F11** para preencher o monitor. FSR amplia quando a
++   saída da janela é maior que a imagem de entrada; para reduzir uma imagem maior,
++   o renderer usa Lanczos e registra `EASU bypassed`.
++4. No menu Insert, o filtro também fica em **Upscaling**: selecione a linha com
++   cima/baixo e altere com esquerda/direita até **AMD FSR 1**.
+ 
+-| Tentativa | Ajuste | O que registrar |
+-|---|---|---|
+-| Base | Perfil Original, 100%, Lanczos, nitidez 10%, tempo real, pacing ligado | Captura da vegetação e FPS na cena; configuração do menu |
+-| FSR | Mesmo perfil, 67%, AMD FSR 1, nitidez 10%, geração desligada | Nitidez em movimento, FPS e log de ativação do FSR |
+-| Resolução | Selecione 2560×1440 nativo no launcher e reinicie | Dimensão efetiva no menu/log, HUD e nitidez; anote FPS separado |
++Escala interna e resolução de saída agora têm controles separados no launcher.
++1440p e 4K continuam disponíveis; a saída exige reiniciar o jogo. O preset FSR não
++promete um FPS específico nem corresponde a FSR 3.1 ou geração de quadros.
+ 
+-A opção de saída 3840×2160 também pode ser conferida depois; 4K aumenta o trabalho
+-da GPU. Saída 1440p e 4K usam escala fixa 100% quando selecionadas no launcher.
+-O FSR não recupera detalhes que desapareceram de uma entrada muito pequena. No
+-log, procure `vk: AMD FSR 1 ready` e `vk: FSR output`; mensagens `FSR is NOT active`
+-ou `EASU bypassed` precisam ser incluídas no retorno.
++## Instalações novas e hardware
+ 
+-Para comparar com Hookshot, use a mesma cena, saída, escala interna, perfil
+-handheld e geração de quadros desligada. Dois números de FPS com configurações
+-diferentes não medem a diferença dos renderizadores. Os contadores de preparação
+-incluem variantes; 116.427 tentativas não equivalem a 116.427 programas únicos.
++Use o ZIP completo, selecione sua entrada local e mantenha Processos de compilação
++em **Automático**. A interface mostra os threads e a memória observados neste PC.
++O plano consulta novamente a memória disponível antes de compilar e registra os
++valores em `work/build-request.json`. Uma escolha manual de processos é respeitada.
++Blocos novos usam alvo 6 ou 12 MiB conforme CPU/memória; limites já gravados são
++preservados. As opções manuais continuam aceitas. Não são copiados os valores
++3C/6T/15,9 GB do otimizador recebido. O alvo de CPU da distribuição continua x86-64-v3.
+ 
+-## Enviar o resultado
++## Comparar e enviar o resultado
+ 
+-Feche pela janela do jogo e aguarde o launcher registrar o encerramento.
+-Depois execute `suporte/Coletar-Crash.cmd`. O comando informa o ZIP de diagnóstico
+-criado em `jogo/diagnosticos`; ele também funciona quando a partida termina normalmente.
++Use o mesmo save, posição e câmera. Faça uma passagem de aquecimento e observe a
++mesma cena por 60 segundos na segunda passagem, com geração de quadros desligada.
++Anote a saída, escala, filtro e FPS. Feche pela janela do jogo e aguarde o registro.
++Depois execute `suporte/Coletar-Crash.cmd` e envie o ZIP indicado junto com uma captura.
++O comando também coleta uma partida encerrada normalmente.
+ 
+-Envie o ZIP da tentativa, uma captura da mesma cena e a indicação Base/FSR/Resolução.
+-Os registros incluem opções, identidade do build e logs. Não é necessário enviar
+-novamente os bancos de shaders ou os cinco ZIPs do RuntimeId.
+-
+-Se a criação parar antes de abrir o jogo, envie o log da etapa em `work/logs`,
+-principalmente `lift.log` se a falha ocorrer na tradução.
++Compilação e testes internos passaram; o ganho de FPS e a imagem do Teste 2 ainda
++precisam desse teste no hardware. Não envie novamente os bancos ou os cinco ZIPs
++do RuntimeId.
+--- a/docs/origem.md
++++ b/docs/origem.md
+@@ -212,3 +212,20 @@
+ genéricas da base, launcher republicado dos fontes e DLL já conferida. Não contém
+ jogo, ExeFS, RomFS, saves ou bancos privados. O host é gerado localmente pelo usuário.
+ A publicação de teste permite a validação física que não foi feita neste ambiente.
++
++
++## Teste 2 — adaptação de hardware, acesso ao FSR e CPU do renderer
++
++Analisados os arquivos de teste do usuário, build_optimizer.zip e Hookshot v2.0.10,
++commit 7f9daf06d902588476102d6650c600bb84f02ce5. Adaptados somente o cache de samplers
++com geração dos registros e a união de cópias consecutivas de capturas, incluindo
++sua regressão sintética. Código Hookshot sob GPL-3.0; texto em
++licenses/Hookshot-GPL-3.0.txt. Preservados os avisos originais e o caminho AMD local.
++
++Detecção de hardware, fila limitada do preview de logs, controles separados de
++saída/escala, preset FSR e conferência de atualização por host exato são adaptações
++locais. Não foi copiada a geração de comandos do otimizador. NX2navi 0.6.1 foi
++consultado com seus avisos; adições reservadas por LICENSE-ADDITIONS não foram copiadas.
++Não foram habilitados o write-back diff ou a fila separada de apresentação da
++referência, desativados por padrão no snapshot recebido. Nenhum ganho de FPS foi
++medido localmente. Relatório em ANALISE-OPTIMIZER-REFERENCIAS-TESTE2.md.
+--- /dev/null
++++ b/docs/validacao-teste-0.4.3-test2.json
+@@ -0,0 +1,79 @@
++{
++  "status": "TEST_BUILD_AWAITING_USER_VALIDATION",
++  "version": "0.4.3-test.2",
++  "python_tests": {
++    "total": 193,
++    "passed": 184,
++    "skipped": 9,
++    "failed": 0
++  },
++  "runner_checks": 11,
++  "renderer_units": 182,
++  "renderer_compile_summary_final": {
++    "schema": 1,
++    "units": 182,
++    "jobs": 4,
++    "renderer_prebuilt": false,
++    "compile_seconds": 7.618,
++    "local_hits": 181,
++    "shared_hits": 0,
++    "compiled": 1,
++    "failed": 0
++  },
++  "renderer_exports": [
++    "mkwvk_init"
++  ],
++  "launcher": {
++    "schema": 1,
++    "version": "0.4.3-test.2",
++    "pe_product_version": "0.4.3-test.2",
++    "source_sha256": "c92b52e908d0afd343d943cdc056ebba079f97551d42d0890890348c13852982",
++    "binary_sha256": "d0f3ef12736305b9d42bcc505515b94cbbbfabcd5096a4a1954fdaab847eff02",
++    "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
++    "wpf_window_executed": false
++  },
++  "renderer": {
++    "schema": 1,
++    "release": "0.4.3-test.2",
++    "config": {
++      "target": "windows-gnu",
++      "march": "x86-64-v3",
++      "release": "1"
++    },
++    "source_sha256": "053e16379946c86a8d37d740a44d91db9e382ca00c9bb123c9c59723ec7a6e59",
++    "binary_sha256": "209b356bb3fc6e0794e72c47a2297d0a61bb5aa6a50b7dc0eae764058c178c91",
++    "compiler": "LLVM-MinGW 20261020",
++    "generic": true,
++    "game_executed": false,
++    "physical_gpu_tested": false
++  },
++  "shader_stamp": "48efaca57aa305ab",
++  "old_test1_game_exe_recompile_required": false,
++  "exact_old_host_source_pinned": true,
++  "full_game_executed_here": false,
++  "physical_gpu_tested_here": false,
++  "fps_gain_measured": false,
++  "user_test1_logs_reviewed": true,
++  "upstream": {
++    "tag": "v2.0.10",
++    "commit": "7f9daf06d902588476102d6650c600bb84f02ce5",
++    "source_zip_sha256": "f7c41626da42eff95da5c8db56bab536990395b38c6ea6f7be27c3f90d139a65",
++    "backports": [
++      "sampler generation/cache",
++      "adjacent captured-buffer copy combining"
++    ],
++    "writeback_diff_default_in_uploaded_source": false,
++    "separate_present_queue_default_in_uploaded_source": false,
++    "nx2navi_commit": "78ee0ddb1e29206ec730bbcfb8f5105cb4087499",
++    "nx2navi_additions_copied": false
++  },
++  "changes": [
++    "bounded/batched UI log preview",
++    "independent output and internal resolution; explicit FSR preset",
++    "CPU/free RAM/commit-aware build and shader worker plan",
++    "exact Test 1 host maintenance",
++    "sampler generation/cache",
++    "coalesced adjacent capture copies"
++  ],
++  "shader_stamp_fnv_prefix_present_in_old_and_new_dll": true
++}
+--- a/gpu/PROVENANCE.md
++++ b/gpu/PROVENANCE.md
+@@ -1,3 +1,13 @@
++# Test 2 selected CPU backports — 2026-11-09
++
++Hookshot v2.0.10 commit 7f9daf06d902588476102d6650c600bb84f02ce5 supplied the
++sampler generation/cache wrapper and contiguous capture-copy helper/regression.
++Adapted in vk_bank.cpp, vk_draw.cpp and vk_memory.cpp; existing sampler creation
++and AMD depth-comparison behavior retained. These additions remain under GPL-3.0;
++see ../licenses/Hookshot-GPL-3.0.txt and ../docs/origem.md. No write-back diff,
++separate present queue or reserved NX2navi additions were imported. Shader translator,
++public host ABI and FSR shaders are unchanged in this maintenance update.
++
+ # Current source layout — AkynoLeyend graphics work 2026-11-09
+ 
+ The active renderer/compiler is `vk/` (Vulkan + Eden + Sirit). Unused WebGPU
+--- a/gpu/vk/vk_bank.cpp
++++ b/gpu/vk/vk_bank.cpp
+@@ -37,6 +37,7 @@
+ std::vector<SampReg> samp_regs;
+ std::unordered_map<uint64_t, std::vector<int>> regs_by_serial;
+ std::atomic<uint64_t> reg_gen{1};   // (bumped by every texture registration: resolved handles go stale)
++std::atomic<uint64_t> samp_gen{1}; // Hookshot 2.0.10: invalidated by changed sampler registrations.
+ // (and a version a slot: caches of what a slot resolves to check theirs, not every registration's)
+ constexpr int kSlotVersions = 1 << 20;
+ std::unique_ptr<std::atomic<uint32_t>[]> slot_versions{new std::atomic<uint32_t>[kSlotVersions]()};
+@@ -179,9 +180,16 @@
+     const nvn_samp_par* p = &par;
+     std::lock_guard lk(reg_mu);
+     if ((size_t)id >= samp_regs.size()) samp_regs.resize((size_t)id + 256);
++    // (sampler_for's cache goes stale only when a registration's contents change, not at each rewrite of the same)
++    const bool same = samp_regs[id].ok && !std::memcmp(&samp_regs[id].p, p, sizeof *p);
+     samp_regs[id].p = *p;
+     samp_regs[id].ok = true;
+-}
++    if (!same) samp_gen.fetch_add(1, std::memory_order_acq_rel);
++}
++uint64_t sampler_registrations_generation() {
++    return samp_gen.load(std::memory_order_acquire);
++}
++
+ void texture_released(uint64_t serial) {
+     std::lock_guard lk(reg_mu);
+     auto it = regs_by_serial.find(serial);
+--- a/gpu/vk/vk_draw.cpp
++++ b/gpu/vk/vk_draw.cpp
+@@ -49,6 +49,7 @@
+ // (EvilOOT, RX_VK_DRAW_STATS: the pointer table's regions, vk_bank.cpp)
+ struct PointerEntry { uint64_t addr, size; };
+ const PointerEntry* pointer_table(const NvnState& s, int stage);
++uint64_t sampler_registrations_generation();
+ uint32_t stage_cbuf_word(const NvnState& s, const Stage& st, uint32_t index, uint32_t offset);   // (vk_shader.cpp)
+ namespace {
+ 
+@@ -1075,7 +1076,21 @@
+     }
+ }
+ /// compare: the shader reads depth with a reference (a sampler without one cannot compare)
++// Hookshot 2.0.10 sampler cache: keep the existing sampler construction and AMD behavior.
++VkSampler sampler_make(int id, bool compare);
+ VkSampler sampler_for(int id, bool compare) {
++    static const bool on = !getenv("RX_VK_SAMPLER_CACHE") || atoi(getenv("RX_VK_SAMPLER_CACHE")) != 0;
++    if (!on || id < 0 || id >= 4096) return sampler_make(id, compare);
++    struct Entry { uint64_t gen; VkSampler s; };
++    static thread_local Entry table[2][4096];   // (gen 0: never filled; the generation starts at 1)
++    const uint64_t gen = sampler_registrations_generation();   // (read first: a registration after it makes the next call miss)
++    Entry& e = table[compare ? 1 : 0][id];
++    if (e.gen == gen) return e.s;
++    const VkSampler made = sampler_make(id, compare);
++    e = {gen, made};
++    return made;
++}
++VkSampler sampler_make(int id, bool compare) {
+     nvn_samp_par p{};
+     if (!sampler_of(id, &p)) p.minf = NVN_MIN_FILTER_LINEAR, p.magf = NVN_MAG_FILTER_LINEAR, p.lod_max = 1000.0f;
+     uint64_t key = compare ? 0xC0 : 0xAB;
+--- a/gpu/vk/vk_memory.cpp
++++ b/gpu/vk/vk_memory.cpp
+@@ -1469,6 +1469,21 @@
+ }
+ 
+ /// The pages of the pool the CPU wrote since its mirror's sync, copied in (the upload command buffer)
++// Hookshot 2.0.10: merge only adjacent capture copies; preserve bytes and order.
++void append_capture_copy(std::vector<VkBufferCopy>& runs, const VkBufferCopy& next) {
++    if (!runs.empty()) {
++        VkBufferCopy& last = runs.back();
++        if (last.size && next.size && last.size <= UINT64_MAX - last.srcOffset &&
++            last.size <= UINT64_MAX - last.dstOffset && next.size <= UINT64_MAX - last.size &&
++            next.size <= UINT64_MAX - next.srcOffset && next.size <= UINT64_MAX - next.dstOffset &&
++            last.srcOffset + last.size == next.srcOffset && last.dstOffset + last.size == next.dstOffset) {
++            last.size += next.size;
++            return;
++        }
++    }
++    runs.push_back(next);
++}
++
+ void mirror_sync(Pool& p) {
+     p.synced_epoch = mirror_epoch;
+     p.sync_seg = texture_segment();
+@@ -1500,7 +1515,7 @@
+                 auto b = cap_bufs.find(e.gen);
+                 if (b != cap_bufs.end()) {
+                     const uint64_t ga = std::max(page << kPageShift, p.lo), gb = std::min((page + 1) << kPageShift, p.hi);
+-                    cap_runs[b->second.buffer].push_back(
++                    append_capture_copy(cap_runs[b->second.buffer],
+                         {(uint64_t)e.slot * 4096 + (ga - (page << kPageShift)), ga - p.lo, gb - ga});
+                     b->second.last_use = std::max(b->second.last_use, cur_cap_value);
+                     (e.gen == cur_cap_gen ? st_sync_cap_pages : st_sync_old_pages)++;
+--- /dev/null
++++ b/licenses/Hookshot-GPL-3.0.txt
+@@ -0,0 +1,674 @@
++                    GNU GENERAL PUBLIC LICENSE
++                       Version 3, 29 June 2007
++
++ Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
++ Everyone is permitted to copy and distribute verbatim copies
++ of this license document, but changing it is not allowed.
++
++                            Preamble
++
++  The GNU General Public License is a free, copyleft license for
++software and other kinds of works.
++
++  The licenses for most software and other practical works are designed
++to take away your freedom to share and change the works.  By contrast,
++the GNU General Public License is intended to guarantee your freedom to
++share and change all versions of a program--to make sure it remains free
++software for all its users.  We, the Free Software Foundation, use the
++GNU General Public License for most of our software; it applies also to
++any other work released this way by its authors.  You can apply it to
++your programs, too.
++
++  When we speak of free software, we are referring to freedom, not
++price.  Our General Public Licenses are designed to make sure that you
++have the freedom to distribute copies of free software (and charge for
++them if you wish), that you receive source code or can get it if you
++want it, that you can change the software or use pieces of it in new
++free programs, and that you know you can do these things.
++
++  To protect your rights, we need to prevent others from denying you
++these rights or asking you to surrender the rights.  Therefore, you have
++certain responsibilities if you distribute copies of the software, or if
++you modify it: responsibilities to respect the freedom of others.
++
++  For example, if you distribute copies of such a program, whether
++gratis or for a fee, you must pass on to the recipients the same
++freedoms that you received.  You must make sure that they, too, receive
++or can get the source code.  And you must show them these terms so they
++know their rights.
++
++  Developers that use the GNU GPL protect your rights with two steps:
++(1) assert copyright on the software, and (2) offer you this License
++giving you legal permission to copy, distribute and/or modify it.
++
++  For the developers' and authors' protection, the GPL clearly explains
++that there is no warranty for this free software.  For both users' and
++authors' sake, the GPL requires that modified versions be marked as
++changed, so that their problems will not be attributed erroneously to
++authors of previous versions.
++
++  Some devices are designed to deny users access to install or run
++modified versions of the software inside them, although the manufacturer
++can do so.  This is fundamentally incompatible with the aim of
++protecting users' freedom to change the software.  The systematic
++pattern of such abuse occurs in the area of products for individuals to
++use, which is precisely where it is most unacceptable.  Therefore, we
++have designed this version of the GPL to prohibit the practice for those
++products.  If such problems arise substantially in other domains, we
++stand ready to extend this provision to those domains in future versions
++of the GPL, as needed to protect the freedom of users.
++
++  Finally, every program is threatened constantly by software patents.
++States should not allow patents to restrict development and use of
++software on general-purpose computers, but in those that do, we wish to
++avoid the special danger that patents applied to a free program could
++make it effectively proprietary.  To prevent this, the GPL assures that
++patents cannot be used to render the program non-free.
++
++  The precise terms and conditions for copying, distribution and
++modification follow.
++
++                       TERMS AND CONDITIONS
++
++  0. Definitions.
++
++  "This License" refers to version 3 of the GNU General Public License.
++
++  "Copyright" also means copyright-like laws that apply to other kinds of
++works, such as semiconductor masks.
++
++  "The Program" refers to any copyrightable work licensed under this
++License.  Each licensee is addressed as "you".  "Licensees" and
++"recipients" may be individuals or organizations.
++
++  To "modify" a work means to copy from or adapt all or part of the work
++in a fashion requiring copyright permission, other than the making of an
++exact copy.  The resulting work is called a "modified version" of the
++earlier work or a work "based on" the earlier work.
++
++  A "covered work" means either the unmodified Program or a work based
++on the Program.
++
++  To "propagate" a work means to do anything with it that, without
++permission, would make you directly or secondarily liable for
++infringement under applicable copyright law, except executing it on a
++computer or modifying a private copy.  Propagation includes copying,
++distribution (with or without modification), making available to the
++public, and in some countries other activities as well.
++
++  To "convey" a work means any kind of propagation that enables other
++parties to make or receive copies.  Mere interaction with a user through
++a computer network, with no transfer of a copy, is not conveying.
++
++  An interactive user interface displays "Appropriate Legal Notices"
++to the extent that it includes a convenient and prominently visible
++feature that (1) displays an appropriate copyright notice, and (2)
++tells the user that there is no warranty for the work (except to the
++extent that warranties are provided), that licensees may convey the
++work under this License, and how to view a copy of this License.  If
++the interface presents a list of user commands or options, such as a
++menu, a prominent item in the list meets this criterion.
++
++  1. Source Code.
++
++  The "source code" for a work means the preferred form of the work
++for making modifications to it.  "Object code" means any non-source
++form of a work.
++
++  A "Standard Interface" means an interface that either is an official
++standard defined by a recognized standards body, or, in the case of
++interfaces specified for a particular programming language, one that
++is widely used among developers working in that language.
++
++  The "System Libraries" of an executable work include anything, other
++than the work as a whole, that (a) is included in the normal form of
++packaging a Major Component, but which is not part of that Major
++Component, and (b) serves only to enable use of the work with that
++Major Component, or to implement a Standard Interface for which an
++implementation is available to the public in source code form.  A
++"Major Component", in this context, means a major essential component
++(kernel, window system, and so on) of the specific operating system
++(if any) on which the executable work runs, or a compiler used to
++produce the work, or an object code interpreter used to run it.
++
++  The "Corresponding Source" for a work in object code form means all
++the source code needed to generate, install, and (for an executable
++work) run the object code and to modify the work, including scripts to
++control those activities.  However, it does not include the work's
++System Libraries, or general-purpose tools or generally available free
++programs which are used unmodified in performing those activities but
++which are not part of the work.  For example, Corresponding Source
++includes interface definition files associated with source files for
++the work, and the source code for shared libraries and dynamically
++linked subprograms that the work is specifically designed to require,
++such as by intimate data communication or control flow between those
++subprograms and other parts of the work.
++
++  The Corresponding Source need not include anything that users
++can regenerate automatically from other parts of the Corresponding
++Source.
++
++  The Corresponding Source for a work in source code form is that
++same work.
++
++  2. Basic Permissions.
++
++  All rights granted under this License are granted for the term of
++copyright on the Program, and are irrevocable provided the stated
++conditions are met.  This License explicitly affirms your unlimited
++permission to run the unmodified Program.  The output from running a
++covered work is covered by this License only if the output, given its
++content, constitutes a covered work.  This License acknowledges your
++rights of fair use or other equivalent, as provided by copyright law.
++
++  You may make, run and propagate covered works that you do not
++convey, without conditions so long as your license otherwise remains
++in force.  You may convey covered works to others for the sole purpose
++of having them make modifications exclusively for you, or provide you
++with facilities for running those works, provided that you comply with
++the terms of this License in conveying all material for which you do
++not control copyright.  Those thus making or running the covered works
++for you must do so exclusively on your behalf, under your direction
++and control, on terms that prohibit them from making any copies of
++your copyrighted material outside their relationship with you.
++
++  Conveying under any other circumstances is permitted solely under
++the conditions stated below.  Sublicensing is not allowed; section 10
++makes it unnecessary.
++
++  3. Protecting Users' Legal Rights From Anti-Circumvention Law.
++
++  No covered work shall be deemed part of an effective technological
++measure under any applicable law fulfilling obligations under article
++11 of the WIPO copyright treaty adopted on 20 December 1996, or
++similar laws prohibiting or restricting circumvention of such
++measures.
++
++  When you convey a covered work, you waive any legal power to forbid
++circumvention of technological measures to the extent such circumvention
++is effected by exercising rights under this License with respect to
++the covered work, and you disclaim any intention to limit operation or
++modification of the work as a means of enforcing, against the work's
++users, your or third parties' legal rights to forbid circumvention of
++technological measures.
++
++  4. Conveying Verbatim Copies.
++
++  You may convey verbatim copies of the Program's source code as you
++receive it, in any medium, provided that you conspicuously and
++appropriately publish on each copy an appropriate copyright notice;
++keep intact all notices stating that this License and any
++non-permissive terms added in accord with section 7 apply to the code;
++keep intact all notices of the absence of any warranty; and give all
++recipients a copy of this License along with the Program.
++
++  You may charge any price or no price for each copy that you convey,
++and you may offer support or warranty protection for a fee.
++
++  5. Conveying Modified Source Versions.
++
++  You may convey a work based on the Program, or the modifications to
++produce it from the Program, in the form of source code under the
++terms of section 4, provided that you also meet all of these conditions:
++
++    a) The work must carry prominent notices stating that you modified
++    it, and giving a relevant date.
++
++    b) The work must carry prominent notices stating that it is
++    released under this License and any conditions added under section
++    7.  This requirement modifies the requirement in section 4 to
++    "keep intact all notices".
++
++    c) You must license the entire work, as a whole, under this
++    License to anyone who comes into possession of a copy.  This
++    License will therefore apply, along with any applicable section 7
++    additional terms, to the whole of the work, and all its parts,
++    regardless of how they are packaged.  This License gives no
++    permission to license the work in any other way, but it does not
++    invalidate such permission if you have separately received it.
++
++    d) If the work has interactive user interfaces, each must display
++    Appropriate Legal Notices; however, if the Program has interactive
++    interfaces that do not display Appropriate Legal Notices, your
++    work need not make them do so.
++
++  A compilation of a covered work with other separate and independent
++works, which are not by their nature extensions of the covered work,
++and which are not combined with it such as to form a larger program,
++in or on a volume of a storage or distribution medium, is called an
++"aggregate" if the compilation and its resulting copyright are not
++used to limit the access or legal rights of the compilation's users
++beyond what the individual works permit.  Inclusion of a covered work
++in an aggregate does not cause this License to apply to the other
++parts of the aggregate.
++
++  6. Conveying Non-Source Forms.
++
++  You may convey a covered work in object code form under the terms
++of sections 4 and 5, provided that you also convey the
++machine-readable Corresponding Source under the terms of this License,
++in one of these ways:
++
++    a) Convey the object code in, or embodied in, a physical product
++    (including a physical distribution medium), accompanied by the
++    Corresponding Source fixed on a durable physical medium
++    customarily used for software interchange.
++
++    b) Convey the object code in, or embodied in, a physical product
++    (including a physical distribution medium), accompanied by a
++    written offer, valid for at least three years and valid for as
++    long as you offer spare parts or customer support for that product
++    model, to give anyone who possesses the object code either (1) a
++    copy of the Corresponding Source for all the software in the
++    product that is covered by this License, on a durable physical
++    medium customarily used for software interchange, for a price no
++    more than your reasonable cost of physically performing this
++    conveying of source, or (2) access to copy the
++    Corresponding Source from a network server at no charge.
++
++    c) Convey individual copies of the object code with a copy of the
++    written offer to provide the Corresponding Source.  This
++    alternative is allowed only occasionally and noncommercially, and
++    only if you received the object code with such an offer, in accord
++    with subsection 6b.
++
++    d) Convey the object code by offering access from a designated
++    place (gratis or for a charge), and offer equivalent access to the
++    Corresponding Source in the same way through the same place at no
++    further charge.  You need not require recipients to copy the
++    Corresponding Source along with the object code.  If the place to
++    copy the object code is a network server, the Corresponding Source
++    may be on a different server (operated by you or a third party)
++    that supports equivalent copying facilities, provided you maintain
++    clear directions next to the object code saying where to find the
++    Corresponding Source.  Regardless of what server hosts the
++    Corresponding Source, you remain obligated to ensure that it is
++    available for as long as needed to satisfy these requirements.
++
++    e) Convey the object code using peer-to-peer transmission, provided
++    you inform other peers where the object code and Corresponding
++    Source of the work are being offered to the general public at no
++    charge under subsection 6d.
++
++  A separable portion of the object code, whose source code is excluded
++from the Corresponding Source as a System Library, need not be
++included in conveying the object code work.
++
++  A "User Product" is either (1) a "consumer product", which means any
++tangible personal property which is normally used for personal, family,
++or household purposes, or (2) anything designed or sold for incorporation
++into a dwelling.  In determining whether a product is a consumer product,
++doubtful cases shall be resolved in favor of coverage.  For a particular
++product received by a particular user, "normally used" refers to a
++typical or common use of that class of product, regardless of the status
++of the particular user or of the way in which the particular user
++actually uses, or expects or is expected to use, the product.  A product
++is a consumer product regardless of whether the product has substantial
++commercial, industrial or non-consumer uses, unless such uses represent
++the only significant mode of use of the product.
++
++  "Installation Information" for a User Product means any methods,
++procedures, authorization keys, or other information required to install
++and execute modified versions of a covered work in that User Product from
++a modified version of its Corresponding Source.  The information must
++suffice to ensure that the continued functioning of the modified object
++code is in no case prevented or interfered with solely because
++modification has been made.
++
++  If you convey an object code work under this section in, or with, or
++specifically for use in, a User Product, and the conveying occurs as
++part of a transaction in which the right of possession and use of the
++User Product is transferred to the recipient in perpetuity or for a
++fixed term (regardless of how the transaction is characterized), the
++Corresponding Source conveyed under this section must be accompanied
++by the Installation Information.  But this requirement does not apply
++if neither you nor any third party retains the ability to install
++modified object code on the User Product (for example, the work has
++been installed in ROM).
++
++  The requirement to provide Installation Information does not include a
++requirement to continue to provide support service, warranty, or updates
++for a work that has been modified or installed by the recipient, or for
++the User Product in which it has been modified or installed.  Access to a
++network may be denied when the modification itself materially and
++adversely affects the operation of the network or violates the rules and
++protocols for communication across the network.
++
++  Corresponding Source conveyed, and Installation Information provided,
++in accord with this section must be in a format that is publicly
++documented (and with an implementation available to the public in
++source code form), and must require no special password or key for
++unpacking, reading or copying.
++
++  7. Additional Terms.
++
++  "Additional permissions" are terms that supplement the terms of this
++License by making exceptions from one or more of its conditions.
++Additional permissions that are applicable to the entire Program shall
++be treated as though they were included in this License, to the extent
++that they are valid under applicable law.  If additional permissions
++apply only to part of the Program, that part may be used separately
++under those permissions, but the entire Program remains governed by
++this License without regard to the additional permissions.
++
++  When you convey a copy of a covered work, you may at your option
++remove any additional permissions from that copy, or from any part of
++it.  (Additional permissions may be written to require their own
++removal in certain cases when you modify the work.)  You may place
++additional permissions on material, added by you to a covered work,
++for which you have or can give appropriate copyright permission.
++
++  Notwithstanding any other provision of this License, for material you
++add to a covered work, you may (if authorized by the copyright holders of
++that material) supplement the terms of this License with terms:
++
++    a) Disclaiming warranty or limiting liability differently from the
++    terms of sections 15 and 16 of this License; or
++
++    b) Requiring preservation of specified reasonable legal notices or
++    author attributions in that material or in the Appropriate Legal
++    Notices displayed by works containing it; or
++
++    c) Prohibiting misrepresentation of the origin of that material, or
++    requiring that modified versions of such material be marked in
++    reasonable ways as different from the original version; or
++
++    d) Limiting the use for publicity purposes of names of licensors or
++    authors of the material; or
++
++    e) Declining to grant rights under trademark law for use of some
++    trade names, trademarks, or service marks; or
++
++    f) Requiring indemnification of licensors and authors of that
++    material by anyone who conveys the material (or modified versions of
++    it) with contractual assumptions of liability to the recipient, for
++    any liability that these contractual assumptions directly impose on
++    those licensors and authors.
++
++  All other non-permissive additional terms are considered "further
++restrictions" within the meaning of section 10.  If the Program as you
++received it, or any part of it, contains a notice stating that it is
++governed by this License along with a term that is a further
++restriction, you may remove that term.  If a license document contains
++a further restriction but permits relicensing or conveying under this
++License, you may add to a covered work material governed by the terms
++of that license document, provided that the further restriction does
++not survive such relicensing or conveying.
++
++  If you add terms to a covered work in accord with this section, you
++must place, in the relevant source files, a statement of the
++additional terms that apply to those files, or a notice indicating
++where to find the applicable terms.
++
++  Additional terms, permissive or non-permissive, may be stated in the
++form of a separately written license, or stated as exceptions;
++the above requirements apply either way.
++
++  8. Termination.
++
++  You may not propagate or modify a covered work except as expressly
++provided under this License.  Any attempt otherwise to propagate or
++modify it is void, and will automatically terminate your rights under
++this License (including any patent licenses granted under the third
++paragraph of section 11).
++
++  However, if you cease all violation of this License, then your
++license from a particular copyright holder is reinstated (a)
++provisionally, unless and until the copyright holder explicitly and
++finally terminates your license, and (b) permanently, if the copyright
++holder fails to notify you of the violation by some reasonable means
++prior to 60 days after the cessation.
++
++  Moreover, your license from a particular copyright holder is
++reinstated permanently if the copyright holder notifies you of the
++violation by some reasonable means, this is the first time you have
++received notice of violation of this License (for any work) from that
++copyright holder, and you cure the violation prior to 30 days after
++your receipt of the notice.
++
++  Termination of your rights under this section does not terminate the
++licenses of parties who have received copies or rights from you under
++this License.  If your rights have been terminated and not permanently
++reinstated, you do not qualify to receive new licenses for the same
++material under section 10.
++
++  9. Acceptance Not Required for Having Copies.
++
++  You are not required to accept this License in order to receive or
++run a copy of the Program.  Ancillary propagation of a covered work
++occurring solely as a consequence of using peer-to-peer transmission
++to receive a copy likewise does not require acceptance.  However,
++nothing other than this License grants you permission to propagate or
++modify any covered work.  These actions infringe copyright if you do
++not accept this License.  Therefore, by modifying or propagating a
++covered work, you indicate your acceptance of this License to do so.
++
++  10. Automatic Licensing of Downstream Recipients.
++
++  Each time you convey a covered work, the recipient automatically
++receives a license from the original licensors, to run, modify and
++propagate that work, subject to this License.  You are not responsible
++for enforcing compliance by third parties with this License.
++
++  An "entity transaction" is a transaction transferring control of an
++organization, or substantially all assets of one, or subdividing an
++organization, or merging organizations.  If propagation of a covered
++work results from an entity transaction, each party to that
++transaction who receives a copy of the work also receives whatever
++licenses to the work the party's predecessor in interest had or could
++give under the previous paragraph, plus a right to possession of the
++Corresponding Source of the work from the predecessor in interest, if
++the predecessor has it or can get it with reasonable efforts.
++
++  You may not impose any further restrictions on the exercise of the
++rights granted or affirmed under this License.  For example, you may
++not impose a license fee, royalty, or other charge for exercise of
++rights granted under this License, and you may not initiate litigation
++(including a cross-claim or counterclaim in a lawsuit) alleging that
++any patent claim is infringed by making, using, selling, offering for
++sale, or importing the Program or any portion of it.
++
++  11. Patents.
++
++  A "contributor" is a copyright holder who authorizes use under this
++License of the Program or a work on which the Program is based.  The
++work thus licensed is called the contributor's "contributor version".
++
++  A contributor's "essential patent claims" are all patent claims
++owned or controlled by the contributor, whether already acquired or
++hereafter acquired, that would be infringed by some manner, permitted
++by this License, of making, using, or selling its contributor version,
++but do not include claims that would be infringed only as a
++consequence of further modification of the contributor version.  For
++purposes of this definition, "control" includes the right to grant
++patent sublicenses in a manner consistent with the requirements of
++this License.
++
++  Each contributor grants you a non-exclusive, worldwide, royalty-free
++patent license under the contributor's essential patent claims, to
++make, use, sell, offer for sale, import and otherwise run, modify and
++propagate the contents of its contributor version.
++
++  In the following three paragraphs, a "patent license" is any express
++agreement or commitment, however denominated, not to enforce a patent
++(such as an express permission to practice a patent or covenant not to
++sue for patent infringement).  To "grant" such a patent license to a
++party means to make such an agreement or commitment not to enforce a
++patent against the party.
++
++  If you convey a covered work, knowingly relying on a patent license,
++and the Corresponding Source of the work is not available for anyone
++to copy, free of charge and under the terms of this License, through a
++publicly available network server or other readily accessible means,
++then you must either (1) cause the Corresponding Source to be so
++available, or (2) arrange to deprive yourself of the benefit of the
++patent license for this particular work, or (3) arrange, in a manner
++consistent with the requirements of this License, to extend the patent
++license to downstream recipients.  "Knowingly relying" means you have
++actual knowledge that, but for the patent license, your conveying the
++covered work in a country, or your recipient's use of the covered work
++in a country, would infringe one or more identifiable patents in that
++country that you have reason to believe are valid.
++
++  If, pursuant to or in connection with a single transaction or
++arrangement, you convey, or propagate by procuring conveyance of, a
++covered work, and grant a patent license to some of the parties
++receiving the covered work authorizing them to use, propagate, modify
++or convey a specific copy of the covered work, then the patent license
++you grant is automatically extended to all recipients of the covered
++work and works based on it.
++
++  A patent license is "discriminatory" if it does not include within
++the scope of its coverage, prohibits the exercise of, or is
++conditioned on the non-exercise of one or more of the rights that are
++specifically granted under this License.  You may not convey a covered
++work if you are a party to an arrangement with a third party that is
++in the business of distributing software, under which you make payment
++to the third party based on the extent of your activity of conveying
++the work, and under which the third party grants, to any of the
++parties who would receive the covered work from you, a discriminatory
++patent license (a) in connection with copies of the covered work
++conveyed by you (or copies made from those copies), or (b) primarily
++for and in connection with specific products or compilations that
++contain the covered work, unless you entered into that arrangement,
++or that patent license was granted, prior to 28 March 2007.
++
++  Nothing in this License shall be construed as excluding or limiting
++any implied license or other defenses to infringement that may
++otherwise be available to you under applicable patent law.
++
++  12. No Surrender of Others' Freedom.
++
++  If conditions are imposed on you (whether by court order, agreement or
++otherwise) that contradict the conditions of this License, they do not
++excuse you from the conditions of this License.  If you cannot convey a
++covered work so as to satisfy simultaneously your obligations under this
++License and any other pertinent obligations, then as a consequence you may
++not convey it at all.  For example, if you agree to terms that obligate you
++to collect a royalty for further conveying from those to whom you convey
++the Program, the only way you could satisfy both those terms and this
++License would be to refrain entirely from conveying the Program.
++
++  13. Use with the GNU Affero General Public License.
++
++  Notwithstanding any other provision of this License, you have
++permission to link or combine any covered work with a work licensed
++under version 3 of the GNU Affero General Public License into a single
++combined work, and to convey the resulting work.  The terms of this
++License will continue to apply to the part which is the covered work,
++but the special requirements of the GNU Affero General Public License,
++section 13, concerning interaction through a network will apply to the
++combination as such.
++
++  14. Revised Versions of this License.
++
++  The Free Software Foundation may publish revised and/or new versions of
++the GNU General Public License from time to time.  Such new versions will
++be similar in spirit to the present version, but may differ in detail to
++address new problems or concerns.
++
++  Each version is given a distinguishing version number.  If the
++Program specifies that a certain numbered version of the GNU General
++Public License "or any later version" applies to it, you have the
++option of following the terms and conditions either of that numbered
++version or of any later version published by the Free Software
++Foundation.  If the Program does not specify a version number of the
++GNU General Public License, you may choose any version ever published
++by the Free Software Foundation.
++
++  If the Program specifies that a proxy can decide which future
++versions of the GNU General Public License can be used, that proxy's
++public statement of acceptance of a version permanently authorizes you
++to choose that version for the Program.
++
++  Later license versions may give you additional or different
++permissions.  However, no additional obligations are imposed on any
++author or copyright holder as a result of your choosing to follow a
++later version.
++
++  15. Disclaimer of Warranty.
++
++  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY
++APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
++HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY
++OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,
++THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM
++IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF
++ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
++
++  16. Limitation of Liability.
++
++  IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
++WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
++THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY
++GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE
++USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF
++DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD
++PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS),
++EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
++SUCH DAMAGES.
++
++  17. Interpretation of Sections 15 and 16.
++
++  If the disclaimer of warranty and limitation of liability provided
++above cannot be given local legal effect according to their terms,
++reviewing courts shall apply local law that most closely approximates
++an absolute waiver of all civil liability in connection with the
++Program, unless a warranty or assumption of liability accompanies a
++copy of the Program in return for a fee.
++
++                     END OF TERMS AND CONDITIONS
++
++            How to Apply These Terms to Your New Programs
++
++  If you develop a new program, and you want it to be of the greatest
++possible use to the public, the best way to achieve this is to make it
++free software which everyone can redistribute and change under these terms.
++
++  To do so, attach the following notices to the program.  It is safest
++to attach them to the start of each source file to most effectively
++state the exclusion of warranty; and each file should have at least
++the "copyright" line and a pointer to where the full notice is found.
++
++    <one line to give the program's name and a brief idea of what it does.>
++    Copyright (C) <year>  <name of author>
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>.
++
++Also add information on how to contact you by electronic and paper mail.
++
++  If the program does terminal interaction, make it output a short
++notice like this when it starts in an interactive mode:
++
++    <program>  Copyright (C) <year>  <name of author>
++    This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
++    This is free software, and you are welcome to redistribute it
++    under certain conditions; type `show c' for details.
++
++The hypothetical commands `show w' and `show c' should show the appropriate
++parts of the General Public License.  Of course, your program's commands
++might be different; for a GUI interface, you would use an "about box".
++
++  You should also get your employer (if you work as a programmer) or school,
++if any, to sign a "copyright disclaimer" for the program, if necessary.
++For more information on this, and how to apply and follow the GNU GPL, see
++<https://www.gnu.org/licenses/>.
++
++  The GNU General Public License does not permit incorporating your program
++into proprietary programs.  If your program is a subroutine library, you
++may consider it more useful to permit linking proprietary applications with
++the library.  If this is what you want to do, use the GNU Lesser General
++Public License instead of this License.  But first, please read
++<https://www.gnu.org/licenses/why-not-lgpl.html>.
+--- /dev/null
++++ b/tests/test_adaptive_043.py
+@@ -0,0 +1,96 @@
++"""Exercise independent output, actual hardware plans and exact-host maintenance."""
++import contextlib
++import io
++import json
++from pathlib import Path
++import subprocess
++import sys
++import tempfile
++import unittest
++from unittest.mock import patch
++
++from akynoleyend import __version__
++from akynoleyend.build import source_identity
++from akynoleyend.cli import parser
++from akynoleyend.coherence import HOST_REVISION, PREVIOUS_HOST_SOURCES, require_host
++from akynoleyend.config import compile_jobs
++from akynoleyend.errors import ProjectError
++from akynoleyend.files import sha256, write_json
++from akynoleyend.graphics import graphics_environment
++from akynoleyend.hardware import recommended_chunk, shader_workers, usable_memory
++from akynoleyend.launch import launch, verify_build
++from akynoleyend.shader_prepare import _update_renderer
++
++ROOT = Path(__file__).resolve().parents[1]
++GIB = 1 << 30
++
++
++class AdaptiveTests(unittest.TestCase):
++    def test_plans_use_available_memory_affinity_and_commit_not_a_saved_machine(self):
++        low = {"ram_total": 16*GIB, "ram_available": 8*GIB, "commit_available": 0, "logical_cpus": 6}
++        high = {"ram_total": 48*GIB, "ram_available": 32*GIB, "commit_available": 40*GIB, "logical_cpus": 24}
++        self.assertEqual(recommended_chunk(low), 6)
++        self.assertEqual(compile_jobs(None, usable_memory(low), low["logical_cpus"]), 1)
++        self.assertEqual(recommended_chunk(high), 12)
++        self.assertEqual(compile_jobs(None, usable_memory(high), 24, chunk_mib=12), 7)
++        high["commit_available"] = 5*GIB
++        self.assertEqual(compile_jobs(None, usable_memory(high), 24, chunk_mib=12), 1)
++        self.assertEqual(shader_workers(dict(low, logical_cpus=1)), 1)
++        self.assertEqual(shader_workers(low, background=True), 2)
++        self.assertEqual(compile_jobs(3, 0, 1), 3)  # explicit user selection
++
++    def test_hardware_cli_detects_current_process_without_requiring_game_or_tools(self):
++        result = subprocess.run([sys.executable, str(ROOT/'manage.py'), 'hardware'],
++                                capture_output=True, text=True, timeout=20)
++        self.assertEqual(result.returncode, 0, result.stderr)
++        info = json.loads(result.stdout.removeprefix('@@hardware '))
++        self.assertGreaterEqual(info['logical_cpus'], 1)
++        self.assertGreaterEqual(info['ram_total'], info['ram_available'])
++        self.assertIn(info['chunk_mib'], (6, 12))
++        self.assertGreaterEqual(info['jobs'], 1)
++
++    def test_fsr_preset_can_reset_4k_output_without_overriding_internal_scale(self):
++        args = parser().parse_args(['run', '--resolution', '67', '--output-resolution', 'game', '--upscaling', 'fsr'])
++        env = graphics_environment(resolution=args.resolution, output_resolution=args.output_resolution,
++                                   upscaling=args.upscaling, sharpness=10, framegen=0)
++        self.assertEqual(env['HOS_OUTPUT_RES'], '0')
++        self.assertEqual(env['AKYNO_RESOLUTION'], '3')
++        self.assertEqual(env['RX_VK_UPSCALE'], '3')
++        self.assertEqual(env['AKYNO_SHARPNESS'], '10')
++        self.assertNotIn('HOS_RES_SCALE', env)
++        with self.assertRaises(ProjectError):
++            graphics_environment(resolution='native-4k', output_resolution='game')
++
++    def test_exact_test1_host_update_launches_without_rebuilding_or_changing_save(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            base = Path(temporary); game = base/'jogo'; game.mkdir()
++            romfs = base/'romfs'
++            for name in ['System', 'Pack']: (romfs/name).mkdir(parents=True)
++            for name in ['AkynoLeyend.exe', 'image.bin', 'AkynoLeyend.dll']: (game/name).write_bytes(name.encode())
++            save = game/'user/save/keep'; save.parent.mkdir(parents=True); save.write_bytes(b'save')
++            source = next(iter(PREVIOUS_HOST_SOURCES['0.4.3-test.1']))
++            manifest = {'schema': 1, 'project': 'AkynoLeyend', 'version': '0.4.3-test.1',
++                        'host_revision': HOST_REVISION, 'source_sha256': source,
++                        'game_build_id': 'e0f3ccfa', 'romfs': str(romfs),
++                        'files': {n: sha256(game/n) for n in ['AkynoLeyend.exe', 'AkynoLeyend.dll', 'image.bin']}}
++            write_json(game/'AkynoLeyend-build.json', manifest)
++            before = {p: p.read_bytes() for p in [game/'AkynoLeyend.exe', game/'image.bin', save]}
++            ready = base/'ready'; ready.mkdir(); dll = ready/'AkynoLeyend.dll'; dll.write_bytes(b'AkynoLeyend.dll')
++            write_json(ready/'renderer.json', {'source_sha256': 'generic', 'binary_sha256': sha256(dll)})
++            with contextlib.redirect_stdout(io.StringIO()):
++                with self.assertRaises(ProjectError): launch(game, require_current_build=True, dry_run=True)
++                with patch('akynoleyend.shader_prepare.renderer_prebuilt', return_value=dll):
++                    updated = _update_renderer(game, manifest, lambda _: None)
++                self.assertEqual(updated['runtime_source_sha256'], source_identity())
++                self.assertEqual(updated['renderer_version'], __version__)
++                self.assertEqual(launch(game, require_current_build=True, dry_run=True), 0)
++            for path, content in before.items(): self.assertEqual(path.read_bytes(), content)
++            self.assertEqual(verify_build(game)['version'], '0.4.3-test.1')
++            with self.assertRaises(ProjectError): require_host(dict(manifest, source_sha256='modified'))
++            with self.assertRaises(ProjectError): require_host(dict(manifest, host_revision='old-abi'))
++
++    def test_unrecognized_old_host_is_rejected_before_updating_any_file(self):
++        manifest = {'version': '0.4.3-test.1', 'host_revision': HOST_REVISION,
++                    'source_sha256': 'unrecognized', 'game_build_id': 'e0f3ccfa'}
++        with patch('akynoleyend.shader_prepare.renderer_prebuilt', side_effect=AssertionError('must reject first')):
++            with self.assertRaises(ProjectError): _update_renderer(Path('unused'), manifest, print)
+--- /dev/null
++++ b/tests/test_renderer_cpu043.py
+@@ -0,0 +1,83 @@
++"""Execute production sampler generation/cache and captured-copy regressions."""
++from pathlib import Path
++import os
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def function(text, marker):
++    start = text.index(marker); end = text.index('{', start) + 1; depth = 1
++    while depth:
++        depth += (text[end] == '{') - (text[end] == '}'); end += 1
++    return text[start:end]
++
++
++class RendererCpuTests(unittest.TestCase):
++    def test_sampler_cache_reuses_only_current_registration_and_compare_mode(self):
++        cxx = shutil.which('c++')
++        if not cxx: self.skipTest('C++ compiler unavailable')
++        bank = (ROOT/'gpu/vk/vk_bank.cpp').read_text()
++        draw = (ROOT/'gpu/vk/vk_draw.cpp').read_text()
++        code = r'''
++#include <atomic>
++#include <cassert>
++#include <cstdint>
++#include <cstdlib>
++#include <cstring>
++#include <mutex>
++#include <thread>
++#include <vector>
++#define _Static_assert static_assert
++#include "rx_nvn.h"
++using VkSampler = uint64_t;
++struct SampReg {nvn_samp_par p{};bool ok=false;};
++std::mutex reg_mu;std::vector<SampReg> samp_regs;
++std::atomic<uint64_t> samp_gen{1};std::atomic<int> made{0};
++'''
++        code += function(bank, 'void register_sampler_copy(')
++        code += function(bank, 'uint64_t sampler_registrations_generation(')
++        code += function(bank, 'bool sampler_of(')
++        code += r'''
++VkSampler sampler_make(int id,bool compare){++made;nvn_samp_par p{};sampler_of(id,&p);
++return (uint64_t(id+2)<<24)+(uint64_t(p.minf)<<1)+(compare?1:0);}
++'''
++        code += function(draw, 'VkSampler sampler_for(int id, bool compare) {')
++        code += r'''
++int main(){
++ const bool on=!getenv("RX_VK_SAMPLER_CACHE")||atoi(getenv("RX_VK_SAMPLER_CACHE"))!=0;
++ nvn_samp_par p{};p.minf=1;register_sampler_copy(5,p);
++ const auto gen=sampler_registrations_generation();register_sampler_copy(5,p);assert(sampler_registrations_generation()==gen);
++ const auto original=sampler_for(5,false);for(int n=0;n<10000;n++)assert(sampler_for(5,false)==original);
++ assert(made==(on?1:10001));
++ auto before=made.load();assert(sampler_for(5,true)!=original);assert(made==before+1);
++ p.minf=2;register_sampler_copy(5,p);assert(sampler_registrations_generation()==gen+1);
++ assert(sampler_for(5,false)!=original);
++ const auto changed=sampler_registrations_generation();register_sampler_copy(-1,p);register_sampler_copy(4096,p);
++ assert(sampler_registrations_generation()==changed);
++ before=made.load();sampler_for(-1,false);sampler_for(-1,false);assert(made==before+2);
++ before=made.load();std::thread worker([]{sampler_for(5,false);sampler_for(5,false);});worker.join();
++ assert(made==before+(on?1:2));
++}
++'''
++        with tempfile.TemporaryDirectory() as temp:
++            source=Path(temp)/'sampler.cpp';binary=Path(temp)/'sampler';source.write_text(code)
++            result=subprocess.run([cxx,'-std=c++20','-O2','-pthread','-Wall','-Wextra','-Werror',
++                                   '-I'+str(ROOT/'gpu/render'),str(source),'-o',str(binary)],capture_output=True,text=True)
++            self.assertEqual(result.returncode,0,result.stderr)
++            for setting in ['0','1']:
++                env=dict(os.environ,RX_VK_SAMPLER_CACHE=setting)
++                result=subprocess.run([str(binary)],env=env,capture_output=True,text=True)
++                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
++
++    def test_captured_copy_merging_preserves_every_byte_and_boundary(self):
++        cxx=shutil.which('c++')
++        if not cxx:self.skipTest('C++ compiler unavailable')
++        result=subprocess.run([sys.executable,str(ROOT/'tools/test_capture_copy_runs.py'),'--cxx',cxx],
++                              capture_output=True,text=True,timeout=60)
++        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
++        self.assertIn('PASS merged exact bytes',result.stdout)
+--- a/tools/make_distribution.py
++++ b/tools/make_distribution.py
+@@ -67,13 +67,16 @@
+     parser.add_argument("--out", type=Path, required=True)
+     parser.add_argument("--source-only", action="store_true")
+     parser.add_argument(
+-        "--update", action="store_true", help="Indisponivel nesta revisao: exige pacote completo em pasta nova."
++        "--update", action="store_true", help="Atualizacao da interface/orquestracao para o host exato do Teste 1."
+     )
+     args = parser.parse_args()
+     if args.source_only and args.update:
+         parser.error("Choose source-only or update.")
+     if args.update:
+-        parser.error("Esta revisao altera o host. Gere o pacote completo para uma pasta nova.")
++        from akynoleyend import __version__
++        from akynoleyend.coherence import PREVIOUS_HOST_SOURCES
++        if __version__ != "0.4.3-test.2" or "0.4.3-test.1" not in PREVIOUS_HOST_SOURCES:
++            parser.error("Atualizacao incremental sem host anterior conferido.")
+     if not args.source_only:
+         from akynoleyend.release import verify_windows_release
+ 
+--- /dev/null
++++ b/tools/test_capture_copy_runs.py
+@@ -0,0 +1,110 @@
++# Adapted from Hookshot v2.0.10, GPL-3.0; see docs/origem.md.
++"""Captured mirror regions preserve bytes when adjacent runs are combined.
++
++python -I -B tests/test_capture_copy_runs.py --cxx <compiler>
++The fixture is retained in the ignored work directory.
++"""
++import argparse
++import os
++from pathlib import Path
++import subprocess
++import tempfile
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def function(source, marker):
++    start = source.index(marker)
++    end = source.index("{", start) + 1
++    depth = 1
++    while depth:
++        depth += (source[end] == "{") - (source[end] == "}")
++        end += 1
++    return source[start:end]
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--cxx", default="g++")
++    args = parser.parse_args()
++    source = (ROOT / "gpu/vk/vk_memory.cpp").read_text(encoding="utf-8")
++    helper = function(source, "void append_capture_copy(")
++    sync = function(source, "void mirror_sync(Pool& p)")
++    if "append_capture_copy(cap_runs[b->second.buffer]," not in sync:
++        raise SystemExit("the captured-page path does not use the helper")
++    fixture = r'''
++#include <algorithm>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <map>
++#include <vector>
++struct VkBufferCopy { uint64_t srcOffset, dstOffset, size; };
++#define CHECK(x) do { if (!(x)) { std::fprintf(stderr,"FAIL:%d %s\n",__LINE__,#x); std::exit(1); } } while (0)
++''' + helper + r'''
++static void expect_separate(VkBufferCopy a, VkBufferCopy b) {
++    std::vector<VkBufferCopy> v; append_capture_copy(v,a); append_capture_copy(v,b); CHECK(v.size()==2);
++}
++int main() {
++    std::vector<VkBufferCopy> v;
++    append_capture_copy(v,{16,32,4}); append_capture_copy(v,{20,36,8});
++    CHECK(v.size()==1 && v[0].srcOffset==16 && v[0].dstOffset==32 && v[0].size==12);
++    expect_separate({0,0,4},{5,4,4}); expect_separate({0,0,4},{4,5,4});
++    expect_separate({0,0,4},{2,2,4}); expect_separate({4,4,4},{0,0,4});
++    expect_separate({0,0,0},{0,0,4}); expect_separate({0,0,4},{4,4,0});
++    expect_separate({UINT64_MAX-1,0,2},{0,2,4});
++    expect_separate({0,UINT64_MAX-1,2},{2,0,4});
++    expect_separate({0,0,8},{8,8,UINT64_MAX-7});
++    expect_separate({UINT64_MAX-10,0,5},{UINT64_MAX-5,5,10});
++    expect_separate({0,UINT64_MAX-10,5},{5,UINT64_MAX-5,10});
++
++    // Two independent capture buffers with partial edges and gaps. Interleave the
++    // input and include real adjacent runs, with disjoint destination ranges.
++    std::vector<uint8_t> src[2]={std::vector<uint8_t>(65536),std::vector<uint8_t>(65536)};
++    for (unsigned b=0;b<2;b++) for (unsigned i=0;i<src[b].size();i++) src[b][i]=(uint8_t)(i*31+b*53);
++    std::vector<uint8_t> original(65536,0x7d), combined=original;
++    std::map<int,std::vector<VkBufferCopy>> baseline, optimized;
++    const std::vector<std::pair<int,VkBufferCopy>> input={
++        {0,{3,101,7}}, {1,{100,1000,5}}, {0,{10,108,9}},
++        {1,{105,1005,11}}, {0,{30,150,4}}, {1,{200,1100,3}},
++        {0,{34,154,2}}, {1,{203,1103,1}}, {0,{60,180,5}}
++    };
++    for (const auto& [buffer,r]:input) {
++        baseline[buffer].push_back(r); append_capture_copy(optimized[buffer],r);
++    }
++    CHECK(baseline[0].size()==5 && optimized[0].size()==3);
++    CHECK(baseline[1].size()==4 && optimized[1].size()==2);
++    for (const auto& [b,rs]:baseline) for(const auto& r:rs)
++        std::copy_n(src[b].begin()+r.srcOffset,(size_t)r.size,original.begin()+r.dstOffset);
++    for (const auto& [b,rs]:optimized) for(const auto& r:rs)
++        std::copy_n(src[b].begin()+r.srcOffset,(size_t)r.size,combined.begin()+r.dstOffset);
++    CHECK(original==combined);
++
++    // A long contiguous sequence and its fragmented counterpart.
++    std::vector<VkBufferCopy> pages;
++    for(uint64_t i=0;i<1024;i++) pages.push_back({(i+i/256)*4096,(i+i/256)*4096,4096});
++    std::vector<VkBufferCopy> compressed;
++    for(const auto& r:pages) append_capture_copy(compressed,r);
++    CHECK(compressed.size()==4);
++    compressed.clear();
++    for(uint64_t i=0;i<pages.size();i++) append_capture_copy(compressed,{(i*2)*4096,(i*2)*4096,4096});
++    CHECK(compressed.size()==pages.size());
++    std::printf("PASS merged exact bytes, gaps, defensive overlaps, overflow and buffer grouping\n");
++}
++'''
++    work = ROOT / "work"
++    work.mkdir(exist_ok=True)
++    out = Path(tempfile.mkdtemp(prefix="capture-copy-runs-", dir=work))
++    cpp, exe = out / "fixture.cpp", out / "fixture.exe"
++    cpp.write_text(fixture, encoding="utf-8")
++    subprocess.run([args.cxx, "-std=c++20", "-O2", "-Wall", "-Wextra", "-Werror", str(cpp), "-o", str(exe)], check=True)
++    env = dict(os.environ)
++    compiler = Path(args.cxx)
++    if compiler.is_file():
++        env["PATH"] = str(compiler.resolve().parent) + os.pathsep + env.get("PATH", "")
++    subprocess.run([str(exe)], check=True, env=env)
++    print("Retained:", out)
++
++
++if __name__ == "__main__":
++    main()
+--- a/upstream.json
++++ b/upstream.json
+@@ -1162,5 +1162,84 @@
+       "required_dependencies_present": true,
+       "game_execution_pending": true
+     }
++  },
++  "maintenance_test2_20261109": {
++    "status": "TEST_BUILD_AWAITING_USER_VALIDATION",
++    "version": "0.4.3-test.2",
++    "python_tests": {
++      "total": 193,
++      "passed": 184,
++      "skipped": 9,
++      "failed": 0
++    },
++    "runner_checks": 11,
++    "renderer_units": 182,
++    "renderer_compile_summary_final": {
++      "schema": 1,
++      "units": 182,
++      "jobs": 4,
++      "renderer_prebuilt": false,
++      "compile_seconds": 7.618,
++      "local_hits": 181,
++      "shared_hits": 0,
++      "compiled": 1,
++      "failed": 0
++    },
++    "renderer_exports": [
++      "mkwvk_init"
++    ],
++    "launcher": {
++      "schema": 1,
++      "version": "0.4.3-test.2",
++      "pe_product_version": "0.4.3-test.2",
++      "source_sha256": "c92b52e908d0afd343d943cdc056ebba079f97551d42d0890890348c13852982",
++      "binary_sha256": "d0f3ef12736305b9d42bcc505515b94cbbbfabcd5096a4a1954fdaab847eff02",
++      "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
++      "wpf_window_executed": false
++    },
++    "renderer": {
++      "schema": 1,
++      "release": "0.4.3-test.2",
++      "config": {
++        "target": "windows-gnu",
++        "march": "x86-64-v3",
++        "release": "1"
++      },
++      "source_sha256": "053e16379946c86a8d37d740a44d91db9e382ca00c9bb123c9c59723ec7a6e59",
++      "binary_sha256": "209b356bb3fc6e0794e72c47a2297d0a61bb5aa6a50b7dc0eae764058c178c91",
++      "compiler": "LLVM-MinGW 20261020",
++      "generic": true,
++      "game_executed": false,
++      "physical_gpu_tested": false
++    },
++    "shader_stamp": "48efaca57aa305ab",
++    "old_test1_game_exe_recompile_required": false,
++    "exact_old_host_source_pinned": true,
++    "full_game_executed_here": false,
++    "physical_gpu_tested_here": false,
++    "fps_gain_measured": false,
++    "user_test1_logs_reviewed": true,
++    "upstream": {
++      "tag": "v2.0.10",
++      "commit": "7f9daf06d902588476102d6650c600bb84f02ce5",
++      "source_zip_sha256": "f7c41626da42eff95da5c8db56bab536990395b38c6ea6f7be27c3f90d139a65",
++      "backports": [
++        "sampler generation/cache",
++        "adjacent captured-buffer copy combining"
++      ],
++      "writeback_diff_default_in_uploaded_source": false,
++      "separate_present_queue_default_in_uploaded_source": false,
++      "nx2navi_commit": "78ee0ddb1e29206ec730bbcfb8f5105cb4087499",
++      "nx2navi_additions_copied": false
++    },
++    "changes": [
++      "bounded/batched UI log preview",
++      "independent output and internal resolution; explicit FSR preset",
++      "CPU/free RAM/commit-aware build and shader worker plan",
++      "exact Test 1 host maintenance",
++      "sampler generation/cache",
++      "coalesced adjacent capture copies"
++    ],
++    "shader_stamp_fnv_prefix_present_in_old_and_new_dll": true
+   }
+ }

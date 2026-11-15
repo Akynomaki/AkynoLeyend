@@ -1,0 +1,10 @@
+@echo off
+chcp 65001 >nul
+setlocal
+cd /d "%~dp0"
+echo AkynoLeyend Visual 0.4.1: A/B com patch de culling e retencao DESLIGADOS.
+echo Mantem o MESMO jogo e configuracoes para localizar regressoes.
+"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --require-current-build --out "%~dp0jogo-Visual041" --visual-mode comparison --profile original --resolution 100 --upscaling lanczos --sharpness 0 --framegen 0 --collect-crash %*
+set "akyno_exit=%errorlevel%"
+if not "%akyno_exit%"=="0" pause
+exit /b %akyno_exit%

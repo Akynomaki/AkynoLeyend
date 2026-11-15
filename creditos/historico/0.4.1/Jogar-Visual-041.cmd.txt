@@ -1,0 +1,10 @@
+@echo off
+chcp 65001 >nul
+setlocal
+cd /d "%~dp0"
+echo AkynoLeyend Visual 0.4.1: teste controlado, 100%%, nitidez 0, sem frame generation.
+echo Pressione Ctrl+C se informar que o EXE ainda e de 0.4.0.
+"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --require-current-build --out "%~dp0jogo-Visual041" --visual-mode patched --profile original --resolution 100 --upscaling lanczos --sharpness 0 --framegen 0 --collect-crash %*
+set "akyno_exit=%errorlevel%"
+if not "%akyno_exit%"=="0" pause
+exit /b %akyno_exit%

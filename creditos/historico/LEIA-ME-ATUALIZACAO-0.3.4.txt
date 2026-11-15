@@ -1,0 +1,47 @@
+OCARINA BUILDER 0.3.4-dev.1 - CAMINHOS LONGOS E AUDIO
+
+Baixe somente o ZIP de atualizacao se ja usa a versao 0.3.2 ou 0.3.3.
+O nome da sua pasta pode continuar dizendo 0.3.1; nao precisa renomear.
+
+1. Feche o jogo e o Builder. Por precaucao, guarde uma copia de jogo\user\save.
+2. Extraia TODO o conteudo deste ZIP na pasta existente que contem
+   OcarinaBuilder.exe, manage.py, ferramentas e work. Aceite substituir.
+3. Preserve work, jogo e as entradas. Nao extraia sobre os arquivos a partir
+   de dentro do ZIP nem compacte work/jogo junto da atualizacao.
+4. Abra OcarinaBuilder.exe. Selecione a MESMA entrada e destino. Clique Criar.
+   E necessario recompilar para aplicar as alteracoes C/C++; copiar o ZIP
+   e clicar Jogar diretamente ainda executaria o binario anterior.
+   Objetos de jogo inalterados continuam elegiveis ao cache. Nao apague work.
+5. Ao terminar, teste pelo botao Jogar, em Original. O suporte nativo a
+   caminhos longos deve dispensar o alias do antigo Jogar-Teste-Crash.cmd.
+6. Para comparar os borroes em movimento, feche o jogo e abra Jogar-Nitido.cmd.
+   Usa a alternativa espacial existente no backend e resolucao 100%.
+   Pode haver mais serrilhado; a resolucao fixa pode exigir mais da GPU.
+   Para voltar ao caminho temporal padrao, abra pelo botao Jogar/Original.
+7. Se ainda houver silencio, crash ou pausas, feche o jogo e execute
+   Jogar-Suporte.cmd. Reproduza o problema, encerre o jogo e envie o novo
+   ZIP em jogo\diagnosticos. O terminal informa o caminho exato.
+   Para comparar Nitido com registros: Jogar-Suporte.cmd --profile nitido
+
+Se escolheu uma pasta de jogo diferente, use --out "D:\SuaPasta\Jogo" nos CMDs.
+
+IMPLEMENTADO
+- RomFS: caminhos longos sem truncamento silencioso e I/O Win32 UTF-16.
+- Audio: WASAPI compartilhado, fallback waveOut, nova tentativa em 2 segundos
+  quando a saida falta/desconecta, e volume de dispositivo com retorno float.
+- Diagnostico: opcoes graficas antes/depois e pausas acima de 500 ms.
+- Nitido: comparacao explicita para investigar rastros/borroes de camera.
+
+O programa escolhe audio automaticamente. Comparacao opcional:
+  Jogar.cmd --audio-backend waveout
+  Jogar.cmd --audio-backend wasapi
+Nenhum dos comandos altera volume ou dispositivo padrao do Windows.
+
+LIMITES
+Nao houve teste do jogo, audio fisico ou GPU neste host de desenvolvimento.
+Os testes de codigo e o link Windows nao comprovam o resultado visual/sonoro.
+Folhagem ausente, sombras piscando e iluminacao ainda nao estao resolvidas.
+Primeiras visitas a areas novas ainda podem compilar pipelines e causar pausas.
+Nao se promete eliminar todas as quedas nem um numero fixo de FPS/VRAM.
+Os caches de shaders/pipelines existentes nao sao apagados por esta atualizacao.
+A janela WPF foi mantida; a versao dos componentes esta em upstream.json.

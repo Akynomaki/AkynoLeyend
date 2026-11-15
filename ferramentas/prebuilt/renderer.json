@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "0.4.8",
+  "config": {
+    "target": "windows-gnu",
+    "march": "x86-64-v3",
+    "release": "1"
+  },
+  "source_sha256": "e79e9c3afb84fc332233d9f8400b2938b588f97b14694c5e9a24dff4dbc7e682",
+  "binary_sha256": "b1b0e992a691ffdd18a23dbfbe91eae2725e1249f9d134bb907b5efaee27392a",
+  "compiler": "LLVM-MinGW do SDK instalado (clang 23.1.4), Windows",
+  "shader_stamp": "4cdbb0029868040b",
+  "renderer_api": 2,
+  "nvidia_ngx": "static NGX loader nvsdk_ngx_s.lib, DLSS SDK v310.9.16 (NVIDIA RTX SDKs license); runtime not included",
+  "generic": true,
+  "game_executed": false,
+  "physical_gpu_tested": false
+}

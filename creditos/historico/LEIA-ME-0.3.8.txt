@@ -1,0 +1,91 @@
+ATUALIZACAO DE ACESSO 0.3.8-dev.2: se os arquivos continuarem bloqueados,
+leia LEIA-ME-REPARO-ACESSO.txt e abra Reparar-Acesso.cmd normalmente.
+
+OCARINA 0.3.8 — ACESSO, SHADERS E COMPARACAO DE LUZES
+
+ATUALIZAR A INSTALACAO QUE VOCE JA TEM
+
+1. Feche o jogo, OcarinaBuilder e o programa de extracao.
+2. Copie o CONTEUDO de Ocarina-Hookshot-0.3.8 para dentro da pasta existente
+   que tem manage.py, OcarinaBuilder.exe e ferramentas. Aceite substituir.
+   A pasta antiga pode continuar com o nome 0.3.6 ou 0.3.7.
+3. Preserve work, jogo e jogo\user\save. Nao mova a RomFS registrada.
+4. Rode Diagnosticar-Acesso.cmd. Ele nao abre nem recompila o jogo e mostra
+   onde ficou o ZIP com acesso.txt e acesso.json.
+5. Se os arquivos estiverem legiveis, rode Atualizar-Renderizador.cmd.
+   Em builds locais 0.3.6/0.3.7/0.3.8 compativeis, isso troca somente a DLL,
+   confere seu hash e atualiza o manifesto. Nao recompila o C do jogo.
+6. Opcional: rode Preparar-Shaders.cmd. Ele tambem atualiza a DLL, gera o banco
+   de shaders a partir da sua RomFS e abre o jogo com Preparing shaders.
+   A primeira preparacao pode demorar. Os pacotes ficam no disco; nao se
+   carrega o banco bruto inteiro na RAM. Preserve work\shaders depois.
+
+INSTALACAO NOVA
+
+Extraia o ZIP inteiro, abra OcarinaBuilder.exe, escolha sua copia local
+suportada e clique Criar. Depois, Preparar-Shaders.cmd e opcional.
+O pacote inclui ferramentas e runtime da interface; nao inclui o jogo.
+
+SE CONTINUAR PERMISSION DENIED NO HOOKSHOT.EXE
+
+O erro ocorre antes de o jogo iniciar, ao conferir a integridade do arquivo.
+A atualizacao trata esse erro e gera evidencia; ela nao concede permissoes
+que o Windows negou. Rode Diagnosticar-Acesso.cmd e compartilhe o ZIP indicado.
+
+O relatorio distingue arquivo ausente, pasta com nome de arquivo, falha de
+leitura e erro nativo do Windows. WinError 32 indica compartilhamento;
+WinError 5 indica acesso negado, sem identificar sozinho qual componente
+bloqueou. Ha consultas de permissoes, EFS e processo do jogo; nada e alterado.
+
+Confira o Historico de protecao da Seguranca do Windows se houver registro
+relacionado ao arquivo. Uma mensagem PermissionError, sozinha, nao demonstra
+uma deteccao do antivirus. Nao e preciso apagar work nem repetir a compilacao
+longa para coletar esse diagnostico.
+
+LUZES PISCANDO / BC3
+
+O arquivo astc_analysis.rar foi estudado. Sao configuracoes e trechos OpenGL
+do Eden/Yuzu, nao uma correcao Vulkan pronta. O proprio material usa BC3 para
+economizar VRAM. Ainda nao ha evidencia de que BC3 seja a causa das piscadas.
+
+Comparacao controlada, em duas execucoes separadas da mesma cena/camera:
+
+    Testar-Luzes.cmd
+    Testar-Luzes.cmd --texture-mode rgba8
+
+Feche cada tentativa normalmente. Cada uma produz um ZIP proprio com perfil,
+modo ASTC, opcoes, hashes, logs e medidas de exposicao/saltos grandes de brilho.
+Nao e gravado um banco de todos os frames. O diagnostico tem custo e nao deve
+ser usado para anunciar um benchmark de FPS.
+
+RGBA8 pode quadruplicar a memoria das texturas que antes eram BC3. Nao e uma
+otimizacao de memoria. O log antigo deste PC ja chegou a 10.100/11.176 MiB;
+comece numa cena curta/interior. Se faltar folga, compare as DUAS tentativas
+com o mesmo --profile 8gb, sem alterar apenas uma delas. Esse perfil reduz
+algumas texturas; nao estabelece um teto global para VRAM.
+
+Jogar-Sem-BC3.cmd abre uma comparacao sem recompressao BC3.
+Jogar-ASTC-CPU.cmd tambem troca a decodificacao para CPU; e outro teste,
+potencialmente mais lento. Use apenas depois da comparacao anterior.
+Jogar.cmd preserva o modo automatico e Jogar-Streaming.cmd preserva seu modo.
+
+LIMITES E VALIDACAO
+
+Esta entrega NAO declara as piscadas corrigidas no seu PC. A comparacao e os
+logs novos sao necessarios para confirmar causa e resultado visual.
+O erro de tratamento de acesso do launcher foi corrigido e testado com
+negacoes simuladas. O bloqueio real do Windows ainda precisa ser identificado.
+
+Banco HKSEED01: indice em RAM, pacotes no disco; dados brutos simultaneos de
+ate 16 MiB, leituras/gravacoes de ate 64 KiB e dois workers por padrao.
+O modo de preparacao aplica os limites Streaming ao cache do driver.
+Esses limites nao abrangem toda a RAM/VRAM do compilador, driver ou jogo.
+A geracao do banco ainda processa um arquivo de shader descompactado por vez
+na memoria; nao mantem todos os pacotes extraidos em uma lista unica.
+
+97 testes: 90 passaram, sete PowerShell nao executados neste host.
+DLL Vulkan real compilada/ligada para Windows; leitor C++ com ASan/UBSan.
+Sem jogo/GPU fisica, reparo de permissao ou janela WPF testados aqui.
+Motor/orquestracao 0.3.8-dev.1; interface publicada continua 0.3.2-dev.1.
+
+Relatorio e instrucoes para outra IA: docs\HANDOFF-OUTRA-IA.md.

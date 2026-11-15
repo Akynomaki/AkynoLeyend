@@ -1,0 +1,26 @@
+ATUALIZACAO CUMULATIVA - SPLIT E LEITURA NUP
+
+1. Feche o Ocarina Builder e o jogo.
+2. Copie TODO o conteudo deste ZIP para dentro da pasta Ocarina-Hookshot-0.3.1
+   que possui OcarinaBuilder.exe e ferramentas. Aceite substituir arquivos.
+3. Mantenha a pasta work.
+4. Abra OcarinaBuilder.exe, selecione a mesma entrada e destino e clique Criar.
+
+A atualizacao inclui:
+- A correcao anterior de work\image\chunks.txt.
+- A lista de 849 funcoes de otimizacao do ZIP HookshotBuilder(1) fornecido.
+- Divisao de code_hot.c quando o lifter o gerar. Sem ele, os arquivos normais
+  sao compilados e as pecas antigas sao retiradas da selecao.
+- Leitura dos arquivos NUP compactados por Zstandard, preservando o formato
+  dos arquivos .zs que ja pertencem ao jogo.
+- Dependencia zstandard para o Python 3.14 x64 incluido no pacote.
+- Conferencia e reparo da extracao privada antiga antes de reutiliza-la.
+
+A conferencia pode levar um tempo. Arquivos compactados gravados pelo leitor
+antigo podem ser reescritos com o conteudo correto. A entrada .nup e mantida.
+O lifter sera repetido e a compilacao continuara em seguida.
+
+Foram verificados 51 testes com entradas sinteticas. O jogo e a GPU nao foram
+executados neste ambiente. O executavel da interface continua o mesmo.
+
+Detalhes de origem e escopo em docs/atualizacao-split-nup.md.

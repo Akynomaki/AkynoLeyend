@@ -1,0 +1,36 @@
+OCARINA BUILDER 0.3.3-dev.1 - POINTER LIGHTING 2 E DIAGNOSTICO
+
+Esta atualizacao deve ser aplicada sobre a instalacao 0.3.2 atualizada.
+
+1. Feche o jogo e o Builder.
+2. Copie TODO o conteudo do ZIP de atualizacao para a pasta existente que
+   contem OcarinaBuilder.exe, manage.py, ferramentas e work. Substitua arquivos.
+3. Preserve work, jogo e jogo\user\save. Nao renomeie a pasta instalada.
+4. Abra OcarinaBuilder.exe e clique Criar com a mesma entrada e destino.
+   O programa tenta preservar o diagnostico anterior antes de substituir o mapa.
+   O host/renderizador alterados precisam ser compilados. Objetos de jogo
+   inalterados continuam elegiveis ao cache.
+5. Ao terminar, rode Jogar-Teste-Crash.cmd na mesma pasta.
+   Ele testa RomFS por caminho curto e registra os arquivos abertos.
+6. Se fechar novamente, envie o novo ZIP criado em jogo\diagnosticos.
+   O terminal mostra o nome exato. Coletar-Crash.cmd tambem empacota a ultima
+   execucao existente, sem compilar ou abrir o jogo.
+
+O teste cria uma letra de unidade temporaria livre para a pasta RomFS, sem
+copiar ou mover o jogo. Nao precisa de administrador. O alias e removido ao
+encerrar normalmente ou ao tratar uma falha. Nao encerre o Python a forca.
+Se um encerramento forcado deixar o alias, a letra aparece no terminal; remova
+apenas esse alias com subst LETRA: /D apos fechar o jogo.
+
+A release Hookshot pointer-lighting-2 foi integrada em fonte a partir do
+HookshotBuilder(3).zip. Inclui acesso a memoria apenas nos shaders compute,
+endereco de tabela por push constants, fallback de imagens e pools retirados,
+alem das mudancas de idioma e energia/progresso do build.
+
+Primeiro inicio apos a mudanca pode reconstruir shaders. A melhora de cache
+se aplica aos inicios seguintes e nao elimina stutter em areas novas.
+
+O ultimo crash recebido foi 0xC0000005, leitura do endereco guest 0x150.
+A causa exata ainda exige o mapa/novo log do PC. Caminhos longos sao uma
+hipotese verificavel; esta entrega nao afirma que eles causaram aquele crash.
+A integracao nao foi executada no jogo/GPU neste host Linux.

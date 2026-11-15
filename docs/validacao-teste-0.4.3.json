@@ -1,0 +1,45 @@
+{
+  "version": "0.4.3-test.1",
+  "status": "USER_HARDWARE_TEST_REQUIRED",
+  "python_tests": {
+    "total": 186,
+    "passed": 177,
+    "skipped": 9,
+    "failed": 0
+  },
+  "runner_checks_passed": 9,
+  "launcher": {
+    "schema": 1,
+    "version": "0.4.3-test.1",
+    "pe_product_version": "0.4.3-test.1",
+    "source_sha256": "cc9dc228b4a7ac721f1cd1edb678b93e023d5d1a37d5319009ed96a6dda7addd",
+    "binary_sha256": "9eb308771625ba239c407837a097ca9ab9cca6f713663e19fa733788ed9b8075",
+    "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
+    "wpf_window_executed": false
+  },
+  "renderer": {
+    "schema": 1,
+    "release": "0.4.3-test.1",
+    "config": {
+      "target": "windows-gnu",
+      "march": "x86-64-v3",
+      "release": "1"
+    },
+    "source_sha256": "52e56735dc87d3e16217a8429fe5fe42e30bc39e0da44238ff215a65699e7f3f",
+    "binary_sha256": "13ca5f44aafdf8a0cebed48c7491fc86b3dd92bcaf86c84a6ac9f3fcffa3d37e",
+    "compiler": "LLVM-MinGW 20261020",
+    "generic": true,
+    "game_executed": false,
+    "physical_gpu_tested": false
+  },
+  "windows_renderer_units": 182,
+  "renderer_compile_failures": 0,
+  "fsr_software_validation_groups": 11,
+  "fsr_sync_errors": 0,
+  "culling_ids_verified": 35313,
+  "whole_game_built_here": false,
+  "game_executed_here": false,
+  "physical_gpu_tested_here": false,
+  "fps_gain_measured": false,
+  "guide": "docs/TESTE-0.4.3.md"
+}

@@ -1,0 +1,24 @@
+CORRECAO: work\image\chunks.txt
+
+1. Feche o Ocarina Builder antes de substituir os arquivos.
+2. Copie o conteudo deste ZIP para dentro da pasta Ocarina-Hookshot-0.3.1
+   que possui OcarinaBuilder.exe, manage.py, nx2 e ferramentas.
+3. Aceite substituir os arquivos, em especial nx2\chunks.py.
+4. Mantenha a pasta work, abra OcarinaBuilder.exe, selecione a mesma
+   entrada e destino e clique em Criar novamente.
+
+A extracao ja concluida sera reaproveitada se a entrada e a pasta work
+forem as mesmas. A etapa do lifter sera repetida para terminar a geracao.
+
+Causa: o modo standalone criava work\sa\image, mas os limites de chunks
+sao compartilhados em work\image. Ao gravar chunks.txt pela primeira vez,
+a pasta compartilhada ainda nao existia.
+
+O codigo agora cria o diretorio necessario antes de salvar os limites.
+Tambem fecha explicitamente os arquivos lidos ao retomar a geracao.
+
+Os 3 testes novos reproduziram a falha antes da correcao e passaram depois.
+A suite Python completa passou: 33 testes. Nao houve execucao do jogo
+neste ambiente; esta correcao trata a falha especifica de geracao.
+
+Este ZIP nao contem o jogo nem arquivos gerados a partir dele.

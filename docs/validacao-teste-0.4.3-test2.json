@@ -1,0 +1,79 @@
+{
+  "status": "TEST_BUILD_AWAITING_USER_VALIDATION",
+  "version": "0.4.3-test.2",
+  "python_tests": {
+    "total": 193,
+    "passed": 184,
+    "skipped": 9,
+    "failed": 0
+  },
+  "runner_checks": 11,
+  "renderer_units": 182,
+  "renderer_compile_summary_final": {
+    "schema": 1,
+    "units": 182,
+    "jobs": 4,
+    "renderer_prebuilt": false,
+    "compile_seconds": 7.618,
+    "local_hits": 181,
+    "shared_hits": 0,
+    "compiled": 1,
+    "failed": 0
+  },
+  "renderer_exports": [
+    "mkwvk_init"
+  ],
+  "launcher": {
+    "schema": 1,
+    "version": "0.4.3-test.2",
+    "pe_product_version": "0.4.3-test.2",
+    "source_sha256": "c92b52e908d0afd343d943cdc056ebba079f97551d42d0890890348c13852982",
+    "binary_sha256": "d0f3ef12736305b9d42bcc505515b94cbbbfabcd5096a4a1954fdaab847eff02",
+    "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
+    "wpf_window_executed": false
+  },
+  "renderer": {
+    "schema": 1,
+    "release": "0.4.3-test.2",
+    "config": {
+      "target": "windows-gnu",
+      "march": "x86-64-v3",
+      "release": "1"
+    },
+    "source_sha256": "053e16379946c86a8d37d740a44d91db9e382ca00c9bb123c9c59723ec7a6e59",
+    "binary_sha256": "209b356bb3fc6e0794e72c47a2297d0a61bb5aa6a50b7dc0eae764058c178c91",
+    "compiler": "LLVM-MinGW 20261020",
+    "generic": true,
+    "game_executed": false,
+    "physical_gpu_tested": false
+  },
+  "shader_stamp": "48efaca57aa305ab",
+  "old_test1_game_exe_recompile_required": false,
+  "exact_old_host_source_pinned": true,
+  "full_game_executed_here": false,
+  "physical_gpu_tested_here": false,
+  "fps_gain_measured": false,
+  "user_test1_logs_reviewed": true,
+  "upstream": {
+    "tag": "v2.0.10",
+    "commit": "7f9daf06d902588476102d6650c600bb84f02ce5",
+    "source_zip_sha256": "f7c41626da42eff95da5c8db56bab536990395b38c6ea6f7be27c3f90d139a65",
+    "backports": [
+      "sampler generation/cache",
+      "adjacent captured-buffer copy combining"
+    ],
+    "writeback_diff_default_in_uploaded_source": false,
+    "separate_present_queue_default_in_uploaded_source": false,
+    "nx2navi_commit": "78ee0ddb1e29206ec730bbcfb8f5105cb4087499",
+    "nx2navi_additions_copied": false
+  },
+  "changes": [
+    "bounded/batched UI log preview",
+    "independent output and internal resolution; explicit FSR preset",
+    "CPU/free RAM/commit-aware build and shader worker plan",
+    "exact Test 1 host maintenance",
+    "sampler generation/cache",
+    "coalesced adjacent capture copies"
+  ],
+  "shader_stamp_fnv_prefix_present_in_old_and_new_dll": true
+}

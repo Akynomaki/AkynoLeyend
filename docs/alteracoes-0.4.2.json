@@ -1,0 +1,196 @@
+{
+  "schema": 1,
+  "input_archive_sha256": "207094fa6e26f0d539e0f22aa6d3b8cb3bd664be9bcc0c5ad2f00f5af9a51e11",
+  "changed_code_files": [
+    {
+      "path": "Compilar-AkynoLeyend.cmd",
+      "before_sha256": null,
+      "after_sha256": "03de0ca58fcbfcd30f4e113b16991c97b344daa7019a5c95b48e85cb9997dd2b"
+    },
+    {
+      "path": "Compilar-Interface-041.cmd",
+      "before_sha256": "f08830c7a41b794f459131be0a894357111e3702b47153840b06dd41e3b0d95d",
+      "after_sha256": null
+    },
+    {
+      "path": "Compilar-Visual-041.cmd",
+      "before_sha256": "d1b38ac734f77abad92f0c72f82e157bdb5aa3469298673de458a35f7f89e685",
+      "after_sha256": null
+    },
+    {
+      "path": "Jogar-Comparacao-041.cmd",
+      "before_sha256": "3929c95d8f04d13f8211f60166f74293a1bd96e921fedb76d0f71a47b0b15526",
+      "after_sha256": null
+    },
+    {
+      "path": "Jogar-Comparacao.cmd",
+      "before_sha256": null,
+      "after_sha256": "ac1a780621617e43edfed7aa14df533ed8c81dc46585e3a6e7a3704e00a6d98e"
+    },
+    {
+      "path": "Jogar-Escala-125.cmd",
+      "before_sha256": null,
+      "after_sha256": "7ea06373c9cd3e84c2fa1dadcfc2b393527261aca599e416613945fec4d5ecf1"
+    },
+    {
+      "path": "Jogar-Escala-150.cmd",
+      "before_sha256": null,
+      "after_sha256": "29f54ea67d453a5f997c12052731dd1a3ae885d54db479bbd37f0fd6017225eb"
+    },
+    {
+      "path": "Jogar-MaxResolucao-125.cmd",
+      "before_sha256": "5f72d9af09267295fc4fa4fe5d4daa57b44f96f67ad91bc8db615fe83059a0ce",
+      "after_sha256": null
+    },
+    {
+      "path": "Jogar-MaxResolucao-150.cmd",
+      "before_sha256": "b700b4f78778a88324197695ec48d9098c5c8dbda84be0b16fb447ab530c1ccb",
+      "after_sha256": null
+    },
+    {
+      "path": "Jogar-Visual-041.cmd",
+      "before_sha256": "d6746123888ff31bb11a0cedfeab8dc17d46caae73848df7030e22ed8bfdd43e",
+      "after_sha256": null
+    },
+    {
+      "path": "Jogar-Visual.cmd",
+      "before_sha256": null,
+      "after_sha256": "ed10773e9da106c720bce1111c52dbf7ad88eba26e61943789cd9e99a4f08228"
+    },
+    {
+      "path": "Jogar.cmd",
+      "before_sha256": "e519d15a7590c4e46fe6d435fc2f7707f17d342519eb7786a018cf75e83c75ec",
+      "after_sha256": "fa9ba1a183e52da660a2680e91bdb7f8bf991740fd150c2c3c74e43193b93d94"
+    },
+    {
+      "path": "VERSION",
+      "before_sha256": "5218cbab44abcc61d1863d6f4226b83f9e03e2b89af20eb6a62b5678a8bff018",
+      "after_sha256": "5d3e1681e019cdb752bffc4d443ea66b18b28ec3d517768b2fe0c25fa90f046c"
+    },
+    {
+      "path": "akynoleyend/__init__.py",
+      "before_sha256": "8c41fc7317d9c6fec6966628d6f982a7aaf834483942a524056b660cb2dabfcf",
+      "after_sha256": "543e8ebc5c60c437ff014374defb71b306dbdebd6b5327007c3778900f8219ee"
+    },
+    {
+      "path": "akynoleyend/build.py",
+      "before_sha256": "76809573613a75238005080f7afbaf3e774133531ffea2ab32c218e437b18039",
+      "after_sha256": "41a7a383ef3ba3308682c38de49c6df1e0a8ba7848c8c8f56fa4c7660fdf8a7a"
+    },
+    {
+      "path": "akynoleyend/cli.py",
+      "before_sha256": "a8886360ebbf1e13a692027bb9c3ff3550c6e2cc75b7f0c1daefde1d761fbde0",
+      "after_sha256": "9a23434b4b4fc44d2272746eb3cf8e6f6126ddf54a4a1225f8a0fe9d94c7691a"
+    },
+    {
+      "path": "akynoleyend/coherence.py",
+      "before_sha256": null,
+      "after_sha256": "53013b8297651440adfac6390aba47dc14744a630ccd51364cdcdb4898f11bc7"
+    },
+    {
+      "path": "akynoleyend/graphics.py",
+      "before_sha256": "7805c92bb218fd36f68ab80df4d2b23d1364330ee7afb0613921dba1da39730d",
+      "after_sha256": "9324769ed6addca6f87a74cd1c5678734667259f1e2189843266ef09a56f27fe"
+    },
+    {
+      "path": "akynoleyend/launch.py",
+      "before_sha256": "846409344865ebf9365f1ef7a7c3d0e9d26a159a8e579d3fd07d278f6fba55cd",
+      "after_sha256": "7f36b275b9a5d9f80441753146cb60873e3bfc0e81a78e336ec0155660a1c39a"
+    },
+    {
+      "path": "akynoleyend/release.py",
+      "before_sha256": null,
+      "after_sha256": "843f00eab3b94ed2af415949d6b4a238ed19213e24b9c4bf23d6797c569c09d1"
+    },
+    {
+      "path": "akynoleyend/shader_prepare.py",
+      "before_sha256": "3a58e47ce4f78f04bdfd0f0651e7fe5e35ebd6cbe51c9c1942b7f6fd36cf6c8e",
+      "after_sha256": "339526b0891caebcf95bbbbabfd6bb9a7c92ec708a5e80b76516d71caa3cfb5b"
+    },
+    {
+      "path": "builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj",
+      "before_sha256": "1aff7b143df7ccda7d1d4c04768ce798f2137cbbaef97edbc16e117499bb08fa",
+      "after_sha256": "db28b2eb4be8546b80439a240bed5f8cc77dacbd9ba8716aa8c87e4c5f7bdcdb"
+    },
+    {
+      "path": "builder/AkynoLeyendBuilder/MainWindow.xaml",
+      "before_sha256": "d281cb5c87830cb36e8d8d3305a888034add1915030f1ed31ef0968ccb3d3bf5",
+      "after_sha256": "d10b853295337cbf03b5480c393622ab2259daa89302de01df4fdfb324819a9b"
+    },
+    {
+      "path": "builder/AkynoLeyendBuilder/MainWindow.xaml.cs",
+      "before_sha256": "560ad5699fc721095e44f016d76ec18e048933c1355e18b15297e8b990053ac0",
+      "after_sha256": "55d4421c48d23fb7864ce7ba607d36a262684c36f63a8f3c34b1c6132a73275d"
+    },
+    {
+      "path": "builder/RunnerChecks/Program.cs",
+      "before_sha256": "5ddaf159510c564dd1c20af467bbe9b1e94799422476fa971fb3a317c53a44fe",
+      "after_sha256": "38dced75bda63fd0bbcb8e3aa952f52fd02d9c512729b8fd3ebef1f625112eba"
+    },
+    {
+      "path": "gpu/vk/cache_rate.h",
+      "before_sha256": "8273b8f4a58922a3717aaafdd75b14a30aea1cb812fe78bd31d8c3b448c2ddf4",
+      "after_sha256": "b49e700160dc255c5e9238a94c1b032487050c52ead6552c98e0f75785f212f7"
+    },
+    {
+      "path": "gpu/vk/cache_stream.h",
+      "before_sha256": "df335877ae4fd6a008a113f65945308d5a96785447718fb710a2d9e36c95f03b",
+      "after_sha256": "f95842e474adafa3e17b2763dafb2cdea04f4aa7832c728ca38e673132f08045"
+    },
+    {
+      "path": "gpu/vk/vk_draw.cpp",
+      "before_sha256": "95f34ce5243a04564ca37b2ae80dff35058b13595d254350f4a2f8ea057a53b7",
+      "after_sha256": "5d88fa7dfc13f2d57c2a34ca74009e102dcea1688e4c997dda48794ff5a45fcb"
+    },
+    {
+      "path": "gpu/vk/vk_menu.cpp",
+      "before_sha256": "8519766d36df18f7b83f95bda54eb0dbe07bc913171cdfb6f24ad822d87fe023",
+      "after_sha256": "ae633e50c7146523ebae11be93a315fd88c88161b2723e23d451f8d4ec67b07e"
+    },
+    {
+      "path": "gpu/vk/vk_replay.cpp",
+      "before_sha256": "d26f5f0da40d9c0ac08b18f41e6a305e15cea2b33e6a9dad7cbe4e9372906b84",
+      "after_sha256": "4ebcf1e7ee1bbda465a70fc5c328ef10199062d13dc8c1a45ea5e8458bd9a906"
+    },
+    {
+      "path": "gpu/vk/vk_shader.cpp",
+      "before_sha256": "0d7e8758aaa7111bf5ecf71890fb21cd92c24daf4e261ffa8120acd53c6a70e7",
+      "after_sha256": "ac124e934c5c38a5f74476f6decb1c9392e0c45388fb8d386ed72450635a1186"
+    },
+    {
+      "path": "tests/native/test_cache_stream.cpp",
+      "before_sha256": "72a2a7abfd7a28a55d4b55004dc9cbbc9ebf312f1476a5409da623cca19327f8",
+      "after_sha256": "e56171dc058efd3902686c12331f27923c571fa99c7630961356513de0879bba"
+    },
+    {
+      "path": "tests/test_access.py",
+      "before_sha256": "eb3dc47405a81755f26443ea8c3e16544378a587224f3cfa68569e7693d7ad1c",
+      "after_sha256": "e2c7b320920f7e6486865c3793fc3c5f90c9e1ab50cdf7683649cdf3a87404ac"
+    },
+    {
+      "path": "tests/test_integracao_041.py",
+      "before_sha256": "24546974041688f6668e45c67495b3f7a2bb42661f6ecac5e3ff3a14067935bb",
+      "after_sha256": "46a6430eee7990d8fee1c773dd4cd2540d0e8193f1df2eeac8a0090fd2aab48b"
+    },
+    {
+      "path": "tests/test_release042.py",
+      "before_sha256": null,
+      "after_sha256": "69c9fb5c2d8349a9e4fd0c7c5594fa5a6cebc298711b79fd391a0facbabc4fe5"
+    },
+    {
+      "path": "tests/test_resolution_override.py",
+      "before_sha256": "a7c7ced35ab2579a569a8af241e8aa43d139796c91d680467ab4fa53b921ea02",
+      "after_sha256": "d4b1352ea339a1a4938fe814ef30dcb067a0b27006a38c06b0953a9adc908c5d"
+    },
+    {
+      "path": "tests/test_shader_prepare.py",
+      "before_sha256": "ea214761a50c8a52c4a926fd1cd2c964d3f29b0b4f0c5b160cd9d315e15d9509",
+      "after_sha256": "95aa9c4381b3fbfbe804246eb7e68e4b621cb52e396b59f384ee965f5c141b0a"
+    },
+    {
+      "path": "tools/make_distribution.py",
+      "before_sha256": "8114634ba3cb5fb89ae8e8cff9946d8e7637d29c94d5887dc15399674cdcf0be",
+      "after_sha256": "99ff1445091946b9a058da23dfac60ec57dc68fab92625fd507bb6c258889ba7"
+    }
+  ]
+}

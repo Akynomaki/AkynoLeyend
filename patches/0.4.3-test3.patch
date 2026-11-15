@@ -1,0 +1,2405 @@
+--- a/README.md
++++ b/README.md
+@@ -1,16 +1,27 @@
+ # AkynoLeyend — desenvolvimento 0.4.3
+ 
+-**Versão Windows de teste: 0.4.3-test.2.** Inclui acesso direto ao AMD FSR 1,
+-escala e saída separadas, detecção do hardware e otimizações de samplers/cópias.
++**Versão Windows de teste: 0.4.3-test.3.** Inclui Full HD, perfis com FSR 1 e FPS,
++menu por mouse/WASD, preparação automática de shaders ao jogar e atualização pelo launcher.
+ 
+-**Já compilou o Teste 1?** A atualização mantém esse executável, seus saves e
+-shaders. Extraia o ZIP de atualização na pasta que contém o Builder e execute
+-`suporte/Atualizar-AkynoLeyend.cmd`. Depois use **Gráficos → AMD FSR 1 · desempenho**.
+-O [roteiro](docs/TESTE-0.4.3.md) detalha a atualização e a comparação.
++**Já compilou o Teste 1 ou 2?** Extraia a atualização na pasta que contém o Builder
++e execute `suporte/Atualizar-AkynoLeyend.cmd`. Esse primeiro passo instala o botão
++novo; atualizações seguintes usam **Atualizar build**, ao lado de Jogar, escolhendo
++o ZIP de atualização. O fluxo reaproveita os objetos do jogo em `work`, recompila
++os componentes nativos alterados e religa o EXE. Não repete extração nem lift.
++Se os objetos necessários sumiram ou mudaram, ele interrompe e explica.
+ 
+-Em uma instalação nova, use o pacote completo e **Criar** com sua entrada local.
+-O modo Automático consulta CPU e memória deste computador antes da compilação.
++Em **Gráficos**, escolha **AMD básico · Full HD + FSR**, Fluidez, Equilibrado ou
++Qualidade. A primeira escolha usa perfil portátil e escala interna 50%; as outras
++usam 67/75/100%. Todas selecionam saída 1920×1080, FSR 1 e contador de FPS.
++Use **Ctrl+M** no jogo; mouse ou WASD controlam o menu, inclusive a nitidez por arraste.
+ 
++Ao clicar em **Jogar**, o launcher confere o banco e mostra a preparação de shaders
++e pipelines. A primeira inicialização depois desta correção do tradutor prepara
++o cache novamente; as seguintes reutilizam o que corresponde à GPU/driver.
++O [roteiro](docs/TESTE-0.4.3.md) detalha instalação, atualização e comparação.
++
++Em instalação nova, use o ZIP completo e **Criar** com sua entrada local.
++O modo Automático consulta CPU e memória disponível deste computador.
+ 
+ O projeto usa o compilador ARM64 e o renderizador Vulkan derivados do Hookshot,
+ com launcher Windows e orquestração próprios. Não contém jogo, saves ou caches
+@@ -27,7 +38,7 @@
+ | Verificar.cmd | Conferir ferramentas e dependências |
+ | suporte/ | Diagnóstico, reparos e perfis opcionais |
+ 
+-O pacote Windows inclui os executáveis e SDKs; a cópia separada de fontes não os inclui. A atualização incremental aceita apenas o host exato do Teste 1;
++O pacote Windows inclui os executáveis e SDKs; a cópia separada de fontes não os inclui. A atualização incremental aceita os hosts conhecidos dos Testes 1 e 2;
+ versões anteriores aos patches de saída e pools exigem um novo host.
+ Uma futura distribuição deve passar pelas verificações de identidade do launcher,
+ renderizador e host antes de ser publicada.
+@@ -35,7 +46,7 @@
+ ## Gráficos em desenvolvimento
+ 
+ - FSR 1 oficial AMD: EASU e RCAS separados; não equivale a FSR 3 ou geração de quadros.
+-- Saída 2560×1440 ou 3840×2160 com escala fixa; exige reinício do jogo.
++- Saída 1920×1080, 2560×1440 ou 3840×2160 com escala fixa; exige reinício do jogo.
+ - Escalas internas, Lanczos, Catmull-Rom, nitidez e frame pacing no launcher/menu.
+ - Preparação BNSH, BAHS, NDSR e NDVE com banco em disco e leituras limitadas.
+ - Reparos de registradores e dos pontos das sombras da grama provenientes da referência.
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.4.3-test.2
++0.4.3-test.3
+--- a/akynoleyend/__init__.py
++++ b/akynoleyend/__init__.py
+@@ -1 +1 @@
+-__version__ = "0.4.3-test.2"
++__version__ = "0.4.3-test.3"
+--- a/akynoleyend/build.py
++++ b/akynoleyend/build.py
+@@ -214,6 +214,7 @@
+             "project": "AkynoLeyend",
+             "version": __version__,
+             "host_revision": HOST_REVISION,
++            "host_features": ["fullhd-video-budget-v1"],
+             "source_sha256": source_identity(),
+             "game_build_id": identity,
+             "files": hashes,
+--- a/akynoleyend/build_support.py
++++ b/akynoleyend/build_support.py
+@@ -6,6 +6,23 @@
+ import os
+ import re
+ from pathlib import Path
++
++
++def require_cached_game_objects(jobs, cache_folder):
++    """A maintenance update must never start compiling missing translated game units."""
++    from .errors import ProjectError
++    for cc, source, output, flags, dependencies in jobs:
++        key = object_key(cc, source, flags, dependencies)
++        stamp = Path(str(output) + ".sha256")
++        if Path(output).is_file() and stamp.is_file() and stamp.read_text() == key:
++            continue
++        if (Path(cache_folder) / (key + ".o")).is_file():
++            continue
++        raise ProjectError(
++            "Cache da unidade traduzida ausente ou diferente: " + Path(source).name +
++            ". A atualizacao foi interrompida antes de recompilar o jogo. "
++            "Restaure a pasta work da instalacao correspondente ou use Criar."
++        )
+ 
+ 
+ def shader_source_identity(vk: Path) -> tuple[str, str]:
+--- a/akynoleyend/cli.py
++++ b/akynoleyend/cli.py
+@@ -110,6 +110,8 @@
+     )
+     player.add_argument("--framegen", type=int, choices=(0, 2, 3, 4, 5, 6, 7, 8))
+     player.add_argument("--pacing", choices=("on", "off"))
++    player.add_argument("--fps-counter", choices=("on", "off"))
++    player.add_argument("--handheld", choices=("on", "off"))
+     player.add_argument(
+         "--prepare-again",
+         action="store_true",
+@@ -166,6 +168,18 @@
+     )
+     update.add_argument("--out", type=absolute, default=ROOT / "jogo")
+     update.add_argument("--work", type=absolute, default=ROOT / "work")
++    maintain = commands.add_parser("maintain-build", help="Atualiza componentes usando os objetos ja compilados.")
++    maintain.add_argument("--out", type=absolute, default=ROOT/"jogo")
++    maintain.add_argument("--work", type=absolute, default=ROOT/"work")
++    maintain.add_argument("--tools", type=absolute, default=default_tools)
++    maintain.add_argument("--jobs", type=int)
++    stage_update = commands.add_parser("stage-update", help="Confere e prepara um pacote de atualizacao.")
++    stage_update.add_argument("--archive", type=absolute, required=True)
++    stage_update.add_argument("--out", type=absolute, default=ROOT/"jogo")
++    stage_update.add_argument("--jobs", type=int)
++    apply_update = commands.add_parser("apply-update", help="Aplica o pacote depois que a interface fecha.")
++    apply_update.add_argument("--plan", type=absolute, required=True)
++    apply_update.add_argument("--wait-pid", type=int, default=0)
+     prepare = commands.add_parser(
+         "prepare-shaders", help="Atualiza a DLL e prepara o banco privado de shaders."
+     )
+@@ -190,6 +204,18 @@
+ def main(arguments: list[str] | None = None) -> int:
+     args = parser().parse_args(arguments)
+     try:
++        if args.command == "maintain-build":
++            from .maintenance import maintain_build
++            maintain_build(args.out, args.work, args.tools, jobs=args.jobs)
++            return 0
++        if args.command == "stage-update":
++            from .updater import stage_update
++            plan = stage_update(args.archive, ROOT, args.out, jobs=args.jobs)
++            print("@@update_plan " + str(plan), flush=True)
++            return 0
++        if args.command == "apply-update":
++            from .updater import apply_update
++            return apply_update(args.plan, args.wait_pid)
+         if args.command == "hardware":
+             info = snapshot()
+             target = recommended_chunk(info)
+@@ -285,6 +311,8 @@
+             sharpness=args.sharpness,
+             framegen=args.framegen,
+             pacing=None if args.pacing is None else args.pacing == "on",
++            fps_counter=None if args.fps_counter is None else args.fps_counter == "on",
++            handheld=None if args.handheld is None else args.handheld == "on",
+         )
+         return launch(
+             args.out,
+@@ -304,6 +332,8 @@
+             sharpness=args.sharpness,
+             framegen=args.framegen,
+             pacing=None if args.pacing is None else args.pacing == "on",
++            fps_counter=None if args.fps_counter is None else args.fps_counter == "on",
++            handheld=None if args.handheld is None else args.handheld == "on",
+             cache_mode=args.cache_mode,
+             texture_mode=args.texture_mode,
+             visual_mode=args.visual_mode,
+--- a/akynoleyend/coherence.py
++++ b/akynoleyend/coherence.py
+@@ -5,12 +5,16 @@
+ 
+ HOST_REVISION = "directory304-early-texels-regmap759-output849-v2"
+ 
+-# Test 2 changes orchestration/UI only. Exact Test 1 sources are known, including
+-# the old platform-dependent Path ordering (Windows and POSIX fingerprints).
++# Known generated-code/host ABIs. Test 3 updates compatible host objects in place.
++# Include the old platform-dependent Path ordering (Windows and POSIX).
+ PREVIOUS_HOST_SOURCES = {
+     "0.4.3-test.1": {
+         "47ffe71f2ee66633a2430cd6274c8132abdf7361d21d3373c85ce1cf09a07721",
+         "7d2b02f836049915084038c0a5318bb65454db7e4956f658c922c3e6842931ce",
++    },
++    "0.4.3-test.2": {
++        "3b564d1259ca3ffe3c6e6e06247ae1ee9d3e55b2bab4b423af6fecb80aa8119f",
++        "7075b5e051bbde188f035861d0331a4a6b668da5a4ab58fc36c9894574576736",
+     }
+ }
+ 
+--- a/akynoleyend/graphics.py
++++ b/akynoleyend/graphics.py
+@@ -28,7 +28,7 @@
+ 
+ SPEEDS = {"realtime": "1", "per-frame": "0"}
+ FILTERS = {"off": "0", "catmull-rom": "1", "lanczos": "2", "fsr": "3"}
+-OUTPUTS = {"game": "0", "1440p": "1", "4k": "2"}
++OUTPUTS = {"game": "0", "1440p": "1", "4k": "2", "1080p": "3"}
+ 
+ 
+ def graphics_environment(
+@@ -41,6 +41,8 @@
+     sharpness=None,
+     framegen=None,
+     pacing=None,
++    fps_counter=None,
++    handheld=None,
+ ):
+     if backend != "vulkan":
+         raise ProjectError(
+@@ -85,4 +87,10 @@
+         if type(pacing) is not bool:
+             raise ProjectError("Ritmo de quadros deve ser ligado ou desligado.")
+         result["RX_VK_PACE"] = "1" if pacing else "0"
++    for value, key, label in [(fps_counter, "AKYNO_FPS_COUNTER", "Contador de FPS"),
++                              (handheld, "HOS_HANDHELD", "Perfil portatil")]:
++        if value is not None:
++            if type(value) is not bool:
++                raise ProjectError(label + " deve ser ligado ou desligado.")
++            result[key] = "1" if value else "0"
+     return result
+--- a/akynoleyend/launch.py
++++ b/akynoleyend/launch.py
+@@ -118,6 +118,9 @@
+     framegen: int | None = None,
+     pacing: bool | None = None,
+     shader_workers: int | None = None,
++    fps_counter: bool | None = None,
++    handheld: bool | None = None,
++    auto_prepare: bool = True,
+ ) -> int:
+     graphics = graphics_environment(
+         backend=backend,
+@@ -128,6 +131,8 @@
+         sharpness=sharpness,
+         framegen=framegen,
+         pacing=pacing,
++        fps_counter=fps_counter,
++        handheld=handheld,
+     )
+     if profile == "compatibilidade":
+         trace_runtime = True
+@@ -136,6 +141,11 @@
+         from .build import source_identity
+         current_source = source_identity()
+         current = manifest.get("version") == __version__ and manifest.get("source_sha256") == current_source
++        if not current and not dry_run and compatible_previous_host(manifest):
++            from .maintenance import maintain_build
++            print("Atualizando componentes compativeis antes de jogar; compilacao existente sera reaproveitada.", flush=True)
++            manifest = maintain_build(folder, work or ROOT/"work", ROOT/"ferramentas")
++            current = manifest.get("version") == __version__ and manifest.get("source_sha256") == current_source
+         updated_previous = (compatible_previous_host(manifest)
+                             and manifest.get("renderer_version") == __version__
+                             and manifest.get("runtime_source_sha256") == current_source)
+@@ -146,6 +156,8 @@
+                 "Outras revisoes precisam de Criar/Compilar.cmd."
+             )
+         require_host(manifest)
++    if output_resolution == "1080p" and "fullhd-video-budget-v1" not in manifest.get("host_features", []):
++        raise ProjectError("Full HD exige o runtime atualizado. Use Atualizar build ou Aplicar componentes instalados no launcher.")
+     if resolution in EXPERIMENTAL_SCALES:
+         # Do not silently claim 125/150 on an EXE that cannot even read the
+         # fixed-scale variable. This check is deliberately conservative.
+@@ -179,10 +191,18 @@
+         environment["HOS_FS_TRACE"] = "1"
+     if trace_runtime:
+         environment["HOS_AUDIO_STATS"] = "1"
++        environment["HOS_VIDEO_LOG"] = "1"
+         environment["RX_VK_SLOW_LOG"] = "25"
+         environment["RX_VK_FAULT_BREADCRUMBS"] = "1"
+     if prepare_again:
+         environment["RX_VK_PREPARE_AGAIN"] = "1"
++    if auto_prepare and cache_mode != "preparacao":
++        environment["RX_VK_SEED_PREPARE"] = "1"
++        environment["AKYNO_LAUNCHER_PROGRESS"] = "1"
++        if not dry_run:
++            from .shader_prepare import prepare_shaders
++            print("@@stage shaders Conferindo e preparando shaders automaticamente", flush=True)
++            prepare_shaders(folder, work or ROOT / "work", start_game=False, verified_manifest=manifest)
+     command = [
+         str(folder / "AkynoLeyend.exe"),
+         str(folder / "image.bin"),
+@@ -263,8 +283,11 @@
+             "sharpness": sharpness,
+             "framegen": framegen,
+             "pacing": pacing,
++            "fps_counter": fps_counter,
++            "handheld": handheld,
+         },
+         "prepare_again": prepare_again,
++        "auto_prepare": auto_prepare,
+         "prepare_only": cache_mode == "preparacao",
+         "diagnostic": diagnostic,
+         "trace_files": trace_files,
+--- /dev/null
++++ b/akynoleyend/maintenance.py
+@@ -0,0 +1,75 @@
++"""Update a pinned compatible build using its generated files and existing object cache."""
++import os
++from pathlib import Path
++import shutil
++import sys
++import time
++
++from . import __version__
++from .build import publish, source_identity
++from .coherence import compatible_previous_host, require_host
++from .config import ROOT, MANIFEST, BuildRequest, compile_jobs
++from .errors import ProjectError
++from .files import read_json, sha256, write_json, workspace_lock, workspace_stage
++from .hardware import snapshot, usable_memory
++from .hot import configure_hot
++from .launch import checked_build
++from .power import keep_awake
++from .preflight import require_tools
++from .process import run
++
++
++def maintain_build(folder: Path, work: Path, tools: Path, *, jobs=None, report=print):
++    with workspace_lock(work), keep_awake():
++        manifest = checked_build(folder)
++        identity = source_identity()
++        if manifest.get("version") == __version__ and manifest.get("source_sha256") == identity:
++            report("Build ja atualizado; nenhum compilador iniciado.")
++            return manifest
++        if not compatible_previous_host(manifest):
++            raise ProjectError("Este build nao tem uma revisao gerada compativel conhecida para atualizacao. Use Criar com sua entrada local.")
++        require_host(manifest)
++        gen = work / "sa/gen"
++        required = ["a64_table.c", "a64_hooks.c", "a64_suyu.c", "a64_stubs.c", "hos_image.c", "nvn2_exports.c"]
++        if not all((gen/name).is_file() for name in required) or not list(gen.glob("code_*.c")):
++            raise ProjectError("Os fontes gerados em work/sa/gen foram removidos. Restaure a pasta work correspondente ou use Criar; saves preservados.")
++        image = work / "sa/image/image.bin"
++        if not image.is_file() or sha256(image) != manifest["files"]["image.bin"]:
++            raise ProjectError("A imagem de work nao corresponde ao jogo instalado. Nenhuma atualizacao aplicada.")
++        plan = read_json(work / "build-request.json")
++        if plan.get("game_build_id") != manifest.get("game_build_id") or Path(plan.get("output", "")).resolve() != folder.resolve():
++            raise ProjectError("A pasta work pertence a outra compilacao ou pasta de saida. Nenhum arquivo do jogo foi alterado.")
++        report("@@stage read Conferindo atualizacao compativel")
++        environment = require_tools(tools)
++        environment.update({"OOT_WORK": str(work), "RX_RELEASE": "1",
++                            "OCARINA_HELPER_CACHE": str(work/"helpers"),
++                            "OCARINA_PREBUILT_DIR": str(tools/"prebuilt"),
++                            "OCARINA_BUILD_RENDERER": "0"})
++        configure_hot(ROOT, environment)
++        hardware = snapshot()
++        processes = compile_jobs(jobs, usable_memory(hardware), hardware["logical_cpus"])
++        started = time.monotonic()
++        report("@@stage compile Atualizando apenas componentes alterados; objetos do jogo preservados")
++        run([sys.executable, "-I", "-u", str(ROOT/"nx2/build.py"), "--standalone",
++             "--reuse-game-objects", "--jobs", str(processes)], ROOT, environment,
++            work/"logs/runtime-update.log", report)
++        request = BuildRequest(output=folder, work=work, tools=tools,
++                               language=manifest.get("language", "pt-BR"), jobs=processes)
++        report("@@stage finish Publicando a atualizacao")
++        names = ["AkynoLeyend.exe", "AkynoLeyend.dll", "image.bin", "SDL2.dll", MANIFEST, "language.txt"]
++        with workspace_stage(prefix=".runtime-backup-", dir=folder) as backup:
++            for name in names:
++                if (folder/name).is_file(): shutil.copy2(folder/name, backup/name)
++            try:
++                updated = publish(request, Path(manifest["romfs"]), manifest["game_build_id"], processes, started)
++                updated["maintenance"] = {"from_version": manifest.get("version"),
++                    "previous_build_seconds": manifest.get("seconds"), "lift_repeated": False,
++                    "game_objects_required_from_cache": True, "runtime_features": "fullhd-video-budget-v1"}
++                write_json(folder/MANIFEST, updated)
++            except Exception:
++                for name in names:
++                    if (backup/name).is_file(): shutil.copy2(backup/name, folder/name)
++                raise
++        report("@@done " + str(folder))
++        report("Build atualizado. Entrada, saves e objetos do jogo preservados; shaders serao conferidos ao jogar.")
++        return updated
+--- a/akynoleyend/shader_prepare.py
++++ b/akynoleyend/shader_prepare.py
+@@ -133,6 +133,14 @@
+     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+ 
+ 
++def bank_stamp(path: Path) -> dict:
++    value = path.stat()
++    if path.is_symlink():
++        return {}
++    return {"size": value.st_size, "mtime_ns": value.st_mtime_ns,
++            "ctime_ns": value.st_ctime_ns, "inode": value.st_ino, "device": value.st_dev}
++
++
+ def prepare_shaders(
+     folder: Path,
+     work: Path,
+@@ -142,10 +150,12 @@
+     start_game: bool = True,
+     shader_workers: int | None = None,
+     report=print,
++    verified_manifest: dict | None = None,
+ ) -> int:
+     with workspace_lock(work):
+-        manifest = checked_build(folder)
+-        manifest = _update_renderer(folder, manifest, report)
++        manifest = verified_manifest if verified_manifest is not None else checked_build(folder)
++        if verified_manifest is None:
++            manifest = _update_renderer(folder, manifest, report)
+         romfs = Path(manifest["romfs"])
+         identity = seed_identity(romfs, manifest["files"]["image.bin"])
+         cache = work / "shaders"
+@@ -154,6 +164,7 @@
+         reuse = False
+         known_digest = None
+         reading = marker
++        previous = {}
+         try:
+             marker.stat()
+             previous = read_json(marker)
+@@ -161,7 +172,10 @@
+             reuse = (
+                 not force
+                 and previous.get("input") == identity
+-                and sha256(bank) == previous.get("sha256")
++                and isinstance(previous.get("sha256"), str)
++                and len(previous["sha256"]) == 64
++                and (previous.get("bank_stamp") == bank_stamp(bank)
++                     or sha256(bank) == previous.get("sha256"))
+             )
+             if reuse:
+                 known_digest = previous["sha256"]
+@@ -205,7 +219,10 @@
+             dest.is_file()
+             and not dest.is_symlink()
+             and dest.stat().st_size == bank.stat().st_size
+-            and sha256(dest) == known_digest
++            and ((previous.get("sha256") == known_digest
++                  and previous.get("installed_path") == str(dest.resolve())
++                  and previous.get("installed_stamp") == bank_stamp(dest))
++                 or sha256(dest) == known_digest)
+         ):
+             report("Banco de shaders ja instalado e conferido; copia dispensada.")
+         else:
+@@ -217,9 +234,12 @@
+                         "Banco de shaders alterado durante a copia; o anterior foi preservado."
+                     )
+                 staged.replace(dest)
+-    report(
+-        "Banco publicado. Acompanhe Preparing shaders; o processo termina apos preparar, sem entrar na partida."
+-    )
++        receipt = {"schema": 2, "input": identity, "sha256": known_digest,
++                   "bank_stamp": bank_stamp(bank), "installed_path": str(dest.resolve()),
++                   "installed_stamp": bank_stamp(dest)}
++        if receipt != previous:
++            write_json(marker, receipt)
++    report("Banco pronto. O inicio do jogo confere shaders e pipelines para esta GPU e driver.")
+     if not start_game:
+         return 0
+     return launch(
+--- /dev/null
++++ b/akynoleyend/updater.py
+@@ -0,0 +1,194 @@
++"""Install an explicitly selected update package, preserving local game data and toolchains."""
++import json
++import os
++from pathlib import Path, PurePosixPath
++import shutil
++import stat
++import subprocess
++import sys
++import time
++import uuid
++import zipfile
++
++from .errors import ProjectError
++from .files import read_json, sha256, write_json, workspace_lock
++
++BLOCKED = {"work", "jogo", "user", "atualizacoes", "diagnosticos", "analysis", ".git"}
++INDEX = "update-package.json"
++
++
++def relative_name(name):
++    p = PurePosixPath(name)
++    if (not name or p.is_absolute() or "\\" in name or p.as_posix() != name
++            or any(x in {"", ".", ".."} or x.rstrip(" .") != x or any(c in x for c in '<>:"|?*') for x in p.parts)):
++        raise ProjectError("Caminho invalido no pacote de atualizacao.")
++    if p.parts[0].casefold() in BLOCKED or name.casefold() == "akynoleyend-launcher.json":
++        raise ProjectError("O pacote tenta substituir dados locais preservados.")
++    if p.parts[0].casefold() == "ferramentas" and (len(p.parts) != 3 or p.parts[1] != "prebuilt"):
++        raise ProjectError("Use o pacote de atualizacao; SDKs completos nao sao substituidos por este fluxo.")
++    return Path(*p.parts)
++
++
++def _inspect_package(archive: Path):
++    with zipfile.ZipFile(archive) as z:
++        if INDEX not in z.namelist():
++            raise ProjectError("Este ZIP nao possui indice de atualizacao. Selecione o pacote Atualizacao desta versao.")
++        if z.getinfo(INDEX).file_size > 2 << 20:
++            raise ProjectError("Indice de atualizacao excede o limite.")
++        meta = json.loads(z.read(INDEX))
++        files = meta.get("files")
++        if meta.get("schema") != 1 or meta.get("kind") != "update" or not isinstance(meta.get("version"), str) or not isinstance(files, dict):
++            raise ProjectError("Formato de atualizacao desconhecido.")
++        entries = [i for i in z.infolist() if not i.is_dir()]
++        names = [i.filename for i in entries]
++        if len(entries) > 20000 or len(names) != len(set(n.casefold() for n in names)) or set(names) != set(files) | {INDEX}:
++            raise ProjectError("Conteudo do ZIP diverge do indice ou possui nomes repetidos.")
++        if sum(i.file_size for i in entries) > 2 << 30:
++            raise ProjectError("Pacote de atualizacao excede 2 GiB descompactado.")
++        for item in entries:
++            relative_name(item.filename)
++            if stat.S_ISLNK(item.external_attr >> 16):
++                raise ProjectError("Links nao sao aceitos no pacote.")
++            if item.filename != INDEX:
++                digest = files[item.filename]
++                if not isinstance(digest, str) or len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest):
++                    raise ProjectError("Hash invalido no indice.")
++        for name in ("AkynoLeyendBuilder.exe", "manage.py", "VERSION", "ferramentas/prebuilt/AkynoLeyend.dll", "ferramentas/prebuilt/renderer.json"):
++            if name not in files: raise ProjectError("Atualizacao incompleta: " + name)
++        return meta
++
++
++def inspect_package(archive: Path):
++    try:
++        return _inspect_package(archive)
++    except (zipfile.BadZipFile, json.JSONDecodeError, AttributeError, TypeError, KeyError) as error:
++        raise ProjectError("O arquivo nao e um pacote de atualizacao valido.") from error
++
++
++def stage_update(archive: Path, root: Path, output: Path, *, jobs=None, report=print):
++    meta = inspect_package(archive)
++    root = root.resolve()
++    folder = root / "atualizacoes" / ("pendente-" + uuid.uuid4().hex)
++    payload = folder / "arquivos"
++    folder.mkdir(parents=True)
++    try:
++        if os.name == "nt":
++            from .windows_acl import protect_staging
++            protect_staging(folder)
++        payload.mkdir()
++        with zipfile.ZipFile(archive) as z:
++            for name, digest in meta["files"].items():
++                dest = payload / relative_name(name)
++                dest.parent.mkdir(parents=True, exist_ok=True)
++                with z.open(name) as src, dest.open("wb") as target:
++                    shutil.copyfileobj(src, target, 1 << 20)
++                if sha256(dest) != digest: raise ProjectError("Arquivo danificado no pacote: " + name)
++        if (payload/"VERSION").read_text().strip() != meta["version"]:
++            raise ProjectError("Versao do pacote diverge dos fontes.")
++        for name in ("AkynoLeyendBuilder.exe", "ferramentas/prebuilt/AkynoLeyend.dll"):
++            with (payload/name).open("rb") as f:
++                if f.read(2) != b'MZ': raise ProjectError("Binario Windows ausente no pacote: " + name)
++        plan = folder / "plano.json"
++        write_json(plan, {"schema": 1, "root": str(root), "output": str(output.resolve()),
++                          "version": meta["version"], "files": meta["files"], "jobs": jobs})
++        report("Pacote conferido. Saves, ferramentas e objetos compilados serao preservados.")
++        return plan
++    except Exception:
++        shutil.rmtree(folder)
++        raise
++
++
++def wait_for_parent(pid, timeout=90):
++    if not pid: return
++    if pid == os.getpid(): raise ProjectError("O atualizador nao pode esperar por si mesmo.")
++    if os.name == "nt":
++        import ctypes
++        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
++        kernel.OpenProcess.restype = ctypes.c_void_p
++        kernel.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
++        kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
++        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
++        handle = kernel.OpenProcess(0x00100000, 0, pid)
++        if not handle: return
++        try:
++            if kernel.WaitForSingleObject(handle, int(timeout*1000)) != 0:
++                raise ProjectError("A interface continua aberta; feche-a antes de aplicar o pacote.")
++        finally: kernel.CloseHandle(handle)
++    else:
++        end = time.monotonic()+timeout
++        while time.monotonic() < end:
++            try: os.kill(pid, 0)
++            except ProcessLookupError: return
++            time.sleep(0.1)
++        raise ProjectError("A interface continua aberta.")
++
++
++def install_files(plan, maintain=None):
++    """Atomic file replacements and rollback, also exercised without a Windows UI."""
++    data = read_json(plan)
++    if data.get("schema") != 1 or not isinstance(data.get("files"), dict):
++        raise ProjectError("Plano de atualizacao invalido.")
++    root = Path(data["root"]).resolve()
++    if plan.parent.parent.resolve() != root/"atualizacoes":
++        raise ProjectError("Plano fora da pasta de atualizacoes desta instalacao.")
++    payload, backup = plan.parent/"arquivos", plan.parent/"anterior"
++    files = data["files"]
++    for name, digest in files.items():
++        rel = relative_name(name)
++        if sha256(payload/rel) != digest: raise ProjectError("Pacote alterado depois da conferencia: " + name)
++        target = root/rel
++        if target.is_symlink() or any(p.is_symlink() for p in target.parents if p != root.parent):
++            raise ProjectError("Destino da atualizacao e um link: " + name)
++    changed = []
++    with workspace_lock(root/"atualizacoes"):
++        try:
++            for name in files:
++                rel = relative_name(name); dest = root/rel
++                if dest.is_file() and sha256(dest) == files[name]: continue
++                if dest.exists():
++                    old = backup/rel;old.parent.mkdir(parents=True, exist_ok=True);shutil.copy2(dest, old)
++                dest.parent.mkdir(parents=True, exist_ok=True)
++                temp = dest.with_name(dest.name+'.update-'+uuid.uuid4().hex)
++                try: shutil.copy2(payload/rel, temp);temp.replace(dest)
++                finally: temp.unlink(missing_ok=True)
++                changed.append(rel)
++            if maintain is not None: maintain(data)
++        except Exception as original:
++            errors = []
++            for rel in reversed(changed):
++                try:
++                    if (backup/rel).exists(): shutil.copy2(backup/rel, root/rel)
++                    else: (root/rel).unlink(missing_ok=True)
++                except OSError as e: errors.append(str(e))
++            if errors: raise ProjectError("Atualizacao interrompida; reversao pendente em " + str(backup) + ': ' + '; '.join(errors)) from original
++            raise
++    return data
++
++
++def apply_update(plan: Path, wait_pid=0, *, restart=True):
++    wait_for_parent(wait_pid)
++    data = read_json(plan);root = Path(data["root"])
++    log = root/"atualizacoes/ultima-atualizacao.log"
++    def maintain(current):
++        output = Path(current["output"])
++        if not (output/"AkynoLeyend-build.json").is_file(): return
++        cmd = [sys.executable, "-I", "-X", "utf8", "-u", str(root/"manage.py"), "maintain-build", "--out", str(output)]
++        if current.get("jobs") is not None: cmd += ["--jobs", str(current["jobs"])]
++        with log.open("w", encoding="utf-8") as f:
++            process = subprocess.Popen(cmd, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
++                                       text=True, encoding="utf-8", errors="replace")
++            for line in process.stdout:
++                f.write(line); print(line, end="", flush=True)
++            status = process.wait()
++        if status: raise ProjectError("Atualizacao dos componentes interrompida. Consulte " + str(log))
++    try:
++        install_files(plan, maintain)
++        if restart: subprocess.Popen([str(root/"AkynoLeyendBuilder.exe")], cwd=root)
++        shutil.rmtree(plan.parent)
++        return 0
++    except Exception as error:
++        print("@@error " + str(error), flush=True)
++        if os.name == "nt":
++            import ctypes
++            ctypes.windll.user32.MessageBoxW(None, str(error), "AkynoLeyend — atualização interrompida", 0x10)
++        return 1
+--- a/builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj
++++ b/builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj
+@@ -9,7 +9,7 @@
+     <ImplicitUsings>enable</ImplicitUsings>
+     <AssemblyName>AkynoLeyendBuilder</AssemblyName>
+     <RootNamespace>AkynoLeyendBuilder</RootNamespace>
+-    <Version>0.4.3-test.2</Version>
++    <Version>0.4.3-test.3</Version>
+     <Product>AkynoLeyend</Product>
+     <ApplicationIcon>../../assets/AkynoLeyend.ico</ApplicationIcon>
+     <ApplicationManifest>app.manifest</ApplicationManifest>
+--- a/builder/AkynoLeyendBuilder/LaunchOptions.cs
++++ b/builder/AkynoLeyendBuilder/LaunchOptions.cs
+@@ -10,14 +10,20 @@
+  public string Sharpness{get;init;}="saved";
+  public string Framegen{get;init;}="saved";
+  public string Pacing{get;init;}="saved";
++ public string FpsCounter{get;init;}="saved";
++ public string Handheld{get;init;}="saved";
+  public string Cache{get;init;}="original";
+  public string[] Arguments(){
+   if(Backend!="vulkan")throw new InvalidOperationException("OpenGL ainda não está disponível nesta versão.");
+   var args=new List<string>{"--backend",Backend};
+   void Add(string option,string value,params string[] allowed){if(value=="saved")return;if(!allowed.Contains(value))throw new InvalidOperationException($"Opção inválida: {option}={value}");args.Add(option);args.Add(value);}
+-  Add("--resolution",Resolution,"auto","100","75","67","50","125","150","native-1440","native-4k");Add("--output-resolution",OutputResolution,"game","1440p","4k");Add("--speed",Speed,"realtime","per-frame");Add("--upscaling",Upscaling,"off","catmull-rom","lanczos","fsr");Add("--sharpness",Sharpness,"0","10","20","30");Add("--framegen",Framegen,"0","2","3","4","5","6","7","8");Add("--pacing",Pacing,"on","off");Add("--cache-mode",Cache,"original","streaming","equilibrado");return args.ToArray();
++  Add("--resolution",Resolution,"auto","100","75","67","50","125","150","native-1440","native-4k");Add("--output-resolution",OutputResolution,"game","1440p","4k","1080p");Add("--speed",Speed,"realtime","per-frame");Add("--upscaling",Upscaling,"off","catmull-rom","lanczos","fsr");Add("--sharpness",Sharpness,"0","10","20","30");Add("--framegen",Framegen,"0","2","3","4","5","6","7","8");Add("--pacing",Pacing,"on","off");Add("--fps-counter",FpsCounter,"on","off");Add("--handheld",Handheld,"on","off");Add("--cache-mode",Cache,"original","streaming","equilibrado");return args.ToArray();
+  }
+- public static GraphicsSettings FsrPreset()=>new(){Resolution="67",OutputResolution="game",Speed="realtime",Upscaling="fsr",Sharpness="10",Framegen="0",Pacing="on",Cache="equilibrado"};
++ public static GraphicsSettings FsrPreset()=>Preset("smooth");
++ public static GraphicsSettings Preset(string name)=>new(){
++  Resolution=name=="amd-low"?"50":name=="quality"?"100":name=="balanced"?"75":"67",
++  OutputResolution="1080p",Speed="realtime",Upscaling="fsr",Sharpness="10",Framegen="0",
++  Pacing="on",FpsCounter="on",Handheld=name=="amd-low"?"on":"off",Cache="equilibrado"};
+  public GraphicsSettings NormalizeLegacyOutput()=>Resolution=="native-1440"||Resolution=="native-4k"?
+   this with {Resolution="100",OutputResolution=Resolution=="native-1440"?"1440p":"4k"}:this;
+ }
+--- a/builder/AkynoLeyendBuilder/MainWindow.xaml
++++ b/builder/AkynoLeyendBuilder/MainWindow.xaml
+@@ -122,6 +122,7 @@
+         <TextBlock x:Name="SpaceText" Style="{StaticResource Note}" VerticalAlignment="Center" Margin="0,0,16,0" />
+         <StackPanel Grid.Column="1" Orientation="Horizontal">
+           <Button x:Name="ExistingPlay" Style="{StaticResource Primary}" Visibility="Collapsed" Click="PlayExisting" Margin="0,0,8,0" />
++          <Button x:Name="UpdateBuildButton" Content="Atualizar build" Style="{StaticResource Quiet}" Click="UpdateBuild" Margin="0,0,8,0" />
+           <Button x:Name="BuildButton" Style="{StaticResource Quiet}" IsEnabled="False" Click="StartBuild" />
+         </StackPanel>
+       </Grid>
+@@ -135,6 +136,7 @@
+       <StackPanel>
+         <TextBlock x:Name="BuildTitle" Style="{StaticResource Heading}" />
+         <TextBlock x:Name="BuildNote" Style="{StaticResource Note}" Margin="0,6,0,0" />
++        <ProgressBar x:Name="ShaderProgress" Style="{StaticResource Thin}" Minimum="0" Maximum="1" Height="6" Margin="0,12,0,12" Visibility="Collapsed" />
+       </StackPanel>
+       <Grid Grid.Row="1" Margin="0,28,0,16">
+         <Grid.RowDefinitions>
+@@ -183,7 +185,7 @@
+         </StackPanel>
+         <StackPanel Grid.Row="2">
+           <Border Height="1" Background="{StaticResource Line}" Margin="0,0,0,16" />
+-          <TextBlock Text="0.4.3 · TESTE 2" FontSize="10" Foreground="{StaticResource InkFaint}" />
++          <TextBlock Text="0.4.3 · TESTE 3" FontSize="10" Foreground="{StaticResource InkFaint}" />
+           <TextBlock Text="Construído para explorar." Style="{StaticResource Note}" FontSize="11" Margin="0,8,0,0" />
+         </StackPanel>
+       </Grid>
+@@ -194,7 +196,7 @@
+         <TextBlock Text="A imagem do seu jeito." FontSize="23" Margin="0,18,0,8" />
+         <TextBlock Text="Os ajustes são aplicados ao jogar. Compare a mesma cena para avaliar FPS e qualidade." Style="{StaticResource Note}" Margin="0,0,0,22" />
+         <WrapPanel Margin="0,0,0,20">
+-          <Button Content="AMD FSR 1 · desempenho" Tag="fsr" Click="Preset" Style="{StaticResource Primary}" Margin="0,0,10,8" />
++          <Button Content="AMD básico · Full HD + FSR" Tag="amd-low" Click="Preset" Style="{StaticResource Primary}" Margin="0,0,10,8" />
+           <Button Content="Qualidade" Tag="quality" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+           <Button Content="Equilibrado" Tag="balanced" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+           <Button Content="Fluidez" Tag="smooth" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+@@ -205,6 +207,7 @@
+             <StackPanel Margin="0,0,0,20">
+               <TextBlock Text="Resolução de saída (reiniciar o jogo)" Style="{StaticResource Label}" />
+               <ComboBox x:Name="OutputBox" Style="{StaticResource Choice}" SelectedIndex="0">
++                <ComboBoxItem Content="1920×1080 · Full HD" Tag="1080p" />
+                 <ComboBoxItem Content="Usar opção salva" Tag="saved" />
+                 <ComboBoxItem Content="2048×1152 · padrão do jogo" Tag="game" />
+                 <ComboBoxItem Content="2560×1440" Tag="1440p" />
+@@ -317,7 +320,26 @@
+                 </ComboBox>
+               </StackPanel>
+             </Grid>
+-            <TextBlock Text="OpenGL exige um caminho próprio para task/mesh e ainda não executa esta base. Tempo real mantém a velocidade; não aumenta os quadros renderizados. A interpolação pode acrescentar atraso e artefatos." Style="{StaticResource Note}" FontSize="11" />
++            <Grid Margin="0,0,0,20">
++              <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="20" /><ColumnDefinition /></Grid.ColumnDefinitions>
++              <StackPanel>
++                <TextBlock Text="Contador de FPS" Style="{StaticResource Label}" />
++                <ComboBox x:Name="FpsBox" Style="{StaticResource Choice}" SelectedIndex="0">
++                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
++                  <ComboBoxItem Content="Mostrar FPS" Tag="on" />
++                  <ComboBoxItem Content="Ocultar FPS" Tag="off" />
++                </ComboBox>
++              </StackPanel>
++              <StackPanel Grid.Column="2">
++                <TextBlock Text="Perfil portátil (reiniciar o jogo)" Style="{StaticResource Label}" />
++                <ComboBox x:Name="HandheldBox" Style="{StaticResource Choice}" SelectedIndex="0">
++                  <ComboBoxItem Content="Usar opção salva" Tag="saved" />
++                  <ComboBoxItem Content="Ligado · usado pelo AMD básico" Tag="on" />
++                  <ComboBoxItem Content="Desligado" Tag="off" />
++                </ComboBox>
++              </StackPanel>
++            </Grid>
++            <TextBlock Text="No jogo: Ctrl+M abre o menu. Use mouse ou WASD. Os shaders são conferidos e preparados automaticamente ao jogar. Tempo real mantém a simulação; não aumenta os quadros renderizados." Style="{StaticResource Note}" FontSize="11" />
+           </StackPanel>
+         </Border>
+         <TextBlock x:Name="GraphicsNote" Text="Os ajustes ficam guardados no launcher." Style="{StaticResource Note}" Margin="0,18,0,18" />
+@@ -334,7 +356,8 @@
+           <TextBlock Text="Antecipe a tradução dos shaders para reduzir pausas. A primeira preparação pode demorar." Style="{StaticResource Note}" Margin="0,0,0,20" />
+           <WrapPanel>
+             <Button Content="Preparar shaders" Tag="prepare-shaders" Click="RunTool" Style="{StaticResource Primary}" Margin="0,0,12,10" />
+-            <Button Content="Atualizar AkynoLeyend" Tag="update-renderer" Click="RunTool" Style="{StaticResource Quiet}" Margin="0,0,0,10" />
++            <Button Content="Atualizar build com pacote ZIP" Click="UpdateBuild" Style="{StaticResource Quiet}" Margin="0,0,12,10" />
++            <Button Content="Aplicar componentes instalados" Tag="maintain-build" Click="RunTool" Style="{StaticResource Quiet}" Margin="0,0,0,10" />
+           </WrapPanel>
+         </StackPanel>
+       </Border>
+--- a/builder/AkynoLeyendBuilder/MainWindow.xaml.cs
++++ b/builder/AkynoLeyendBuilder/MainWindow.xaml.cs
+@@ -36,6 +36,7 @@
+     bool sourceOk;
+     bool playing;
+     string? operation;
++    string? pendingUpdatePlan;
+     string SettingsPath => Path.Combine(Tools.Find()?.Root ?? AppContext.BaseDirectory,"AkynoLeyend-launcher.json");
+ 
+     public MainWindow()
+@@ -236,9 +237,20 @@
+ 
+     void Line(string line)
+     {
+-        if (line.StartsWith("@@stage "))
++        if (line.StartsWith("@@update_plan ")) pendingUpdatePlan = line[14..];
++        else if (line.StartsWith("@@shader_progress ")) {
++            var parts=line.Split(' ',StringSplitOptions.RemoveEmptyEntries);
++            if(parts.Length==3&&long.TryParse(parts[1],out var done)&&long.TryParse(parts[2],out var total)&&total>0){
++                BuildTitle.Text="Preparando shaders";BuildNote.Text=$"{done:N0} de {total:N0} · {done*100/total}%";
++                ShaderProgress.Visibility=Visibility.Visible;ShaderProgress.IsIndeterminate=false;
++                ShaderProgress.Value=Math.Clamp(done/(double)total,0,1);
++            }
++        }
++        else if (line=="@@shader_ready") {ShaderProgress.Visibility=Visibility.Collapsed;BuildTitle.Text="Executando o jogo";BuildNote.Text="Shaders preparados. O jogo está iniciando.";}
++        else if (line.StartsWith("@@stage "))
+         {
+             var id = line.Split(' ')[1];
++            if(id=="shaders"){BuildTitle.Text="Conferindo shaders";BuildNote.Text="Preparação automática antes da partida.";ShaderProgress.Visibility=Visibility.Visible;ShaderProgress.IsIndeterminate=true;}
+             if (current != null && rows.TryGetValue(current, out var previous)) previous.Done();
+             current = id;
+             if (rows.TryGetValue(id, out var row)) row.Begin();
+@@ -295,6 +307,15 @@
+         clock.Stop();
+         elapsed.Stop();
+         runner = null;
++        ShaderProgress.Visibility=Visibility.Collapsed;
++        if(operation=="stage-update"&&failure==null&&pendingUpdatePlan!=null){
++            try{
++                var tools=Tools.Find()??throw new IOException("Ferramentas ausentes.");
++                var info=Runner.Info(tools,"apply-update",new[]{"--plan",pendingUpdatePlan,"--wait-pid",Environment.ProcessId.ToString()});
++                info.CreateNoWindow=false;info.RedirectStandardOutput=false;info.RedirectStandardError=false;
++                Process.Start(info);operation=null;Application.Current.Shutdown();return;
++            }catch(Exception ex){failure="Não foi possível iniciar a atualização: "+ex.Message;}
++        }
+         Navigation.IsEnabled=true;
+         if(operation!=null){
+             BuildTitle.Text=failure==null?"Operação concluída":"Operação interrompida";
+@@ -408,23 +429,19 @@
+     }
+     static string Choice(ComboBox b)=>(b.SelectedItem as ComboBoxItem)?.Tag?.ToString()??"saved";
+     static void Select(ComboBox b,string value){b.SelectedIndex=0;for(int i=0;i<b.Items.Count;i++)if(b.Items[i] is ComboBoxItem x&&x.IsEnabled&&x.Tag?.ToString()==value){b.SelectedIndex=i;break;}}
+-    GraphicsSettings CaptureGraphics()=>new(){Backend=Choice(BackendBox),Resolution=Choice(ResolutionBox),OutputResolution=Choice(OutputBox),Speed=Choice(SpeedBox),Upscaling=Choice(UpscaleBox),Sharpness=Choice(SharpnessBox),Framegen=Choice(FramegenBox),Pacing=Choice(PacingBox),Cache=Choice(CacheBox)};
+-    void ApplyGraphics(GraphicsSettings g){g=g.NormalizeLegacyOutput();Select(BackendBox,g.Backend);Select(ResolutionBox,g.Resolution);Select(OutputBox,g.OutputResolution);Select(SpeedBox,g.Speed);Select(UpscaleBox,g.Upscaling);Select(SharpnessBox,g.Sharpness);Select(FramegenBox,g.Framegen);Select(PacingBox,g.Pacing);Select(CacheBox,g.Cache);}
++    GraphicsSettings CaptureGraphics()=>new(){Backend=Choice(BackendBox),Resolution=Choice(ResolutionBox),OutputResolution=Choice(OutputBox),Speed=Choice(SpeedBox),Upscaling=Choice(UpscaleBox),Sharpness=Choice(SharpnessBox),Framegen=Choice(FramegenBox),Pacing=Choice(PacingBox),Cache=Choice(CacheBox),FpsCounter=Choice(FpsBox),Handheld=Choice(HandheldBox)};
++    void ApplyGraphics(GraphicsSettings g){g=g.NormalizeLegacyOutput();Select(BackendBox,g.Backend);Select(ResolutionBox,g.Resolution);Select(OutputBox,g.OutputResolution);Select(SpeedBox,g.Speed);Select(UpscaleBox,g.Upscaling);Select(SharpnessBox,g.Sharpness);Select(FramegenBox,g.Framegen);Select(PacingBox,g.Pacing);Select(CacheBox,g.Cache);Select(FpsBox,g.FpsCounter);Select(HandheldBox,g.Handheld);}
+     void LoadSettings(){try{var s=LauncherSettings.Load(SettingsPath);if(s==null)return;if(!string.IsNullOrWhiteSpace(s.Output))OutPath.Text=s.Output;NupPath.Text=s.Nup;RomfsPath.Text=s.Romfs;ExefsPath.Text=s.Exefs;UseFolders.IsChecked=s.Folders;UseNup.IsChecked=!s.Folders;JobsBox.SelectedIndex=Math.Clamp(s.Jobs,0,8);ProfileBox.SelectedIndex=Math.Clamp(s.Profile,0,3);LanguageBox.SelectedItem=Strings.All.FirstOrDefault(x=>x.Code==s.Language)??lang;ApplyGraphics(s.Graphics);}catch(Exception e){GraphicsNote.Text="Não foi possível ler ajustes anteriores; usando padrões: "+e.Message;}}
+     bool SaveSettings(){try{new LauncherSettings{Output=OutPath.Text,Nup=NupPath.Text,Romfs=RomfsPath.Text,Exefs=ExefsPath.Text,Folders=UseFolders.IsChecked==true,Jobs=JobsBox.SelectedIndex,Profile=ProfileBox.SelectedIndex,Language=lang.Code,Graphics=CaptureGraphics()}.Save(SettingsPath);return true;}catch(Exception e){GraphicsNote.Text="Não foi possível salvar: "+e.Message;return false;}}
+     void SaveGraphics(object sender,RoutedEventArgs e){if(SaveSettings())GraphicsNote.Text="Ajustes salvos. Serão aplicados ao jogar.";}
+     void Preset(object sender,RoutedEventArgs e)
+     {
+         var p=(sender as Button)?.Tag?.ToString();
+-        ApplyGraphics(p=="saved"?new GraphicsSettings():p=="fsr"?GraphicsSettings.FsrPreset():
+-            new GraphicsSettings{Resolution=p=="quality"?"100":p=="balanced"?"75":"67",
+-                OutputResolution="game",Speed="realtime",Upscaling="lanczos",Sharpness="10",
+-                Framegen="0",Pacing="on",Cache="equilibrado"});
++        ApplyGraphics(p=="saved"?new GraphicsSettings():GraphicsSettings.Preset(p??"smooth"));
+         ProfileBox.SelectedIndex=0;
+-        GraphicsNote.Text=p=="fsr"?
+-            "FSR 1 selecionado: saída padrão, escala 67%, nitidez 10% e geração desligada. Feche e abra o jogo. Para ampliar até a tela do monitor, use F11; se a janela for menor que a entrada, o log informa o downsampling.":
+-            p=="saved"?"Os ajustes seguem as opções salvas no jogo.":
+-            "Ajustes salvos com saída padrão do jogo. A escala interna e a saída podem ser escolhidas separadamente.";
++        GraphicsNote.Text=p=="saved"?"Os ajustes seguem as opções salvas no jogo.":
++            p=="amd-low"?"AMD básico: Full HD, escala 50%, FSR 1, portátil ligado e FPS visível. Reinicie o jogo.":
++            "Perfil aplicado: Full HD, FSR 1 e FPS visível. A escala interna pode ser ajustada separadamente.";
+         SaveSettings();
+     }
+ 
+@@ -434,10 +451,24 @@
+         if(string.IsNullOrWhiteSpace(OutPath.Text))return;
+         try{finished=Path.GetFullPath(OutPath.Text);}catch(Exception ex){ToolNote.Text=ex.Message;return;}
+         SaveSettings();operation=command;playing=false;StageList.Visibility=Visibility.Collapsed;pendingLines.Clear();Log.Clear();
+-        BuildTitle.Text=command=="prepare-shaders"?"Preparando shaders":command=="update-renderer"?"Atualizando AkynoLeyend":"Verificando e coletando";
++        BuildTitle.Text=command=="prepare-shaders"?"Preparando shaders":command=="maintain-build"?"Atualizando build":"Verificando e coletando";
+         BuildNote.Foreground=(Brush)FindResource("InkSoft");ShowPage(true);SetButtons(cancel:true);ShowLog.IsChecked=true;
+         var args=command=="doctor"?Array.Empty<string>():new[]{"--out",finished};
+         runner=new Runner(tools,command,args);runner.Line+=pendingLines.Add;runner.Finished+=failure=>Queue(()=>Ended(failure));elapsed.Restart();clock.Start();ShowClock();runner.Start();
++    }
++    void UpdateBuild(object sender,RoutedEventArgs e){
++        if(runner!=null)return;
++        var tools=Tools.Find();if(tools==null){MessageBox.Show(this,T(S.ToolsMissing),"AkynoLeyend");return;}
++        var dialog=new OpenFileDialog{Filter="Atualização AkynoLeyend (.zip)|*.zip",Title="Selecionar pacote de atualização"};
++        if(dialog.ShowDialog(this)!=true)return;
++        if(!SaveSettings())return;
++        finished=Path.GetFullPath(OutPath.Text);pendingUpdatePlan=null;operation="stage-update";playing=false;
++        StageList.Visibility=Visibility.Collapsed;pendingLines.Clear();Log.Clear();ShowPage(true);SetButtons(cancel:true);
++        BuildTitle.Text="Conferindo atualização";BuildNote.Text="O launcher reiniciará para aplicar o pacote e atualizar os componentes necessários.";
++        var args=new List<string>{"--archive",dialog.FileName,"--out",finished};
++        if(JobsBox.SelectedIndex>0)args.AddRange(new[]{"--jobs",JobsBox.SelectedIndex.ToString()});
++        runner=new Runner(tools,"stage-update",args);runner.Line+=pendingLines.Add;runner.Finished+=failure=>Queue(()=>Ended(failure));
++        elapsed.Restart();clock.Start();runner.Start();
+     }
+     void OpenGameFolder(object sender,RoutedEventArgs e){try{Process.Start(new ProcessStartInfo(Path.GetFullPath(OutPath.Text)){UseShellExecute=true});}catch(Exception ex){ToolNote.Text=ex.Message;}}
+     void OpenCredits(object sender,RoutedEventArgs e){try{Process.Start(new ProcessStartInfo(Path.Combine(Tools.Find()?.Root??AppContext.BaseDirectory,"creditos")){UseShellExecute=true});}catch(Exception ex){MessageBox.Show(this,ex.Message,"AkynoLeyend");}}
+--- a/builder/RunnerChecks/Program.cs
++++ b/builder/RunnerChecks/Program.cs
+@@ -83,14 +83,26 @@
+     {
+         var g = GraphicsSettings.FsrPreset();
+         var args = g.Arguments();
+-        Require(g.Resolution == "67" && g.OutputResolution == "game" && g.Upscaling == "fsr", "FSR preset mismatch.");
++        Require(g.Resolution == "67" && g.OutputResolution == "1080p" && g.Upscaling == "fsr", "FSR preset mismatch.");
+         Require(g.Sharpness == "10" && g.Framegen == "0" && g.Cache == "equilibrado", "Heavy previous options leaked.");
+-        Require(Array.IndexOf(args,"--output-resolution") >= 0 && args.Contains("game"), "Output did not reach CLI.");
++        Require(Array.IndexOf(args,"--output-resolution") >= 0 && args.Contains("1080p"), "Output did not reach CLI.");
++        Require(g.FpsCounter=="on"&&args.Contains("--fps-counter"), "FPS counter missing from preset.");
+         var path = Path.Combine(folder,"fsr-settings.json");
+         new LauncherSettings { Graphics=g }.Save(path);
+         Require(LauncherSettings.Load(path)?.Graphics == g, "Independent output did not roundtrip.");
+         var legacy = new GraphicsSettings {Resolution="native-4k"}.NormalizeLegacyOutput();
+         Require(legacy.Resolution=="100" && legacy.OutputResolution=="4k", "Legacy native output did not migrate.");
++        return Task.CompletedTask;
++    });
++    await Check("AMD basic and three graphics presets retain Full HD, FSR and FPS", () => {
++        foreach(var name in new[]{"amd-low","smooth","balanced","quality"}){
++            var g=GraphicsSettings.Preset(name);
++            Require(g.OutputResolution=="1080p"&&g.Upscaling=="fsr"&&g.FpsCounter=="on", "Preset defaults missing.");
++            Require(g.Handheld==(name=="amd-low"?"on":"off"), "Handheld profile not explicit.");
++            Require(g.Framegen=="0", "Frame generation should remain off in baseline presets.");
++            Require(g.Arguments().Contains("--handheld"), "Handheld did not reach CLI.");
++        }
++        Require(GraphicsSettings.Preset("amd-low").Resolution=="50", "Weak-PC internal scale missing.");
+         return Task.CompletedTask;
+     });
+     await Check("UI log bursts remain bounded and keep completion and errors in order", () =>
+--- a/builder/launcher-build.json
++++ b/builder/launcher-build.json
+@@ -1,9 +1,9 @@
+ {
+   "schema": 1,
+-  "version": "0.4.3-test.2",
+-  "pe_product_version": "0.4.3-test.2",
+-  "source_sha256": "c92b52e908d0afd343d943cdc056ebba079f97551d42d0890890348c13852982",
+-  "binary_sha256": "d0f3ef12736305b9d42bcc505515b94cbbbfabcd5096a4a1954fdaab847eff02",
++  "version": "0.4.3-test.3",
++  "pe_product_version": "0.4.3-test.3",
++  "source_sha256": "1adaf5529625d6805eaa0f211d4690918770b10c2983f58c06bddbc4723a4eff",
++  "binary_sha256": "52cb8154358cd39b47cf1f0166dc6842234cbb893dea0e4e51668cd0d5407f10",
+   "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
+   "wpf_window_executed": false
+ }
+--- /dev/null
++++ b/docs/ANALISE-RX6600-TESTE3.md
+@@ -0,0 +1,63 @@
++# RX 6600 e Teste 3 — análise de 09/11/2026
++
++## Evidências recebidas
++
++O ZIP contém oito sessões do Teste 1, duas de preparação e seis de partida.
++GPU: RX 6600, driver AMD 26.10.1. O cache de programas já separava GPU/driver;
++não se atribuiu o defeito a uma troca de GPU sem evidência.
++
++Uma sessão pesada usou no máximo 4.633 MB de 7.379 MB permitidos. Os registros
++recebidos não mostram estouro desse orçamento nem device lost. Os arquivos
++chamados diagnostico-crash de duas sessões registram código zero; isso por si
++só não prova um crash. Uma sessão de preparação foi encerrada externamente,
++outra concluiu 38.809 programas, 177 falhas, em 191 s. Algumas falhas correspondem
++a redes intencionalmente omitidas em GPU não NVIDIA; seis eram o CAS corrigido.
++
++A sessão que alcança o mapa acumula 149.625 ms na criação de pipelines na
++transição e chega a 0,8 FPS durante essa amostra; depois registra 23 FPS. É
++evidência de grandes pausas de compilação, não um benchmark do novo renderer.
++O vídeo usa AV1 via Media Foundation síncrono; o diagnóstico não tinha trace de
++relógio para quantificar o desvio de áudio.
++
++A imagem inicial mostra corrupção de cores com menu legível. Uma captura
++posterior, com portátil ligado, escala 100%, FSR e nitidez 70%, aparece sem a
++corrupção generalizada. O relato associado informa 22 FPS e dois objetos com
++brilho persistente. Não há comparação pareada do Teste 3; não declarar a
++vegetação completa nem as cores/sincronismo definitivamente corrigidos.
++
++## Demora de build
++
++O log de texto posterior informa 1.399,7 s para entrada/extração, 293,3 s no lift,
++3,3 s no split, 6.880,7 s em compilação/link e 8,3 s de publicação. Foram 393
++unidades, um processo, 8,4 GiB disponíveis e nenhum objeto aproveitado. A captura
++mostra 2h23 no total. Com reserva 2 GiB e estimativa 3,5 GiB por compilador, esse
++paralelismo é compatível com o limite de memória observado; não copiar os três
++jobs fixos do otimizador de outro PC. A manutenção evita repetir essas fases e
++exige os objetos traduzidos existentes antes de compilar qualquer unidade.
++
++## Mudanças e verificação
++
++* CAS global→storage: preservados comparador e substituição. A fixture do IR/pass
++  original reproduziu a exceção exata antes da correção. Depois, 70 unidades reais
++  do backend foram ligadas e seis módulos SPIR-V passaram no spirv-val 2025.1.
++* ASTC→BC3: uma camada por execução, do Hookshot 2.0.10 / PR956. Mantém a compressão;
++  não força todas as texturas a RGBA8. Verificação visual ainda necessária.
++* Vídeo: conversão RGBA sob demanda, EOS tratado com quadros ainda na fila e
++  recuperação adicional limitada a quatro passos/8 ms entre chamadas ao decoder.
++  Fixtures executam o código de fila e aquisição com planos NV12 e relógio sintéticos.
++* Interface: Full HD real no host/menu/CLI/GUI; mouse, WASD e Ctrl+M; FPS e portátil
++  no launcher; quatro perfis explícitos. WPF compilada/publicada, sem janela executada.
++* Atualizador: pacote indexado com hashes, staged antes de fechar o launcher;
++  troca/reversão de arquivos; preservação de SDKs, preferências, saves e work.
++  Manutenção exige fonte/ABI conhecida e objetos antigos, sem extração/lift.
++* Jogar: preparação automática, progresso encaminhado ao launcher e reaproveitamento
++  do banco inalterado sem novo hash integral. O cache traduzido muda com o reparo do CAS.
++
++Fonte Hookshot: commit 7f9daf06d902588476102d6650c600bb84f02ce5, GPL-3.0,
++recebido no ZIP fornecido. Nenhuma adição reservada do NX2navi foi copiada.
++Referências públicas: https://github.com/NotRexed/Hookshot/pull/956,
++https://github.com/NotRexed/Hookshot/issues/993 e
++https://github.com/NotRexed/Hookshot/issues/1006. Esses casos relacionados não
++provam que a causa de toda a imagem recebida seja a mesma.
++
++Identidades e limites de validação em `validacao-teste-0.4.3-test3.json`.
+--- a/docs/TESTE-0.4.3.md
++++ b/docs/TESTE-0.4.3.md
+@@ -1,58 +1,103 @@
+-# AkynoLeyend 0.4.3 — Teste 2
++# AkynoLeyend 0.4.3 — Teste 3
+ 
+-## Atualizar o Teste 1 já compilado
++## Atualizar uma instalação já compilada do Teste 1 ou 2
+ 
+-1. Feche o jogo e o Builder.
+-2. Extraia o conteúdo de `AkynoLeyend-0.4.3-Teste-2-Atualizacao.zip` **dentro da pasta
+-   do Teste 1 que contém AkynoLeyendBuilder.exe**. Aceite substituir os fontes,
+-   launcher e arquivos de suporte do pacote.
+-3. Execute `suporte/Atualizar-AkynoLeyend.cmd` e aguarde a confirmação. O comando
+-   confere o host e os hashes, aplica a DLL e registra a atualização compatível.
+-4. Abra o Builder. A lateral deve mostrar **0.4.3 · TESTE 2**.
++1. Feche o jogo e o Builder. Preserve a pasta `work` que pertence a essa instalação.
++2. Extraia `AkynoLeyend-0.4.3-Teste-3-Atualizacao.zip` dentro da pasta que já contém
++   `AkynoLeyendBuilder.exe`, substituindo os arquivos do pacote.
++3. Execute `suporte/Atualizar-AkynoLeyend.cmd` e aguarde a conclusão.
++4. Abra o Builder. A lateral deve mostrar **0.4.3 · TESTE 3**.
+ 
+-**Não precisa clicar em Criar novamente nem repetir Preparar shaders no Teste 1.**
+-O executável, a imagem, os saves e os objetos de compilação são mantidos. A revisão
+-exata do host é conferida; a atualização recusa hosts diferentes. Não copie uma
+-DLL isolada para contornar essa conferência.
++O primeiro passo manual instala o botão novo. Nas próximas atualizações, use
++**Atualizar build**, ao lado de Jogar, selecione o ZIP recebido e deixe o launcher
++reiniciar. Ele confere o pacote, aplica os arquivos e atualiza os componentes.
++Também há **Ferramentas → Aplicar componentes instalados** para repetir a
++manutenção depois de instalar os fontes correspondentes.
+ 
+-## Corrigir a configuração pesada e encontrar o FSR
++O atualizador usa pacotes ZIP fornecidos ao usuário; não há um servidor de
++atualizações AkynoLeyend configurado para procurar/baixar versões sozinho.
+ 
+-Nos registros recebidos, o jogo usava saída 3840×2160, escala experimental 150%,
+-filtro desligado e nitidez 100%, mesmo com janela 1920×1080. A combinação exige
+-muito mais renderização e memória que uma saída padrão. Isso não mede o ganho ou
+-regressão de uma mudança isolada do renderer.
++O runtime de vídeo, a janela e a saída Full HD mudaram: é preciso compilar esses
++componentes nativos e religar o EXE. **Não é um novo build completo do jogo**:
++não há extração ou lift, e os objetos das unidades traduzidas são exigidos do
++cache. Se uma unidade estiver ausente/incompatível, a atualização para antes
++de iniciar essa compilação longa. Nesse caso, restaure o `work` correto ou use Criar.
++Saves, preferências e ferramentas permanecem. A atualização tem reversão de
++arquivos se a instalação ou a manutenção falhar; os detalhes ficam em
++`atualizacoes/ultima-atualizacao.log`.
+ 
+-1. Na aba **Gráficos**, clique em **AMD FSR 1 · desempenho**.
+-2. O botão seleciona saída padrão 2048×1152, escala interna 67%, FSR 1, nitidez 10%,
+-   geração de quadros desligada, tempo real e cache Equilibrado. Os ajustes são salvos.
+-3. Abra o jogo de novo. Use **F11** para preencher o monitor. FSR amplia quando a
+-   saída da janela é maior que a imagem de entrada; para reduzir uma imagem maior,
+-   o renderer usa Lanczos e registra `EASU bypassed`.
+-4. No menu Insert, o filtro também fica em **Upscaling**: selecione a linha com
+-   cima/baixo e altere com esquerda/direita até **AMD FSR 1**.
++## Perfis e Full HD
+ 
+-Escala interna e resolução de saída agora têm controles separados no launcher.
+-1440p e 4K continuam disponíveis; a saída exige reiniciar o jogo. O preset FSR não
+-promete um FPS específico nem corresponde a FSR 3.1 ou geração de quadros.
++| Perfil | Saída | Escala interna | Filtro | Portátil | FPS |
++|---|---|---|---|---|---|
++| AMD básico | 1920×1080 | 50% | AMD FSR 1 | Ligado | Visível |
++| Fluidez | 1920×1080 | 67% | AMD FSR 1 | Desligado | Visível |
++| Equilibrado | 1920×1080 | 75% | AMD FSR 1 | Desligado | Visível |
++| Qualidade | 1920×1080 | 100% | AMD FSR 1 | Desligado | Visível |
+ 
+-## Instalações novas e hardware
++Todos começam com nitidez 10%, geração de quadros desligada, ritmo ligado,
++tempo real e cache Equilibrado. São pontos de partida; não são um benchmark.
++1440p e 4K continuam no seletor de saída, independentemente da escala interna.
++Full HD e perfil portátil são combináveis neste runtime; a seleção exige reinício.
++Escolha **Mostrar FPS / Ocultar FPS** no launcher ou **FPS counter** no jogo.
+ 
+-Use o ZIP completo, selecione sua entrada local e mantenha Processos de compilação
+-em **Automático**. A interface mostra os threads e a memória observados neste PC.
+-O plano consulta novamente a memória disponível antes de compilar e registra os
+-valores em `work/build-request.json`. Uma escolha manual de processos é respeitada.
+-Blocos novos usam alvo 6 ou 12 MiB conforme CPU/memória; limites já gravados são
+-preservados. As opções manuais continuam aceitas. Não são copiados os valores
+-3C/6T/15,9 GB do otimizador recebido. O alvo de CPU da distribuição continua x86-64-v3.
++O FSR integrado é o filtro espacial FSR 1 com EASU/RCAS. Não é FSR 3.1 nem geração
++de quadros. Ele recebe a imagem de apresentação; EASU amplia quando essa entrada
++é menor que a janela. Uma entrada igual/maior dispensa essa ampliação; o log
++informa `EASU bypassed` em redução. Não confundir a resolução da janela com a
++escala interna do 3D. Nitidez alta pode acentuar contornos/ruído.
+ 
+-## Comparar e enviar o resultado
++## Menu sem setas
+ 
+-Use o mesmo save, posição e câmera. Faça uma passagem de aquecimento e observe a
+-mesma cena por 60 segundos na segunda passagem, com geração de quadros desligada.
+-Anote a saída, escala, filtro e FPS. Feche pela janela do jogo e aguarde o registro.
+-Depois execute `suporte/Coletar-Crash.cmd` e envie o ZIP indicado junto com uma captura.
+-O comando também coleta uma partida encerrada normalmente.
++**Ctrl+M** abre e fecha. Insert e F1 continuam funcionando. Use W/S para navegar
++e A/D para mudar valores, ou passe o mouse sobre uma linha e clique na metade
++esquerda/direita do valor. Na nitidez, arraste a metade direita da linha.
++Esc fecha. Enquanto o menu está aberto, o cursor fica livre e o clique nele
++não deve capturar a câmera. A captura anterior volta ao fechar se o jogo tem foco.
+ 
+-Compilação e testes internos passaram; o ganho de FPS e a imagem do Teste 2 ainda
+-precisam desse teste no hardware. Não envie novamente os bancos ou os cinco ZIPs
+-do RuntimeId.
++## Preparação automática
++
++**Jogar** confere o banco privado e prepara shaders/pipelines necessários antes
++da partida. A interface mostra quantidade e porcentagem. Não precisa ir a
++Ferramentas para a preparação normal. A opção manual continua disponível para
++diagnóstico. A primeira abertura após mudar GPU, driver ou tradutor pode levar
++vários minutos; as seguintes aproveitam o cache compatível. Banco inalterado
++usa a conferência já registrada, evitando reler seu conteúdo inteiro em toda abertura.
++
++Esta versão corrige um caminho do tradutor, portanto o cache traduzido muda uma
++vez. O banco bruto do próprio usuário e os objetos C permanecem. O contador pode
++mostrar tentativas de variantes (como 116.427 para 38.809 programas), depois outra
++etapa de pipelines. Os números não representam a mesma unidade e não foram inflados.
++Estados de pipeline encontrados pela primeira vez ainda podem causar pausas.
++
++## Vídeo e RX 6600
++
++Foi reproduzido e corrigido o erro `Invalid number of arguments 3 in
++StorageAtomicCompareExchange32`: o caminho que transforma CAS global em acesso
++ao buffer descartava o valor de substituição. A preparação recebida mostrou seis
++programas afetados. O backend real passou na nova regressão e seis módulos SPIR-V
++foram validados; isso não é uma execução do jogo na Radeon.
++
++A conversão ASTC→BC3 agora usa uma camada por vez no scratch, seguindo a correção
++Hookshot #956. É uma correção candidata para os arrays de terreno; não foi confirmada
++a eliminação da imagem colorida na RX 6600 deste relato.
++
++Vídeos NV12 deixam de converter/copyar RGBA quando o jogo só lê NV12. A recuperação
++de atraso tem limite de passos e de tempo entre chamadas ao decoder, evitando
++decodificar centenas de quadros de uma vez. Uma chamada do driver não pode ser
++interrompida no meio. O sincronismo final de áudio/vídeo continua pendente de
++comparação no PC. No perfil Compatibilidade, o diagnóstico registra o relógio do vídeo.
++
++## Comparar
++
++Use o mesmo save, posição e câmera, faça uma passagem de aquecimento e observe a
++segunda por 60 segundos, com geração desligada. Teste também a mesma cutscene.
++Anote versão, perfil, escala, saída, FPS e se as cores/brilhos persistem.
++Depois feche o jogo e execute `suporte/Coletar-Crash.cmd`; ele também coleta
++partidas encerradas normalmente. Envie o ZIP e uma captura. Não é necessário
++enviar jogo, saves ou os bancos de shaders.
++
++196 testes passaram, 9 foram omitidos; 12 verificações do launcher e seis módulos
++SPIR-V passaram. DLL Windows ligada com 182 unidades; três C do host compilaram
++com headers auxiliares de fixture. Sem execução local da janela WPF ou do jogo
++em GPU física. Não há ganho de FPS medido para esta versão.
+--- a/docs/origem.md
++++ b/docs/origem.md
+@@ -229,3 +229,15 @@
+ Não foram habilitados o write-back diff ou a fila separada de apresentação da
+ referência, desativados por padrão no snapshot recebido. Nenhum ganho de FPS foi
+ medido localmente. Relatório em ANALISE-OPTIMIZER-REFERENCIAS-TESTE2.md.
++
++
++## Teste 3 — RX 6600, vídeo e atualização
++
++Do mesmo Hookshot v2.0.10 (7f9daf06d902588476102d6650c600bb84f02ce5, GPL-3.0),
++adaptados a execução de uma camada por vez em ASTC→BC3 (#956), o armazenamento de
++NV12 sem RGBA antecipado e o processamento de EOS antes de esvaziar a fila.
++Os limites de recuperação de vídeo, a preservação do quarto operando do CAS
++global→storage, Full HD, controles simplificados por mouse/WASD, perfis e o
++atualizador local são mudanças desta integração. Avisos das bases preservados.
++Não foi importada a ABI de ponteiro do menu novo do Hookshot: a integração Windows
++usa as funções de cursor e o evento da janela, sem alterar vk_api.h.
+--- /dev/null
++++ b/docs/validacao-teste-0.4.3-test3.json
+@@ -0,0 +1,108 @@
++{
++  "status": "TEST_BUILD_AWAITING_PHYSICAL_GPU_VALIDATION",
++  "version": "0.4.3-test.3",
++  "python_tests": {
++    "total": 205,
++    "passed": 196,
++    "skipped": 9,
++    "failed": 0
++  },
++  "runner_checks": 12,
++  "cas_spirv": {
++    "production_units": 70,
++    "modules_validated": 6,
++    "tracked_global_to_storage_regression_reproduced": true,
++    "gpu_executed": false
++  },
++  "native_renderer": {
++    "schema": 1,
++    "units": 182,
++    "jobs": 4,
++    "renderer_prebuilt": false,
++    "compile_seconds": 67.235,
++    "local_hits": 0,
++    "shared_hits": 0,
++    "compiled": 182,
++    "failed": 0
++  },
++  "renderer_exports": [
++    "mkwvk_init"
++  ],
++  "launcher": {
++    "schema": 1,
++    "version": "0.4.3-test.3",
++    "pe_product_version": "0.4.3-test.3",
++    "source_sha256": "1adaf5529625d6805eaa0f211d4690918770b10c2983f58c06bddbc4723a4eff",
++    "binary_sha256": "52cb8154358cd39b47cf1f0166dc6842234cbb893dea0e4e51668cd0d5407f10",
++    "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
++    "wpf_window_executed": false
++  },
++  "renderer": {
++    "schema": 1,
++    "release": "0.4.3-test.3",
++    "config": {
++      "target": "windows-gnu",
++      "march": "x86-64-v3",
++      "release": "1"
++    },
++    "source_sha256": "4554b3a3baa766eedcf8a6471bb8773a93d4d3803b59523c1cfe725a687f110c",
++    "binary_sha256": "cdb5306d7ac90524c0d9295aa09892e756991920220cde1951776d85a1d202bc",
++    "compiler": "LLVM-MinGW 20261020",
++    "generic": true,
++    "game_executed": false,
++    "physical_gpu_tested": false
++  },
++  "host_compile": [
++    {
++      "file": "nn_video.c",
++      "exit": 0,
++      "synthetic_instruction_helper_headers": true
++    },
++    {
++      "file": "nn_applet.c",
++      "exit": 0,
++      "synthetic_instruction_helper_headers": true
++    },
++    {
++      "file": "display.c",
++      "exit": 0,
++      "synthetic_instruction_helper_headers": true
++    }
++  ],
++  "shader_stamp": "ad137a62c8c44901",
++  "shader_source_sha256": "438d77a10b6dab559b213a27025fa45583403f06957732cf612b48e026778193",
++  "shader_stamp_prefix_found_in_dll": true,
++  "shader_translator_cache_changed": true,
++  "generated_game_retranslation_required": false,
++  "generated_game_object_recompile_required": false,
++  "host_objects_updated_and_exe_relinked_on_user_pc": true,
++  "maintenance_uses_existing_work": true,
++  "automatic_shader_preparation": true,
++  "source_sha256_posix": "6c67d2ebcd8918a39253aacaf9421cb36661076a814e787847c5ec42ae886384",
++  "source_sha256_windows": "9b71fcc98444139a9c1388ca6d575ef5fa8cd1083693a450142e2a09b40c1e7a",
++  "full_game_executed_here": false,
++  "physical_gpu_tested_here": false,
++  "fps_gain_measured": false,
++  "rainbow_image_fixed_on_rx6600_confirmed": false,
++  "audio_sync_on_user_pc_confirmed": false,
++  "zip_update_in_launcher": true,
++  "online_update_feed_configured": false,
++  "upstream": {
++    "tag": "v2.0.10",
++    "commit": "7f9daf06d902588476102d6650c600bb84f02ce5",
++    "selected_backports": [
++      "single-layer ASTC-to-BC3 runs (#956)",
++      "lazy RGBA conversion for NV12 video",
++      "EOS processing while pictures remain queued"
++    ],
++    "local_changes": [
++      "tracked global-to-storage CAS operand preservation",
++      "bounded catch-up between decoder calls",
++      "1920x1080 output including handheld profile",
++      "mouse/WASD/Ctrl+M overlay controls",
++      "automatic preparation with launcher progress",
++      "pinned runtime update with reuse-only guard",
++      "ZIP update transaction and rollback"
++    ]
++  }
++}
+--- a/gpu/PROVENANCE.md
++++ b/gpu/PROVENANCE.md
+@@ -1,3 +1,10 @@
++## Teste 3 (09/11/2026)
++
++Hookshot 2.0.10, GPL-3.0: ASTC→BC3 usa uma camada de scratch por vez (#956).
++Reparo local: CAS rastreado para storage mantém comparador e substituição.
++O menu Windows recebe mouse/WASD/Ctrl+M, Full HD e FPS do launcher. ABI pública
++Vulkan preservada. O tradutor mudou: novo stamp, sem reaproveitar SPIR-V incompatível.
++
+ # Test 2 selected CPU backports — 2026-11-09
+ 
+ Hookshot v2.0.10 commit 7f9daf06d902588476102d6650c600bb84f02ce5 supplied the
+--- a/gpu/vk/eden/shader_recompiler/ir_opt/global_memory_to_storage_buffer_pass.cpp
++++ b/gpu/vk/eden/shader_recompiler/ir_opt/global_memory_to_storage_buffer_pass.cpp
+@@ -753,8 +753,12 @@
+                    const IR::U32& offset) {
+     const IR::Opcode new_opcode{GlobalToStorage(inst.GetOpcode())};
+     const auto it{IR::Block::InstructionList::s_iterator_to(inst)};
+-    const IR::Value value{
+-        &*block.PrependNewInst(it, new_opcode, {storage_index, offset, inst.Arg(1)})};
++    // CAS carries both the comparator and the replacement, unlike the other atomics.
++    // Dropping Arg(2) rejected the six CAS shaders seen in the RX 6600 preparation log.
++    const bool cas = inst.GetOpcode() == IR::Opcode::GlobalAtomicCompareExchange32;
++    const IR::Value value{cas
++        ? &*block.PrependNewInst(it, new_opcode, {storage_index, offset, inst.Arg(1), inst.Arg(2)})
++        : &*block.PrependNewInst(it, new_opcode, {storage_index, offset, inst.Arg(1)})};
+     inst.ReplaceUsesWith(value);
+ }
+ 
+--- /dev/null
++++ b/gpu/vk/menu_pointer.h
+@@ -0,0 +1,17 @@
++// Mouse geometry shared by the native overlay and its portable regression.
++#pragma once
++#include <algorithm>
++namespace mkwvk::menu_pointer {
++inline int row(int x, int y, int width, int scale, int count) {
++    if (scale < 1 || x < 8 * scale || x >= width - 8 * scale || y < 44 * scale) return -1;
++    const int n = (y - 44 * scale) / (28 * scale);
++    return n < count ? n : -1;
++}
++inline int slider(int x, int width, int scale) {
++    const int left = width / 2, right = width - 20 * scale;
++    return right <= left ? 0 : std::clamp((x - left) * 100 / (right - left), 0, 100) / 10 * 10;
++}
++inline int image_coordinate(int position, int client, int image) {
++    return client > 0 ? int((static_cast<long long>(position) * image) / client) : -1;
++}
++}
+--- a/gpu/vk/vk_main.cpp
++++ b/gpu/vk/vk_main.cpp
+@@ -387,6 +387,14 @@
+         const auto progress = [](size_t done, size_t total) {
+             static bool tried = false;
+             if (!total) return;
++            static size_t last_percent = (size_t)-1, last_total = 0;
++            const size_t percent = done * 100 / total;
++            if (percent != last_percent || total != last_total || done == total) {
++                last_percent = percent; last_total = total;
++                std::fprintf(stderr, "@@shader_progress %zu %zu\n", done, total);
++                std::fflush(stderr);
++            }
++            if (getenv("AKYNO_LAUNCHER_PROGRESS")) return;
+             if (!tried) {
+                 tried = true;
+                 owns_console = AllocConsole() != 0;
+@@ -412,6 +420,8 @@
+         precompile_run(progress);
+         if (console) CloseHandle(console), console = nullptr;
+         if (owns_console) FreeConsole(), owns_console = false;
++        std::fprintf(stderr, "@@shader_ready\n");
++        std::fflush(stderr);
+         if (prepare_only) {
+             pipeline_cache_save(true);
+             logf("vk: PREPARE_COMPLETE: shader cache prepared; no gameplay started");
+--- a/gpu/vk/vk_menu.cpp
++++ b/gpu/vk/vk_menu.cpp
+@@ -10,6 +10,7 @@
+ #include <vector>
+ 
+ #include "vk_menu.h"
++#include "menu_pointer.h"
+ #include "vk_work.h"   // Count GPU work after other headers have declared the Vulkan calls.
+ 
+ namespace mkwvk {
+@@ -46,8 +47,8 @@
+ }
+ const char* tx_speed(int v) { return v ? "Real time" : "Per frame"; }
+ const char* tx_output(int v) {
+-    static const char* t[] = {"2048x1152 (game, restart)", "2560x1440 (restart)", "3840x2160 (restart)"};
+-    return t[std::clamp(v, 0, 2)];
++    static const char* t[] = {"2048x1152 (game, restart)", "2560x1440 (restart)", "3840x2160 (restart)", "1920x1080 (restart)"};
++    return t[std::clamp(v, 0, 3)];
+ }
+ const char* tx_handheld(int v) { return v ? "On (restart)" : "Off (restart)"; }
+ const char* tx_ultrawide(int v) { return v ? "Monitor's shape (restart)" : "16:9 (restart)"; }
+@@ -63,7 +64,7 @@
+     {"Resolution", &opts.resolution, 0, 6, 1, tx_resolution,
+      "How sharp the 3D is drawn. Auto lets the game lower it when the GPU is busy. A fixed percentage stays steady: lower is "
+      "faster."},
+-    {"Output resolution", &opts.output_res, 0, 2, 1, tx_output,
++    {"Output resolution", &opts.output_res, 0, 3, 1, tx_output,
+      "Sizes the game's picture and render resources. Applies after restarting. 4K uses more GPU memory."},
+     {"Upscaling", &opts.upscale, 0, 3, 1, tx_upscale,
+      "Scales the cropped picture to the window. AMD FSR 1 uses EASU and optional RCAS sharpness. It does not generate frames."},
+@@ -231,7 +232,7 @@
+     wrap_help(dc, rows[selected].help, (int)w - 32 * s, 16 * s, help_top + 4 * s, true);
+     SelectObject(dc, body);
+     SetTextColor(dc, RGB(140, 150, 144));
+-    const char* hint = "Arrows change   Insert or F1 closes";
++    const char* hint = "Mouse / WASD   Ctrl+M opens or closes";
+     TextOutA(dc, 16 * s, help_top + 4 * s + help_px + 10 * s, hint, (int)strlen(hint));
+     SelectObject(dc, old);
+     DeleteObject(title);
+@@ -357,12 +358,14 @@
+     if (const char* e = getenv("RX_VK_FRAMEGEN_MULT")) opts.framegen = std::min(std::max(atoi(e), 2), 8);
+     if (const char* e = getenv("RX_VK_PACE")) opts.pace = atoi(e) != 0;
+     if (const char* e = getenv("RX_VK_UPSCALE")) opts.upscale = atoi(e);
+-    if (const char* e = getenv("HOS_OUTPUT_RES")) opts.output_res = std::clamp(atoi(e), 0, 2);
++    if (const char* e = getenv("HOS_OUTPUT_RES")) opts.output_res = std::clamp(atoi(e), 0, 3);
+     if (const char* e = getenv("HOS_REALTIME_STEP")) opts.realtime = atoi(e) != 0;
+     if (const char* e = getenv("HOS_DYNRES")) opts.resolution = atoi(e) != 0 ? 0 : 1;
+     if (const char* e = getenv("AKYNO_RESOLUTION")) opts.resolution = std::clamp(atoi(e), 0, 6);
+     if (const char* e = getenv("AKYNO_FRAMEGEN")) { opts.framegen = std::clamp(atoi(e), 0, 8); if (opts.framegen == 1) opts.framegen = 0; }
+     if (const char* e = getenv("AKYNO_SHARPNESS")) opts.sharpness = std::clamp(atoi(e), 0, 100);
++    if (const char* e = getenv("AKYNO_FPS_COUNTER")) opts.show_fps = atoi(e) != 0;
++    if (const char* e = getenv("HOS_HANDHELD")) opts.handheld = atoi(e) != 0;
+ }
+ 
+ bool menu_is_open() { return open_now.load(std::memory_order_relaxed); }
+@@ -413,14 +416,15 @@
+ 
+ void menu_tick() {
+     fullscreen_tick();
+-    static bool held[7];
+-    static const int keys[7] = {VK_INSERT, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESCAPE, VK_F1};   // (F1: for keyboards without Insert)
++    static bool held[13];
++    static const int keys[13] = {VK_INSERT, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_ESCAPE, VK_F1,
++                                'W', 'S', 'A', 'D', 'M', VK_LBUTTON};
+     HWND fg = GetForegroundWindow();
+     DWORD pid = 0;
+     if (fg) GetWindowThreadProcessId(fg, &pid);
+     const bool mine = pid == GetCurrentProcessId();
+-    bool press[7] = {};
+-    for (int i = 0; i < 7; i++) {
++    bool press[13] = {};
++    for (int i = 0; i < 13; i++) {
+         const bool down = mine && (GetAsyncKeyState(keys[i]) & 0x8000) != 0;
+         press[i] = down && !held[i];
+         held[i] = down;
+@@ -429,8 +433,36 @@
+     bool changed = scale != cur_scale || menu_refresh;
+     menu_refresh = false;
+     cur_scale = scale;
+-    if (press[0] || press[6]) open_now = !open_now.load(), changed = true;
++    const bool chord = press[11] && (GetAsyncKeyState(VK_CONTROL) & 0x8000);
++    if (press[0] || press[6] || chord) open_now = !open_now.load(), changed = true;
+     if (open_now.load()) {
++        press[1] |= press[7]; press[2] |= press[8]; press[3] |= press[9]; press[4] |= press[10];
++        static bool was_mouse = false;
++        static POINT previous{};
++        static bool dragging = false;
++        POINT cursor{}; RECT client{};
++        const HWND window = app_window();
++        if (mine && window && GetCursorPos(&cursor) && ScreenToClient(window, &cursor) && GetClientRect(window, &client)) {
++            int mw = 0, mh = 0;
++            { std::lock_guard lk(bmp_mu); mw = (int)menu_bmp.w; mh = (int)menu_bmp.h; }
++            const int mx = menu_pointer::image_coordinate(cursor.x, client.right, (int)dev.swap_extent.width) - ((int)dev.swap_extent.width - mw) / 2;
++            const int my = menu_pointer::image_coordinate(cursor.y, client.bottom, (int)dev.swap_extent.height) - ((int)dev.swap_extent.height - mh) / 2;
++            const int hover = menu_pointer::row(mx, my, mw, scale, kRows);
++            const bool moved = was_mouse && (cursor.x != previous.x || cursor.y != previous.y);
++            if (hover >= 0 && (moved || press[12]) && !dragging && hover != selected) selected = hover, changed = true;
++            if (press[12] && hover >= 0) {
++                if (rows[selected].value == &opts.sharpness && mx >= mw / 2) dragging = true;
++                else press[mx < mw * 3 / 4 && mx > mw / 2 ? 3 : 4] = true;
++            }
++            if (dragging) {
++                if (!held[12]) dragging = false, save();
++                else {
++                    const int v = menu_pointer::slider(mx, mw, scale);
++                    if (v != opts.sharpness) opts.sharpness = v, changed = true;
++                }
++            }
++            previous = cursor; was_mouse = true;
++        } else { dragging = false; was_mouse = false; }
+         if (press[5]) open_now = false;
+         if (press[1]) selected = (selected + kRows - 1) % kRows, changed = true;
+         if (press[2]) selected = (selected + 1) % kRows, changed = true;
+@@ -444,6 +476,14 @@
+         }
+         if (changed) redraw_menu(scale);
+     }
++    {
++        static bool told = false;
++        const bool now_open = open_now.load();
++        if (now_open != told && app_window()) {
++            told = now_open;
++            PostMessageA(app_window(), WM_APP + 8, (WPARAM)now_open, 0);
++        }
++    }
+     if (opts.show_fps) {
+         static int64_t next = 0, last_game = 0, last_shown = 0;
+         const int64_t now = prof_now();
+--- a/gpu/vk/vk_texture.cpp
++++ b/gpu/vk/vk_texture.cpp
+@@ -570,7 +570,11 @@
+             pc.native_tiling = 1;
+             for (size_t k0 = 0; k0 < layers.size();) {
+                 size_t k1 = k0 + 1;
+-                while (k1 < layers.size() && k1 - k0 < kBcLayers && layers[k1] == layers[k1 - 1] + 1) k1++;
++                // Hookshot #956: small mips in later layers of a batched terrain array were corrupted.
++                // Keep BC3 compression; serialize its scratch layers instead of expanding all arrays to RGBA8.
++                static const uint32_t run = getenv("RX_VK_BC_LAYERS")
++                    ? std::clamp<uint32_t>((uint32_t)atoi(getenv("RX_VK_BC_LAYERS")), 1u, kBcLayers) : 1u;
++                while (k1 < layers.size() && k1 - k0 < run && layers[k1] == layers[k1 - 1] + 1) k1++;
+                 const uint32_t n = (uint32_t)(k1 - k0);
+                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, astc_pipe);
+                 const uint64_t from = k0 * tail + off;
+--- a/host/display.c
++++ b/host/display.c
+@@ -26,6 +26,7 @@
+ static volatile LONG mouse_dx, mouse_dy;
+ static volatile LONG mouse_captured;
+ static int cursor_hidden;
++static int menu_open, menu_restore_capture;
+ 
+ int hos_mouse_take(int32_t *dx, int32_t *dy) {
+     *dx = InterlockedExchange(&mouse_dx, 0);
+@@ -107,7 +108,7 @@
+         return DefWindowProcA(w, msg, wp, lp);
+     }
+     case WM_LBUTTONDOWN:
+-        if (renderer && !mouse_captured) mouse_capture(w, 1);
++        if (renderer && !menu_open && !mouse_captured) mouse_capture(w, 1);
+         return 0;
+     case WM_KEYDOWN:
+         if (wp == VK_ESCAPE) mouse_capture(w, 0);
+@@ -115,6 +116,14 @@
+         return 0;
+     case WM_APP + 7:   /* (the Insert menu's row) */
+         set_fullscreen(w, (int)wp);
++        return 0;
++    case WM_APP + 8:   /* Options release the pointer; a click there must not capture it. */
++        if (wp && !menu_open) { menu_restore_capture = mouse_captured; mouse_capture(w, 0); }
++        menu_open = wp != 0;
++        if (!menu_open && menu_restore_capture) {
++            menu_restore_capture = 0;
++            if (GetForegroundWindow() == w) mouse_capture(w, 1);
++        }
+         return 0;
+     case WM_DPICHANGED:
+         if (!fullscreen) {
+@@ -125,6 +134,7 @@
+         return 0;
+     case WM_KILLFOCUS:
+     case WM_CANCELMODE:
++        menu_restore_capture = 0;
+         mouse_capture(w, 0);
+         break;
+     case WM_SETCURSOR:
+--- a/host/nn_applet.c
++++ b/host/nn_applet.c
+@@ -122,19 +122,23 @@
+     return v;
+ }
+ /* (hookshot PR849) The Insert menu's Output resolution (output_resolution=, HOS_OUTPUT_RES over it), docked only: 0 the game's 2048 x 1152,
+-   1 2560 x 1440, 2 3840 x 2160. The game's frame is its display size (2560 x 1440 as shipped; nx2/oot_patches.py
++   1 2560 x 1440, 2 3840 x 2160, 3 1920 x 1080 (appended to preserve saved indices). The game's frame is its display size (2560 x 1440 as shipped; nx2/oot_patches.py
+    apply_output_size asks hos_output_size) times its graphics scale (GetCurrentGraphicsScale: 0 x1, 1 x0.8, 2 x0.667). Here it
+    saw scale 1 (x0 left at the call before's answer), so 2048 x 1152; 1 and 2 ask for x1 of a 2560 x 1440 or 3840 x 2160 display. */
+ int hos_output_mode(void) {
+     static int v = -1;
+     if (v < 0) {
+         v = getenv("HOS_OUTPUT_RES") ? atoi(getenv("HOS_OUTPUT_RES")) : ini_option("output_resolution", 0);
+-        if (v < 0 || v > 2 || handheld()) v = 0;
+-        hos_log("oe: output resolution %s", v == 2 ? "3840x2160" : v == 1 ? "2560x1440" : "2048x1152 (the game's)");
++        if (v < 0 || v > 3 || (handheld() && v != 3)) v = 0;
++        hos_log("runtime-features: fullhd-video-budget-v1");
++        hos_log("oe: output resolution %s", v == 3 ? "1920x1080" : v == 2 ? "3840x2160" : v == 1 ? "2560x1440" : "2048x1152 (the game's)");
+     }
+     return v;
+ }
+-uint32_t hos_output_size(int height) { return hos_output_mode() == 2 ? (height ? 2160 : 3840) : (height ? 1440 : 2560); }
++uint32_t hos_output_size(int height) {
++    const int mode = hos_output_mode();
++    return mode == 3 ? (height ? 1080 : 1920) : mode == 2 ? (height ? 2160 : 3840) : (height ? 1440 : 2560);
++}
+ /* (hookshot) The render targets' GPU pool (nx2/oot_patches.py), 0x13100000 bytes as shipped, for 2560 x 1440: a 3840x2160 3D at
+    the 4K output ran out of it. Scaled with the output's pixels. */
+ uint64_t hos_rt_pool_size(uint64_t game) {
+--- a/host/nn_video.c
++++ b/host/nn_video.c
+@@ -39,7 +39,9 @@
+ typedef struct {
+     int w, h, format, count;
+     uint8_t *rgba, *nv12;
+-    uint64_t mem, mem_size;   /* (hookshot) the pool's guest memory: where the hardware decoder writes its pictures */
++    uint64_t mem, mem_size;   /* guest memory used by callers that do not read through the API */
++    int rgba_stale, read_by_api;
++    struct SwsContext *sws;
+ } Pool;
+ /* the preference MakeDecodeImagePreference returns (the caller's buffer is larger: only these fields are ours) */
+ typedef struct { uint32_t magic; uint16_t w, h; uint32_t format, tiling; } Pref;
+@@ -117,6 +119,13 @@
+     o->count = (int)ARG(4) > 0 ? (int)ARG(4) : 1;
+     o->rgba = (uint8_t *)calloc((size_t)o->count, (size_t)o->w * o->h * 4);
+     o->nv12 = (uint8_t *)calloc((size_t)o->count, (size_t)o->w * o->h * 3 / 2);
++    /* A pool acquired before its first decode is black, not NV12's green zero chroma. */
++    if (o->nv12) for (int i = 0; i < o->count; i++) {
++        uint8_t *img = o->nv12 + (size_t)i * o->w * o->h * 3 / 2;
++        memset(img, 16, (size_t)o->w * o->h);
++        memset(img + (size_t)o->w * o->h, 128, (size_t)o->w * o->h / 2);
++    }
++    if (o->rgba) for (size_t k = 3; k < (size_t)o->count * o->w * o->h * 4; k += 4) o->rgba[k] = 255;
+     o->mem = ARG(1), o->mem_size = ARG(2);
+     if (video_log())
+         hos_log("video: image pool %#llx: %dx%d format %d, %d images, memory %#llx+%#llx", (unsigned long long)ARG(0),
+@@ -126,12 +135,29 @@
+ }
+ HLE(_ZN2nn5codec24FinalizeDecoderImagePoolEPNS0_25VideoDecoderImagePoolTypeE) {
+     Pool *o = (Pool *)host_of(ARG(0), POOL_MAGIC);
++    if (o && o->sws) sws_freeContext(o->sws);
+     if (o) free(o->rgba), free(o->nv12), free(o);
+     set_host(ARG(0), POOL_MAGIC, NULL);
+ }
++/* Hookshot 2.0.10: AV1/NV12 is converted only when a caller actually needs RGBA. */
++static SRWLOCK pool_rgba_lock = SRWLOCK_INIT;
++static void pool_rgba(Pool *o) {
++    AcquireSRWLockExclusive(&pool_rgba_lock);
++    if (o->rgba_stale && o->rgba && o->nv12) {
++        if (!o->sws)
++            o->sws = sws_getContext(o->w, o->h, AV_PIX_FMT_NV12, o->w, o->h, AV_PIX_FMT_RGBA, SWS_BILINEAR, NULL, NULL, NULL);
++        const uint8_t *src[4] = {o->nv12, o->nv12 + (size_t)o->w * o->h, NULL, NULL};
++        const int src_stride[4] = {o->w, o->w, 0, 0};
++        uint8_t *dst[4] = {o->rgba, NULL, NULL, NULL};
++        int dst_stride[4] = {o->w * 4, 0, 0, 0};
++        if (o->sws) sws_scale(o->sws, src, src_stride, 0, o->h, dst, dst_stride);
++        o->rgba_stale = 0;
++    }
++    ReleaseSRWLockExclusive(&pool_rgba_lock);
++}
+ /* ReadDecoderOutputImageRgba(pool, u32 index, u16 x, u16 y, u16 w, u16 h, void* dst, size_t stride, size_t size) */
+ HLE(_ZN2nn5codec26ReadDecoderOutputImageRgbaEPKNS0_25VideoDecoderImagePoolTypeEjttttPvmm) {
+-    const Pool *o = (const Pool *)host_of(ARG(0), POOL_MAGIC);
++    Pool *o = (Pool *)host_of(ARG(0), POOL_MAGIC);
+     const uint32_t i = (uint32_t)ARG(1), x = (uint16_t)ARG(2), y = (uint16_t)ARG(3), w = (uint16_t)ARG(4), h = (uint16_t)ARG(5);
+     const uint64_t dst = ARG(6), stride = ARG(7) ? ARG(7) : (uint64_t)w * 4;
+     {   /* (hookshot, HOS_VIDEO_LOG) the first reads, with where they go */
+@@ -141,6 +167,8 @@
+                     o ? "ok" : "unknown", i, x, y, w, h, (unsigned long long)dst, (unsigned long long)stride);
+     }
+     if (!o || i >= (uint32_t)o->count || !dst || x >= (uint32_t)o->w) { RET(0); return; }
++    o->read_by_api = 1;
++    if (i == 0 && o->rgba_stale) pool_rgba(o);
+     const uint8_t *src = o->rgba + (size_t)i * o->w * o->h * 4;
+     const uint32_t cw = x + w <= (uint32_t)o->w ? w : o->w - x;
+     for (uint32_t r = 0; r < h && y + r < (uint32_t)o->h; r++)
+@@ -151,7 +179,7 @@
+ /* ReadDecoderOutputImageNv12(pool, u32 index, u16 x, u16 y, u16 w, u16 h, void* y_dst, size_t y_stride, [stack:]
+    size_t y_size, void* uv_dst, size_t uv_stride, size_t uv_size) */
+ HLE(_ZN2nn5codec26ReadDecoderOutputImageNv12EPKNS0_25VideoDecoderImagePoolTypeEjttttPvmmS4_mm) {
+-    const Pool *o = (const Pool *)host_of(ARG(0), POOL_MAGIC);
++    Pool *o = (Pool *)host_of(ARG(0), POOL_MAGIC);
+     const uint32_t i = (uint32_t)ARG(1), x = (uint16_t)ARG(2), y = (uint16_t)ARG(3), w = (uint16_t)ARG(4), h = (uint16_t)ARG(5);
+     const uint64_t ydst = ARG(6), ystride = ARG(7) ? ARG(7) : w;
+     const uint64_t uvdst = G64(c->x[31] + 8), uvstride = G64(c->x[31] + 16) ? G64(c->x[31] + 16) : w;
+@@ -169,6 +197,7 @@
+         }
+     }
+     if (!o || i >= (uint32_t)o->count || x >= (uint32_t)o->w) { RET(0); return; }
++    o->read_by_api = 1;
+     const uint8_t *yp = o->nv12 + (size_t)i * o->w * o->h * 3 / 2, *uvp = yp + (size_t)o->w * o->h;
+     const uint32_t cw = x + w <= (uint32_t)o->w ? w : o->w - x;
+     for (uint32_t r = 0; ydst && r < h && y + r < (uint32_t)o->h; r++)
+@@ -238,19 +267,26 @@
+ static void queue_frame(Dec *d, const AVFrame *f) {
+     const int w = f->width, h = f->height;
+     if (w <= 0 || h <= 0) return;
+-    if (!d->sws || d->sws_w != w || d->sws_h != h || d->sws_fmt != f->format) {
++    if (f->format != AV_PIX_FMT_NV12 && (!d->sws || d->sws_w != w || d->sws_h != h || d->sws_fmt != f->format)) {
+         if (d->sws) sws_freeContext(d->sws);
+         d->sws = sws_getContext(w, h, (enum AVPixelFormat)f->format, w, h, AV_PIX_FMT_RGBA, SWS_BILINEAR, NULL, NULL, NULL);
+         d->sws_w = w, d->sws_h = h, d->sws_fmt = f->format;
+     }
+     Picture p = {0};
+     p.w = w, p.h = h, p.pts = f->pts;
+-    p.rgba = (uint8_t *)malloc((size_t)w * h * 4);
+-    p.nv12 = (uint8_t *)calloc(1, (size_t)w * h * 3 / 2);
++    const int nv12 = f->format == AV_PIX_FMT_NV12;   /* (hookshot: Media Foundation's pictures, kept as NV12 alone) */
++    p.rgba = nv12 ? NULL : (uint8_t *)malloc((size_t)w * h * 4);
++    p.nv12 = nv12 ? (uint8_t *)malloc((size_t)w * h * 3 / 2) : (uint8_t *)calloc(1, (size_t)w * h * 3 / 2);
++    if (!p.nv12 || (!nv12 && !p.rgba)) {   /* (out of memory: this frame is dropped, not written through NULL; issue 342) */
++        static volatile LONG told;
++        if (InterlockedIncrement(&told) <= 4) hos_log("video: no memory for a %dx%d frame: dropped", w, h);
++        free(p.rgba), free(p.nv12);
++        return;
++    }
+     uint8_t *dst[4] = {p.rgba, NULL, NULL, NULL};
+     int dst_stride[4] = {w * 4, 0, 0, 0};
+-    if (d->sws) sws_scale(d->sws, (const uint8_t *const *)f->data, f->linesize, 0, h, dst, dst_stride);
+-    if (f->format == AV_PIX_FMT_NV12) {   /* (hookshot: Media Foundation's pictures) */
++    if (d->sws && p.rgba) sws_scale(d->sws, (const uint8_t *const *)f->data, f->linesize, 0, h, dst, dst_stride);
++    if (nv12) {
+         for (int y = 0; y < h; y++) memcpy(p.nv12 + (size_t)y * w, f->data[0] + (size_t)y * f->linesize[0], (size_t)w);
+         for (int y = 0; y < h / 2; y++)
+             memcpy(p.nv12 + (size_t)w * h + (size_t)y * w, f->data[1] + (size_t)y * f->linesize[1], (size_t)w);
+@@ -287,7 +323,7 @@
+ /* the oldest submissions decoded until a picture comes out (or none are left) */
+ static void decode_next(Dec *d);
+ static void decode_pending(Dec *d) {
+-    while (!d->qn && d->phead) decode_next(d);
++    while (d->phead && (!d->qn || !d->phead->pkt)) decode_next(d);
+ }
+ /* one submission decoded (its pictures into the queue, if any) */
+ static void decode_next(Dec *d) {
+@@ -384,6 +420,10 @@
+     RET(0);
+ }
+ /* AcquireXDecoderOutputBuffer(u32* index, NativeSyncHandle*, decoder): the oldest picture into a free buffer */
++/* Bound extra catch-up work between decoder calls; one driver decode itself cannot be preempted. */
++static int video_catchup_more(int64_t start, int steps) {
++    return steps < 4 && hos_now_ns() - start < 8000000;
++}
+ static void dec_acquire(Ctx *c) {
+     Dec *d = (Dec *)host_of(ARG(2), DEC_MAGIC);
+     if (ARG(1)) G64(ARG(1)) = 0;
+@@ -426,7 +466,7 @@
+         Picture *h = &d->queue[d->qhead];
+         if (!d->clock_set || h->pts < d->clock_pts) d->clock_set = 1, d->clock_ns = now, d->clock_pts = h->pts;   /* (a start, a loop) */
+         int skipped = 0;
+-        for (int guard = 0; !off && guard < 600 && !d->queue[d->qhead].last; guard++) {
++        for (int guard = 0; !off && video_catchup_more(now, guard) && !d->queue[d->qhead].last; guard++) {
+             const int64_t due = d->clock_pts + (now - d->clock_ns);
+             if (d->queue[d->qhead].pts + late >= due) break;
+             if (d->qn < 2) {
+@@ -445,7 +485,7 @@
+     /* (the picture at the pool's size: rows and columns past either are left out) */
+     const int w = p->w < o->w ? p->w : o->w, h = p->h < o->h ? p->h : o->h;
+     for (int y = 0; y < h; y++) {
+-        memcpy(o->rgba + (size_t)y * o->w * 4, p->rgba + (size_t)y * p->w * 4, (size_t)w * 4);
++        if (p->rgba && o->rgba) memcpy(o->rgba + (size_t)y * o->w * 4, p->rgba + (size_t)y * p->w * 4, (size_t)w * 4);
+         memcpy(o->nv12 + (size_t)y * o->w, p->nv12 + (size_t)y * p->w, (size_t)w);
+     }
+     for (int y = 0; y < h / 2; y++)
+@@ -454,11 +494,13 @@
+     /* (hookshot) and into the pool's guest memory, as the hardware decoder leaves it: OoT copies it from there
+        straight into its luma and chroma textures (NV12, pitch = width, chroma right after the luma rows; RGBA when the
+        memory has room for it and the pool's format is not NV12's) */
+-    if (o->mem && o->mem_size) {
++    o->rgba_stale = !p->rgba;
++    if (o->mem && o->mem_size && !o->read_by_api) {
+         const size_t nv12_size = (size_t)o->w * o->h * 3 / 2, rgba_size = (size_t)o->w * o->h * 4;
+         const int rgba = o->format != 0 && o->mem_size >= rgba_size;   /* (VideoDecoderOutputFormat 0: NV12) */
+         const size_t need = rgba ? rgba_size : nv12_size;
+         if (o->mem_size >= need) {
++            if (rgba && o->rgba_stale) pool_rgba(o);
+             memcpy(GP(o->mem), rgba ? o->rgba : o->nv12, need);
+             HOS_WRITTEN(GP(o->mem), need);
+         }
+@@ -467,12 +509,11 @@
+     d->slot_last[slot] = p->last;
+     d->busy[slot] = 1;
+     {   /* (hookshot) HOS_VIDEO_LOG: the picture's time against the time since the first, to see the picture fall behind the sound */
+-        static int64_t first_ns, first_pts;
+-        if (d->acquires == 1) first_ns = hos_now_ns(), first_pts = p->pts;
++
+         if (video_log() && d->acquires % 60 == 0)
+             hos_log("video: acquire %lld: picture at %.2f s, wall clock %.2f s (behind by %.2f s), %d decoded ahead", (long long)d->acquires,
+-                    (double)(p->pts - first_pts) / 1e9, (double)(hos_now_ns() - first_ns) / 1e9,
+-                    (double)(hos_now_ns() - first_ns - (p->pts - first_pts)) / 1e9, d->qn);
++                    (double)(p->pts - d->clock_pts) / 1e9, (double)(hos_now_ns() - d->clock_ns) / 1e9,
++                    (double)(hos_now_ns() - d->clock_ns - (p->pts - d->clock_pts)) / 1e9, d->qn);
+     }
+     if (video_log() && (d->acquires <= 8 || p->last || d->acquires % 300 == 0)) {
+         uint64_t sum = 0, n = 0;   /* (the picture's mean luma and RGB, sampled: a black or garbage decode shows) */
+@@ -480,7 +521,7 @@
+         for (int y = 0; y < p->h; y += 37)
+             for (int x = 0; x < p->w; x += 41, n++) {
+                 sum += p->nv12[(size_t)y * p->w + x];
+-                for (int k = 0; k < 3; k++) rgb[k] += p->rgba[((size_t)y * p->w + x) * 4 + k];
++                for (int k = 0; p->rgba && k < 3; k++) rgb[k] += p->rgba[((size_t)y * p->w + x) * 4 + k];
+             }
+         hos_log("video: acquire %lld: %dx%d pts %lld%s into buffer %d (mean Y %llu, RGB %llu %llu %llu)",
+                 (long long)d->acquires, p->w, p->h, (long long)p->pts, p->last ? " (last)" : "", slot,
+--- a/nx2/build.py
++++ b/nx2/build.py
+@@ -209,6 +209,7 @@
+     p.add_argument("--dll", action="store_true")
+     p.add_argument("--lib", action="store_true")
+     p.add_argument("--standalone", action="store_true")
++    p.add_argument("--reuse-game-objects", action="store_true")
+     a = p.parse_args()
+     a.jobs = compile_jobs(a.jobs)
+     sa = os.path.join(kit.WORK, "sa")
+@@ -252,6 +253,10 @@
+              hot_fl if os.path.basename(s).startswith("code_hot") else fl,
+              shim_deps if os.path.dirname(s) == NX2_RT else deps) for s in srcs]
+     # the runtime: ordinary C at -O2, with its own headers (any host/*.h change rebuilds all of it)
++    if a.reuse_game_objects:
++        from akynoleyend.build_support import require_cached_game_objects
++        require_cached_game_objects(jobs, OBJ_CACHE)
++        print("Atualizacao: objetos traduzidos conferidos; nenhuma unidade do jogo sera recompilada.", flush=True)
+     host_fl = toolchain.native_target() + CPU + ["-I" + HOST, "-I" + rt64, "-I" + gen, "-Wno-everything", "-O2", "-g0",
+                                            "-mcx16", "-DA64_POLLING", "-DOCARINA_VULKAN_ONLY"] + WRITE_TRACK
+     host_deps = deps + tree_headers(HOST, os.path.join(GPU, "render")) + open(os.path.join(GPU, "vk", "vk_api.h"), "rb").read()
+--- a/suporte/Atualizar-AkynoLeyend.cmd
++++ b/suporte/Atualizar-AkynoLeyend.cmd
+@@ -1,6 +1,6 @@
+ @echo off
+ cd /d "%~dp0..\"
+-"%~dp0..\ferramentas\python\python.exe" -I -X utf8 "%~dp0..\manage.py" update-renderer %*
++"%~dp0..\ferramentas\python\python.exe" -I -X utf8 "%~dp0..\manage.py" maintain-build %*
+ set "akyno_status=%errorlevel%"
+ pause
+ exit /b %akyno_status%
+--- a/tests/native/test_cas_spirv.cpp
++++ b/tests/native/test_cas_spirv.cpp
+@@ -11,6 +11,7 @@
+ #include "shader_recompiler/backend/spirv/emit_spirv.h"
+ #include "shader_recompiler/environment.h"
+ #include "shader_recompiler/frontend/ir/ir_emitter.h"
++#include "shader_recompiler/host_translate_info.h"
+ #include "shader_recompiler/ir_opt/passes.h"
+ #include "shader_recompiler/object_pool.h"
+ using namespace Shader;
+@@ -33,7 +34,7 @@
+ };
+ 
+ void require(bool ok,const char* message) { if (!ok) throw std::runtime_error(message); }
+-void run(bool global,const std::filesystem::path& directory) {
++void run(bool global,const std::filesystem::path& directory,bool tracked=false) {
+     ObjectPool<IR::Inst> pool;
+     IR::Block block{pool}; IR::Program program;
+     program.stage=Stage::Compute;program.workgroup_size={1,1,1};
+@@ -42,13 +43,27 @@
+     program.syntax_list.push_back(body);
+     IR::AbstractSyntaxNode ret{};ret.type=IR::AbstractSyntaxNode::Type::Return;program.syntax_list.push_back(ret);
+     IR::IREmitter ir{block};
+-    if(global) (void)ir.GlobalAtomicCompareExchange(ir.Imm64(u64{0x1000}),ir.Imm32(7u),ir.Imm32(11u));
++    if(tracked) {
++        const auto low=ir.GetCbuf(ir.Imm32(0u),ir.Imm32(0x100u));
++        const auto high=ir.GetCbuf(ir.Imm32(0u),ir.Imm32(0x104u));
++        const auto address=ir.PackUint2x32(ir.CompositeConstruct(low,high));
++        (void)ir.GlobalAtomicCompareExchange(address,ir.Imm32(7u),ir.Imm32(11u));
++        HostTranslateInfo host{};host.min_ssbo_alignment=16;
++        Optimization::GlobalMemoryToStorageBufferPass(program,host);
++        bool found=false;
++        for(auto& inst:block.Instructions()) if(inst.GetOpcode()==IR::Opcode::StorageAtomicCompareExchange32) {
++            found=true;require(inst.NumArgs()==4,"tracked CAS lost its replacement value");
++            require(inst.Arg(2).U32()==7&&inst.Arg(3).U32()==11,"tracked CAS operand order changed");
++        }
++        require(found,"synthetic CAS was not tracked to storage");
++    }
++    else if(global) (void)ir.GlobalAtomicCompareExchange(ir.Imm64(u64{0x1000}),ir.Imm32(7u),ir.Imm32(11u));
+     else block.AppendNewInst(IR::Opcode::StorageAtomicCompareExchange32,{ir.Imm32(0u),ir.Imm32(0u),ir.Imm32(7u),ir.Imm32(11u)});
+     IR::IREmitter tail{block};tail.Epilogue();
+     Optimization::DeadCodeEliminationPass(program);
+     EnvironmentFixture environment;Optimization::CollectShaderInfoPass(environment,program);
+-    program.info.constant_buffer_descriptors.push_back({0,1});
+-    program.info.storage_buffers_descriptors.push_back({0,0x10,1,true});
++    if(program.info.constant_buffer_descriptors.empty())program.info.constant_buffer_descriptors.push_back({0,1});
++    if(program.info.storage_buffers_descriptors.empty())program.info.storage_buffers_descriptors.push_back({0,0x10,1,true});
+     program.info.used_constant_buffer_types|=IR::Type::U32|IR::Type::U32x2;
+     Profile profile{};profile.supported_spirv=0x00010600;profile.support_int64=true;
+     profile.support_descriptor_aliasing=true;profile.min_ssbo_alignment=16;
+@@ -78,12 +93,12 @@
+     require(atomics==expected_atomics,"wrong atomic count across storage/page-table branches");
+     require(!global||returned_results==atomic_results,"global CAS branch no longer returns the previous word");
+     std::filesystem::create_directories(directory);
+-    const auto path=directory/(global?"global-cas.spv":"storage-cas.spv");
++    const auto path=directory/(tracked?"tracked-cas.spv":global?"global-cas.spv":"storage-cas.spv");
+     std::ofstream output(path,std::ios::binary);output.write(reinterpret_cast<const char*>(words.data()),words.size()*4);
+     require(bool(output),"module write failed");
+-    std::printf("PASS %s CAS: side effect kept, comparator/value order correct%s\n",global?"global":"storage",global?", previous word returned":"");
++    std::printf("PASS %s CAS: side effect kept, comparator/value order correct%s\n",tracked?"tracked":global?"global":"storage",global?", previous word returned":"");
+ }
+ int main(int argc,char**argv) {
+-    try {require(argc==2,"usage: fixture output-directory");run(false,argv[1]);run(true,argv[1]);return 0;}
++    try {require(argc==2,"usage: fixture output-directory");run(false,argv[1],true);run(false,argv[1]);run(true,argv[1]);return 0;}
+     catch(const std::exception& e){std::fprintf(stderr,"FAIL: %s\n",e.what());return 1;}
+ }
+--- a/tests/test_crash_recovery.py
++++ b/tests/test_crash_recovery.py
+@@ -195,7 +195,7 @@
+             with patch.object(launcher, "os", fake_os), patch.object(launcher, "short_romfs",
+                     side_effect=lambda path: short_romfs(r"C:\synthetic\romfs", api=api)), contextlib.redirect_stdout(io.StringIO()):
+                 self.assertEqual(launcher.launch(root, short_paths=True, trace_files=True,
+-                                                trace_runtime=True, trace_lighting=True, texture_mode="rgba8", audio_backend="wasapi", cache_mode="streaming", collect_crash=True), 0)
++                                                trace_runtime=True, trace_lighting=True, texture_mode="rgba8", audio_backend="wasapi", cache_mode="streaming", collect_crash=True, auto_prepare=False), 0)
+             self.assertFalse(marker.exists())
+             self.assertEqual(api.removed, api.created)
+             logs = next(path for path in (root / "diagnosticos").iterdir() if path.is_dir())
+@@ -222,7 +222,7 @@
+                     patch.object(launcher.subprocess, "Popen", side_effect=PermissionError("denied")), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                 with self.assertRaisesRegex(ProjectError, "denied"):
+-                    launcher.launch(root, short_paths=True)
++                    launcher.launch(root, short_paths=True, auto_prepare=False)
+             self.assertFalse(marker.exists())
+             self.assertEqual(api.removed, api.created)
+ 
+--- /dev/null
++++ b/tests/test_native_test3.py
+@@ -0,0 +1,140 @@
++"""Execute the production video queue/acquire code and overlay geometry with synthetic data."""
++from pathlib import Path
++import os
++import shutil
++import subprocess
++import tempfile
++import unittest
++
++ROOT=Path(__file__).resolve().parents[1]
++
++
++def function(text, marker):
++    a=text.index(marker);b=text.index('{',a)+1;depth=1
++    while depth:
++        depth+=(text[b]=='{')-(text[b]=='}');b+=1
++    return text[a:b]
++
++
++class NativeTest3(unittest.TestCase):
++    def run_cpp(self, code, cases=((),), environment=None):
++        cxx=shutil.which('c++')
++        if not cxx:self.skipTest('C++ compiler unavailable')
++        with tempfile.TemporaryDirectory() as d:
++            source=Path(d)/'test.cpp';exe=Path(d)/'test';source.write_text(code)
++            p=subprocess.run([cxx,'-std=c++20','-O1','-I'+str(ROOT/'gpu/vk'),str(source),'-o',str(exe)],capture_output=True,text=True)
++            self.assertEqual(p.returncode,0,p.stderr)
++            for case in cases:
++                p=subprocess.run([str(exe),*case],capture_output=True,text=True,env=environment)
++                self.assertEqual(p.returncode,0,p.stdout+p.stderr)
++
++    def test_nv12_frames_keep_exact_planes_and_skip_unused_rgba_conversion(self):
++        s=(ROOT/'host/nn_video.c').read_text()
++        code=r'''
++#include <cassert>
++#include <cstdint>
++#include <cstdlib>
++#include <cstring>
++#define MAX_QUEUE 8
++#define SWS_BILINEAR 1
++enum AVPixelFormat{AV_PIX_FMT_NV12,AV_PIX_FMT_RGBA,AV_PIX_FMT_YUV420P,AV_PIX_FMT_YUVA420P};
++struct SwsContext{};int conversions=0,contexts=0;
++SwsContext* sws_getContext(int,int,AVPixelFormat,int,int,AVPixelFormat,int,void*,void*,void*){++contexts;static SwsContext c;return &c;}
++void sws_freeContext(SwsContext*){}
++int sws_scale(SwsContext*,const uint8_t*const*,const int*,int,int,uint8_t*const*,const int*){++conversions;return 4;}
++using LONG=long;LONG InterlockedIncrement(volatile LONG* n){return ++*n;}void hos_log(const char*,...){}
++struct AVFrame{int width,height,format;int64_t pts;uint8_t*data[8];int linesize[8];};
++struct Picture{uint8_t*rgba,*nv12;int w,h;int64_t pts;int last;};
++struct Dec{SwsContext*sws=nullptr;int sws_w=0,sws_h=0,sws_fmt=0;Picture queue[8]{};int qhead=0,qn=0;};
++'''
++        code+=function(s,'static void picture_free(')+function(s,'static void queue_frame(')
++        code+=r'''
++int main(){
++ uint8_t y[32],uv[16];for(int i=0;i<32;i++)y[i]=uint8_t(i+16);for(int i=0;i<16;i++)uv[i]=uint8_t(120+i);
++ AVFrame frame{};frame.width=frame.height=4;frame.format=AV_PIX_FMT_NV12;frame.pts=123456;
++ frame.data[0]=y;frame.data[1]=uv;frame.linesize[0]=frame.linesize[1]=8;
++ Dec d;queue_frame(&d,&frame);assert(d.qn==1&&contexts==0&&conversions==0);
++ auto&p=d.queue[0];assert(!p.rgba&&p.pts==123456&&p.w==4&&p.h==4);
++ for(int r=0;r<4;r++)assert(!memcmp(p.nv12+r*4,y+r*8,4));
++ for(int r=0;r<2;r++)assert(!memcmp(p.nv12+16+r*4,uv+r*8,4));
++ for(int n=0;n<20;n++){frame.pts++;queue_frame(&d,&frame);}assert(d.qn==8&&contexts==0&&conversions==0);
++ for(int n=0;n<d.qn;n++)picture_free(&d.queue[(d.qhead+n)%8]);
++}
++'''
++        self.run_cpp(code)
++
++    def test_actual_movie_acquire_limits_catchup_instead_of_decoding_a_whole_backlog(self):
++        s=(ROOT/'host/nn_video.c').read_text()
++        code=r'''
++#include <cassert>
++#include <cstdint>
++#include <cstdlib>
++#include <cstring>
++#define MAX_SLOTS 16
++#define MAX_QUEUE 8
++#define POOL_MAGIC 1
++#define DEC_MAGIC 2
++#define RESULT_NO_OUTPUT 123
++struct Ctx{uint64_t x[32]{};};
++#define ARG(i) (c->x[i])
++#define RET(v) (c->x[0]=(v))
++#define GP(v) ((void*)(uintptr_t)(v))
++#define G32(v) (*(uint32_t*)GP(v))
++#define G64(v) (*(uint64_t*)GP(v))
++#define HOS_WRITTEN(p,n) ((void)0)
++int64_t clock_ns=1000000000,decode_ns=0;int calls=0;
++int64_t hos_now_ns(){return clock_ns;}void hos_sleep_ns(int64_t n){clock_ns+=n;}int video_log(){return 0;}
++void hos_log(const char*,...){}void AcquireSRWLockExclusive(int*){}void ReleaseSRWLockExclusive(int*){}
++struct Pool{int w=4,h=4,format=0,count=1;uint8_t*rgba,*nv12;uint64_t mem=0,mem_size=0;int rgba_stale=0,read_by_api=0;};
++struct Picture{uint8_t*rgba,*nv12;int w,h;int64_t pts;int last;};
++struct Dec{uint64_t slots[16]{};int busy[16]{};int64_t slot_pts[16]{};int slot_last[16]{};Picture queue[8]{};
++ int qhead=0,qn=1,eos=0;void*phead=(void*)1;int64_t acquires=0;int clock_set=1;int64_t clock_ns=-1000000000,clock_pts=0;int lock=0;};
++void*host_of(uint64_t p,uint32_t){return GP(p);}void pool_rgba(Pool*){}
++Picture make_picture(int64_t pts){return{(uint8_t*)calloc(64,1),(uint8_t*)calloc(24,1),4,4,pts,0};}
++void decode_pending(Dec*){}
++void decode_next(Dec*d){++calls;clock_ns+=decode_ns;d->queue[(d->qhead+d->qn)%8]=make_picture(calls*16666667);++d->qn;if(calls==100)d->phead=nullptr;}
++'''
++        code+=function(s,'static void picture_free(')
++        code+=function(s,'static int video_catchup_more(')
++        code+=function(s,'static void dec_acquire(')
++        code+=r'''
++int main(int argc,char**argv){
++ unsetenv("HOS_VIDEO_NO_CATCHUP");decode_ns=argc>1?atoll(argv[1]):100000;
++ Dec d;d.queue[0]=make_picture(0);uint8_t rgba[64]{},nv12[24]{};Pool pool;pool.rgba=rgba;pool.nv12=nv12;
++ d.slots[0]=(uintptr_t)&pool;uint32_t index=99;Ctx c;c.x[0]=(uintptr_t)&index;c.x[2]=(uintptr_t)&d;
++ dec_acquire(&c);assert(c.x[0]==0&&index==0&&d.busy[0]);assert(calls>0&&calls<=2);
++ if(decode_ns>=8000000)assert(calls==1);
++ for(int n=0;n<d.qn;n++)picture_free(&d.queue[(d.qhead+n)%8]);
++}
++'''
++        self.run_cpp(code,cases=(('100000',),('10000000',)))
++
++    def test_native_full_hd_works_with_docked_and_handheld_without_reindexing_old_options(self):
++        s=(ROOT/'host/nn_applet.c').read_text()
++        code=r'''
++#include <cassert>
++#include <cstdint>
++#include <cstdlib>
++void hos_log(const char*,...){}int ini_option(const char*,int v){return v;}int handheld(){return getenv("HOS_HANDHELD")&&atoi(getenv("HOS_HANDHELD"));}
++'''+function(s,'int hos_output_mode(')+function(s,'uint32_t hos_output_size(')+r'''
++int main(int argc,char**argv){setenv("HOS_OUTPUT_RES",argv[1],1);setenv("HOS_HANDHELD",argv[2],1);
++ const int expected=atoi(argv[3]);assert(hos_output_mode()==expected);
++ if(expected==3)assert(hos_output_size(0)==1920&&hos_output_size(1)==1080);
++ if(expected==2)assert(hos_output_size(0)==3840&&hos_output_size(1)==2160);
++ if(expected==1)assert(hos_output_size(0)==2560&&hos_output_size(1)==1440);
++}
++'''
++        self.run_cpp(code,cases=(('3','0','3'),('3','1','3'),('2','0','2'),('1','0','1'),('2','1','0'),('99','0','0')))
++
++    def test_mouse_geometry_maps_client_pixels_to_rows_and_sharpness(self):
++        self.run_cpp(r'''
++#include <cassert>
++#include "menu_pointer.h"
++int main(){using namespace mkwvk::menu_pointer;
++ assert(row(16,44,360,1,11)==0);assert(row(16,44+10*28,360,1,11)==10);
++ assert(row(16,44+11*28,360,1,11)==-1);assert(row(-1,44,360,1,11)==-1);
++ assert(row(32,88+2*56,720,2,11)==2);
++ assert(image_coordinate(640,1280,1920)==960);assert(image_coordinate(0,0,1920)==-1);
++ assert(slider(0,360,1)==0&&slider(999,360,1)==100&&slider(260,360,1)==50);
++}
++''')
+--- a/tests/test_release039.py
++++ b/tests/test_release039.py
+@@ -63,7 +63,7 @@
+                 # and the real POSIX child process implementation untouched.
+                 platform = SimpleNamespace(name="nt", environ=os.environ, getpid=os.getpid)
+                 with patch("akynoleyend.launch.os", platform), contextlib.redirect_stdout(io.StringIO()):
+-                    result = launch(game)
++                    result = launch(game, auto_prepare=False)
+                 metadata = json.loads(next((game / "diagnosticos").glob("*/execucao.json")).read_text())
+                 self.assertEqual(metadata["process_exit_code"], 0)
+                 self.assertEqual(result, 70 if failed else 0)
+--- a/tests/test_release040.py
++++ b/tests/test_release040.py
+@@ -222,6 +222,7 @@
+                     sharpness=10,
+                     framegen=0,
+                     pacing=True,
++                    auto_prepare=False,
+                 )
+             self.assertEqual(status, 0)
+             logs = next((game / "diagnosticos").iterdir())
+@@ -247,7 +248,7 @@
+         #include <cstdlib>
+         #include <cstring>
+         #include <string>
+-        struct Options {int resolution=0,realtime=1,framegen=0,pace=0,upscale=0,sharpness=0,output_res=0;} opts;
++        struct Options {int resolution=0,realtime=1,framegen=0,pace=0,upscale=0,sharpness=0,output_res=0,show_fps=0,handheld=0;} opts;
+         struct Row {const char* key;int* value;int lo,hi;};
+         Row rows[]={{"resolution",&opts.resolution,0,4},{"realtime",&opts.realtime,0,1},
+                     {"framegen",&opts.framegen,0,8}};
+--- a/tests/test_shader_prepare.py
++++ b/tests/test_shader_prepare.py
+@@ -157,9 +157,12 @@
+                 bank = folder / "AkynoLeyend_shaders.bin"
+                 self.assertEqual(bank.read_bytes()[:16], b"HKSEED01" + struct.pack("<II", 1, 1))
+                 before = bank.read_bytes()
+-                with patch("akynoleyend.shader_prepare.run") as census_process:
++                with patch("akynoleyend.shader_prepare.run") as census_process, \
++                        patch("akynoleyend.shader_prepare.sha256", wraps=sha256) as hashing:
+                     self.assertEqual(prepare_shaders(folder, work, start_game=False, report=lambda _: None), 0)
+                     census_process.assert_not_called()
++                    self.assertFalse(any(Path(call.args[0]) in {bank, work/'shaders'/bank.name}
++                                         for call in hashing.call_args_list))
+                 self.assertEqual(bank.read_bytes(), before)
+                 marker = work / "shaders/seed.json"
+                 real_read = Path.read_text
+--- /dev/null
++++ b/tests/test_updates_043.py
+@@ -0,0 +1,176 @@
++"""Update transactions, reuse-only compilation and automatic preparation controls."""
++from contextlib import redirect_stdout
++import hashlib
++import io
++import json
++import os
++from pathlib import Path
++import subprocess
++import sys
++import tempfile
++from types import SimpleNamespace
++import unittest
++from unittest.mock import patch
++import zipfile
++
++from akynoleyend import __version__
++from akynoleyend.build_support import object_key, require_cached_game_objects
++from akynoleyend.coherence import HOST_REVISION, PREVIOUS_HOST_SOURCES
++from akynoleyend.config import MANIFEST
++from akynoleyend.errors import ProjectError
++from akynoleyend.files import read_json, sha256, write_json
++from akynoleyend.graphics import graphics_environment
++from akynoleyend.maintenance import maintain_build
++from akynoleyend.updater import stage_update, install_files, inspect_package
++
++
++def package(path, extra=None):
++    files = {"AkynoLeyendBuilder.exe": b'MZ-new-ui', "manage.py": b'# new orchestrator\n',
++             "VERSION": b'0.4.3-test.9\n', "ferramentas/prebuilt/AkynoLeyend.dll": b'MZ-renderer',
++             "ferramentas/prebuilt/renderer.json": b'{}', "akynoleyend/new_module.py": b'# new\n'}
++    files.update(extra or {})
++    index = {"schema": 1, "kind": "update", "version": "0.4.3-test.9",
++             "files": {n: hashlib.sha256(v).hexdigest() for n,v in files.items()}}
++    with zipfile.ZipFile(path, 'w') as z:
++        for n,v in files.items(): z.writestr(n,v)
++        z.writestr('update-package.json',json.dumps(index))
++    return files
++
++
++class UpdatePackageTests(unittest.TestCase):
++    def test_package_install_preserves_sdk_settings_and_saves(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d)/'project';root.mkdir();archive=Path(d)/'update.zip';package(archive)
++            saved={'work/objcache/compiled.o':b'object','jogo/user/save.bin':b'save',
++                   'ferramentas/python/python.exe':b'python','AkynoLeyend-launcher.json':b'preferences'}
++            for n,v in saved.items():p=root/n;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(v)
++            (root/'manage.py').write_bytes(b'old')
++            plan=stage_update(archive,root,root/'jogo',report=lambda _:None)
++            maintain=[];install_files(plan,maintain.append)
++            self.assertEqual((root/'manage.py').read_bytes(),b'# new orchestrator\n')
++            self.assertEqual(len(maintain),1)
++            for n,v in saved.items():self.assertEqual((root/n).read_bytes(),v)
++
++    def test_failed_maintenance_restores_previous_sources_and_removes_new_files(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d)/'project';root.mkdir();archive=Path(d)/'update.zip';package(archive)
++            (root/'manage.py').write_bytes(b'previous');(root/'AkynoLeyendBuilder.exe').write_bytes(b'MZ-old')
++            plan=stage_update(archive,root,root/'jogo',report=lambda _:None)
++            def fail(_):raise ProjectError('synthetic compile failure')
++            with self.assertRaisesRegex(ProjectError,'synthetic'):install_files(plan,fail)
++            self.assertEqual((root/'manage.py').read_bytes(),b'previous')
++            self.assertEqual((root/'AkynoLeyendBuilder.exe').read_bytes(),b'MZ-old')
++            self.assertFalse((root/'akynoleyend/new_module.py').exists())
++            self.assertFalse(list(root.rglob('*.update-*')))
++
++    def test_traversal_settings_work_and_sdk_replacement_are_rejected(self):
++        with tempfile.TemporaryDirectory() as d:
++            for name in ('../escape.py','C:/escape.py','jogo/user/save.bin','work/objcache/a.o',
++                         'AkynoLeyend-launcher.json','ferramentas/python/python.exe'):
++                with self.subTest(name=name):
++                    archive=Path(d)/'bad.zip';package(archive,{name:b'bad'})
++                    with self.assertRaises(ProjectError):inspect_package(archive)
++
++    def test_tampering_after_prepare_fails_before_installing_any_file(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d)/'project';root.mkdir();archive=Path(d)/'update.zip';package(archive)
++            (root/'manage.py').write_bytes(b'old')
++            plan=stage_update(archive,root,root/'jogo',report=lambda _:None)
++            (plan.parent/'arquivos/manage.py').write_bytes(b'changed')
++            with self.assertRaisesRegex(ProjectError,'alterado'):install_files(plan)
++            self.assertEqual((root/'manage.py').read_bytes(),b'old')
++
++
++class RuntimeMaintenanceTests(unittest.TestCase):
++    def test_missing_or_changed_game_object_never_starts_a_compile(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d);source=root/'code_000.c';source.write_text('void game(void){}\n')
++            output=root/'code.o';cache=root/'cache';cache.mkdir()
++            job=(sys.executable,str(source),str(output),['-O1'],b'header')
++            with self.assertRaises(ProjectError):require_cached_game_objects([job],cache)
++            key=object_key(*[job[i] for i in (0,1,3,4)])
++            (cache/(key+'.o')).write_bytes(b'cached')
++            require_cached_game_objects([job],cache)
++            output.write_bytes(b'local');Path(str(output)+'.sha256').write_text(key)
++            (cache/(key+'.o')).unlink();require_cached_game_objects([job],cache)
++            source.write_text('void changed_game(void){}\n')
++            with self.assertRaises(ProjectError):require_cached_game_objects([job],cache)
++
++    def test_pinned_host_update_uses_existing_generated_code_without_lift_or_extraction(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d);folder=root/'jogo';work=root/'work';romfs=root/'romfs';folder.mkdir()
++            for n in ('Pack','System'):(romfs/n).mkdir(parents=True)
++            (folder/'user').mkdir();(folder/'user/save.dat').write_bytes(b'keep-save')
++            for n in ('AkynoLeyend.exe','AkynoLeyend.dll','image.bin'):(folder/n).write_bytes(n.encode())
++            old={'schema':1,'project':'AkynoLeyend','version':'0.4.3-test.1','host_revision':HOST_REVISION,
++                 'source_sha256':next(iter(PREVIOUS_HOST_SOURCES['0.4.3-test.1'])),
++                 'game_build_id':'e0f3ccfa','romfs':str(romfs),
++                 'files':{n:sha256(folder/n) for n in ('AkynoLeyend.exe','AkynoLeyend.dll','image.bin')}}
++            write_json(folder/MANIFEST,old)
++            gen=work/'sa/gen';gen.mkdir(parents=True)
++            for n in ('a64_table.c','a64_hooks.c','a64_suyu.c','a64_stubs.c','hos_image.c','nvn2_exports.c','code_000.c'):(gen/n).write_text('/* generated */')
++            image=work/'sa/image/image.bin';image.parent.mkdir();image.write_bytes((folder/'image.bin').read_bytes())
++            write_json(work/'build-request.json',{'game_build_id':'e0f3ccfa','output':str(folder)})
++            calls=[]
++            def compile_only(command,*_):
++                calls.append(command)
++                built=work/'sa/build';built.mkdir(exist_ok=True)
++                for n in ('AkynoLeyend.exe','AkynoLeyend.dll'):(built/n).write_bytes(b'new-'+n.encode())
++            with patch('akynoleyend.maintenance.require_tools',return_value={}), \
++                 patch('akynoleyend.maintenance.run',side_effect=compile_only), \
++                 patch('akynoleyend.build.renderer_identity',return_value='generic-test-renderer'):
++                updated=maintain_build(folder,work,root/'tools',report=lambda _:None)
++            self.assertEqual(len(calls),1)
++            self.assertEqual(Path(calls[0][3]).name,'build.py')
++            self.assertIn('--reuse-game-objects',calls[0])
++            self.assertEqual(updated['version'],__version__)
++            self.assertFalse(updated['maintenance']['lift_repeated'])
++            self.assertEqual((folder/'user/save.dat').read_bytes(),b'keep-save')
++            self.assertEqual(updated['files']['image.bin'],old['files']['image.bin'])
++            self.assertIn('fullhd-video-budget-v1',updated['host_features'])
++            # A failure after publishing must put the whole previous runtime back.
++            for n in old['files']:(folder/n).write_bytes(n.encode())
++            write_json(folder/MANIFEST,old)
++            def publish_then_fail(*args):
++                from akynoleyend.build import publish
++                publish(*args)
++                raise ProjectError('synthetic publication failure')
++            with patch('akynoleyend.maintenance.require_tools',return_value={}), \
++                 patch('akynoleyend.maintenance.run',side_effect=compile_only), \
++                 patch('akynoleyend.build.renderer_identity',return_value='generic-test-renderer'), \
++                 patch('akynoleyend.maintenance.publish',side_effect=publish_then_fail):
++                with self.assertRaisesRegex(ProjectError,'synthetic publication'):
++                    maintain_build(folder,work,root/'tools',report=lambda _:None)
++            self.assertEqual(read_json(folder/MANIFEST),old)
++            for n,digest in old['files'].items():self.assertEqual(sha256(folder/n),digest)
++            self.assertEqual((folder/'user/save.dat').read_bytes(),b'keep-save')
++
++    def test_full_hd_fps_and_handheld_controls_have_independent_runtime_values(self):
++        value=graphics_environment(output_resolution='1080p',resolution='50',upscaling='fsr',fps_counter=True,handheld=True)
++        self.assertEqual(value['HOS_OUTPUT_RES'],'3');self.assertEqual(value['AKYNO_RESOLUTION'],'4')
++        self.assertEqual(value['AKYNO_FPS_COUNTER'],'1');self.assertEqual(value['HOS_HANDHELD'],'1')
++        with self.assertRaises(ProjectError):graphics_environment(fps_counter='on')
++
++
++class AutomaticPreparationTests(unittest.TestCase):
++    def test_play_prepares_bank_then_starts_real_child_with_native_preparation_enabled(self):
++        import akynoleyend.launch as launcher
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d);game=root/'game';game.mkdir();romfs=root/'romfs'
++            for n in ('Pack','System'):(romfs/n).mkdir(parents=True)
++            exe=game/'AkynoLeyend.exe'
++            exe.write_text(f'#!{sys.executable}\nimport os,json\nprint(json.dumps({{"seed":os.getenv("RX_VK_SEED_PREPARE"),"progress":os.getenv("AKYNO_LAUNCHER_PROGRESS"),"fps":os.getenv("AKYNO_FPS_COUNTER")}}))\n')
++            exe.chmod(0o755)
++            for n in ('AkynoLeyend.dll','image.bin'):(game/n).write_bytes(b'fixture')
++            write_json(game/MANIFEST,{'schema':1,'project':'AkynoLeyend','version':__version__,'romfs':str(romfs),
++                'files':{n:sha256(game/n) for n in ('AkynoLeyend.exe','AkynoLeyend.dll','image.bin')}})
++            fake_os=SimpleNamespace(name='nt',environ=os.environ,getpid=os.getpid)
++            with patch.object(launcher,'os',fake_os),patch('akynoleyend.shader_prepare.prepare_shaders',return_value=0) as prepare,redirect_stdout(io.StringIO()):
++                self.assertEqual(launcher.launch(game,fps_counter=True,work=root/'work'),0)
++            prepare.assert_called_once()
++            self.assertFalse(prepare.call_args.kwargs['start_game'])
++            self.assertIn('verified_manifest',prepare.call_args.kwargs)
++            logs=next((game/'diagnosticos').glob('*/saida.log'))
++            child=json.loads(logs.read_text())
++            self.assertEqual(child,{'seed':'1','progress':'1','fps':'1'})
++
+--- a/tools/make_distribution.py
++++ b/tools/make_distribution.py
+@@ -1,6 +1,8 @@
+ """Package source and tools, excluding every local game/build artifact."""
+ 
+ import argparse
++import hashlib
++import json
+ import re
+ import zipfile
+ import sys
+@@ -16,6 +18,7 @@
+     ".git",
+     ".venv",
+     "dist",
++    "atualizacoes",
+     ".ruff_cache",
+ }
+ OMIT_PARTS = {"__pycache__"}
+@@ -75,7 +78,7 @@
+     if args.update:
+         from akynoleyend import __version__
+         from akynoleyend.coherence import PREVIOUS_HOST_SOURCES
+-        if __version__ != "0.4.3-test.2" or "0.4.3-test.1" not in PREVIOUS_HOST_SOURCES:
++        if __version__ != "0.4.3-test.3" or "0.4.3-test.1" not in PREVIOUS_HOST_SOURCES:
+             parser.error("Atualizacao incremental sem host anterior conferido.")
+     if not args.source_only:
+         from akynoleyend.release import verify_windows_release
+@@ -92,6 +95,11 @@
+         for path, relative in paths:
+             prefix = "" if args.update else ROOT.name + "/"
+             archive.write(path, prefix + relative.as_posix())
++        if args.update:
++            index = {"schema": 1, "kind": "update", "version": __version__,
++                     "files": {relative.as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
++                               for path, relative in paths}}
++            archive.writestr("update-package.json", json.dumps(index, ensure_ascii=False, indent=2)+"\n")
+     print(f"{args.out}: {len(paths)} files, {args.out.stat().st_size} bytes")
+ 
+ 
+--- a/tools/test_cas_spirv.py
++++ b/tools/test_cas_spirv.py
+@@ -61,9 +61,9 @@
+         if follow:
+             environment["RX_VK_FOLLOW_STORES"] = "1"
+         subprocess.run([str(binary), str(modules)], check=True, env=environment)
+-        for name in ("storage-cas.spv", "global-cas.spv"):
++        for name in ("storage-cas.spv", "global-cas.spv", "tracked-cas.spv"):
+             subprocess.run([args.spirv_val, "--target-env", "vulkan1.3", "--uniform-buffer-standard-layout", str(modules / name)], check=True)
+-    print("PASS: %d production units linked; four CAS modules validated with page-table writes off/on; no shader/GPU execution" % len(objects))
++    print("PASS: %d production units linked; six CAS modules validated with page-table writes off/on, including tracked global-to-storage; no shader/GPU execution" % len(objects))
+ 
+ 
+ if __name__ == "__main__":
+--- a/upstream.json
++++ b/upstream.json
+@@ -1241,5 +1241,113 @@
+       "coalesced adjacent capture copies"
+     ],
+     "shader_stamp_fnv_prefix_present_in_old_and_new_dll": true
++  },
++  "maintenance_test3_20261109": {
++    "status": "TEST_BUILD_AWAITING_PHYSICAL_GPU_VALIDATION",
++    "version": "0.4.3-test.3",
++    "python_tests": {
++      "total": 205,
++      "passed": 196,
++      "skipped": 9,
++      "failed": 0
++    },
++    "runner_checks": 12,
++    "cas_spirv": {
++      "production_units": 70,
++      "modules_validated": 6,
++      "tracked_global_to_storage_regression_reproduced": true,
++      "gpu_executed": false
++    },
++    "native_renderer": {
++      "schema": 1,
++      "units": 182,
++      "jobs": 4,
++      "renderer_prebuilt": false,
++      "compile_seconds": 67.235,
++      "local_hits": 0,
++      "shared_hits": 0,
++      "compiled": 182,
++      "failed": 0
++    },
++    "renderer_exports": [
++      "mkwvk_init"
++    ],
++    "launcher": {
++      "schema": 1,
++      "version": "0.4.3-test.3",
++      "pe_product_version": "0.4.3-test.3",
++      "source_sha256": "1adaf5529625d6805eaa0f211d4690918770b10c2983f58c06bddbc4723a4eff",
++      "binary_sha256": "52cb8154358cd39b47cf1f0166dc6842234cbb893dea0e4e51668cd0d5407f10",
++      "toolchain": ".NET SDK 8.0.427, self-contained win-x64",
++      "wpf_window_executed": false
++    },
++    "renderer": {
++      "schema": 1,
++      "release": "0.4.3-test.3",
++      "config": {
++        "target": "windows-gnu",
++        "march": "x86-64-v3",
++        "release": "1"
++      },
++      "source_sha256": "4554b3a3baa766eedcf8a6471bb8773a93d4d3803b59523c1cfe725a687f110c",
++      "binary_sha256": "cdb5306d7ac90524c0d9295aa09892e756991920220cde1951776d85a1d202bc",
++      "compiler": "LLVM-MinGW 20261020",
++      "generic": true,
++      "game_executed": false,
++      "physical_gpu_tested": false
++    },
++    "host_compile": [
++      {
++        "file": "nn_video.c",
++        "exit": 0,
++        "synthetic_instruction_helper_headers": true
++      },
++      {
++        "file": "nn_applet.c",
++        "exit": 0,
++        "synthetic_instruction_helper_headers": true
++      },
++      {
++        "file": "display.c",
++        "exit": 0,
++        "synthetic_instruction_helper_headers": true
++      }
++    ],
++    "shader_stamp": "ad137a62c8c44901",
++    "shader_source_sha256": "438d77a10b6dab559b213a27025fa45583403f06957732cf612b48e026778193",
++    "shader_stamp_prefix_found_in_dll": true,
++    "shader_translator_cache_changed": true,
++    "generated_game_retranslation_required": false,
++    "generated_game_object_recompile_required": false,
++    "host_objects_updated_and_exe_relinked_on_user_pc": true,
++    "maintenance_uses_existing_work": true,
++    "automatic_shader_preparation": true,
++    "source_sha256_posix": "6c67d2ebcd8918a39253aacaf9421cb36661076a814e787847c5ec42ae886384",
++    "source_sha256_windows": "9b71fcc98444139a9c1388ca6d575ef5fa8cd1083693a450142e2a09b40c1e7a",
++    "full_game_executed_here": false,
++    "physical_gpu_tested_here": false,
++    "fps_gain_measured": false,
++    "rainbow_image_fixed_on_rx6600_confirmed": false,
++    "audio_sync_on_user_pc_confirmed": false,
++    "zip_update_in_launcher": true,
++    "online_update_feed_configured": false,
++    "upstream": {
++      "tag": "v2.0.10",
++      "commit": "7f9daf06d902588476102d6650c600bb84f02ce5",
++      "selected_backports": [
++        "single-layer ASTC-to-BC3 runs (#956)",
++        "lazy RGBA conversion for NV12 video",
++        "EOS processing while pictures remain queued"
++      ],
++      "local_changes": [
++        "tracked global-to-storage CAS operand preservation",
++        "bounded catch-up between decoder calls",
++        "1920x1080 output including handheld profile",
++        "mouse/WASD/Ctrl+M overlay controls",
++        "automatic preparation with launcher progress",
++        "pinned runtime update with reuse-only guard",
++        "ZIP update transaction and rollback"
++      ]
++    }
+   }
+ }

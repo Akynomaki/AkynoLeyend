@@ -1,0 +1,1544 @@
+{
+  "status": "WIP cleanup, not a release",
+  "deleted_files": 250,
+  "removed_bytes": 2824542,
+  "moved_commands": {
+    "Jogar-Streaming.cmd": "suporte/Jogar-Streaming.cmd",
+    "Jogar-Escala-150.cmd": "suporte/Jogar-Escala-150.cmd",
+    "Testar-Luzes.cmd": "suporte/Testar-Luzes.cmd",
+    "Reparar-Acesso.cmd": "suporte/Reparar-Acesso.cmd",
+    "Jogar-Sem-BC3.cmd": "suporte/Jogar-Sem-BC3.cmd",
+    "Analisar-Log-Shaders.cmd": "suporte/Analisar-Log-Shaders.cmd",
+    "Diagnosticar-Acesso.cmd": "suporte/Diagnosticar-Acesso.cmd",
+    "Jogar-Cache-Equilibrado.cmd": "suporte/Jogar-Cache-Equilibrado.cmd",
+    "Coletar-Crash.cmd": "suporte/Coletar-Crash.cmd",
+    "Jogar-Teste-Crash.cmd": "suporte/Jogar-Teste-Crash.cmd",
+    "Jogar-Nitido.cmd": "suporte/Jogar-Nitido.cmd",
+    "Jogar-Compatibilidade.cmd": "suporte/Jogar-Compatibilidade.cmd",
+    "Jogar-Escala-125.cmd": "suporte/Jogar-Escala-125.cmd",
+    "Jogar-ASTC-CPU.cmd": "suporte/Jogar-ASTC-CPU.cmd",
+    "Jogar-Visual.cmd": "suporte/Jogar-Visual.cmd",
+    "Jogar-8GB.cmd": "suporte/Jogar-8GB.cmd",
+    "Jogar-Suporte.cmd": "suporte/Jogar-Suporte.cmd",
+    "Aplicar-Correcao-Lift.cmd": "suporte/Aplicar-Correcao-Lift.cmd",
+    "Jogar-Comparacao.cmd": "suporte/Jogar-Comparacao.cmd",
+    "Atualizar-AkynoLeyend.cmd": "suporte/Atualizar-AkynoLeyend.cmd",
+    "Atualizar-Renderizador.cmd": "suporte/Atualizar-Renderizador.cmd",
+    "Auditar-RomFS.cmd": "suporte/Auditar-RomFS.cmd"
+  },
+  "root_commands": [
+    "Compilar.cmd",
+    "Jogar.cmd",
+    "Preparar-Shaders.cmd",
+    "Verificar.cmd"
+  ],
+  "preserved": [
+    "licenses and attribution",
+    "NVN API/record headers",
+    "active Vulkan compiler",
+    "build sources for linked third-party dependencies",
+    "saves and user data"
+  ],
+  "removed": [
+    {
+      "path": "gpu/render/rx_debug.cpp",
+      "bytes": 32189,
+      "sha256": "fad5d4c15e810b810251fb35daf00174c4047208541e7e4c7179b2250bb8b84b",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_present_fx.cpp",
+      "bytes": 20376,
+      "sha256": "81c58ad693e50f9d0ba48678ed9387da6b42fbd53e32821c8f1ad4715f019e34",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_shader.cpp",
+      "bytes": 75413,
+      "sha256": "303109f2357dc67d814d8edd46d089b3be2f1bc8e6aad43abb0d49f4d05e87ec",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_texture_gpu.cpp",
+      "bytes": 57129,
+      "sha256": "b2decf9b3b4d93876b5efde3209b6abfc73dd508361bd5b47d3ff89222fdbc9d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_pipecache_native.cpp",
+      "bytes": 20056,
+      "sha256": "c918dedbea13ed608ff01b080fa5951a1fbc86b3e33784a9ee295052bd2974d2",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_web_mt.cpp",
+      "bytes": 11779,
+      "sha256": "541025e070f8da926de736b12b0cbf0a6ef3ada17d5f3611e441eb8237eb451c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_compute.cpp",
+      "bytes": 34670,
+      "sha256": "3b695e501b4ae63a6e7c40815007a1e937ab5d804e1904b66b4ea5e3a569fa1e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_web_mt.h",
+      "bytes": 15078,
+      "sha256": "bd21e58288b86a96075a79e5e93136433553c4c225be04ce3bbdb8bcfbea4967",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_nvn.cpp",
+      "bytes": 78213,
+      "sha256": "1607d91b5a30de74ee23c277e8a5f832bfe51934987467e80891811265495de8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_buffer.cpp",
+      "bytes": 34368,
+      "sha256": "6dd97a8c02ac3b38baab2abc35ec40556a34d45a430dc87a698f3d5550509b7f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_framegen.cpp",
+      "bytes": 23290,
+      "sha256": "4d0c0096939cf8d36cf98251eee7a087228e4c71c6162f9ed9df918ff9bf08ae",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_record.cpp",
+      "bytes": 36726,
+      "sha256": "023d5c9ea12a8ac32c628df8f9e40c579ff9cd098a61a040dc99db046251e53f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_none.c",
+      "bytes": 1111,
+      "sha256": "b02aca538721efdad700deb34e527227d7268cb683d1acf7d1c47422b7c44a5c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/renderdoc_app.h",
+      "bytes": 36480,
+      "sha256": "b7005e7dc34c3635046868bbd76d81b9b055aede0f56daa0bd39fedee0639ffb",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_internal.h",
+      "bytes": 50509,
+      "sha256": "7305fac65350b3e3a11d66d551df6d5a9999be5fb0224108ef47a190e433da20",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_wgpu_names.h",
+      "bytes": 1194,
+      "sha256": "ce9cc5336b127f210151457ea51b5bee2295eaa18bcf9084a7b3ed9cb396c784",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_texture.cpp",
+      "bytes": 129027,
+      "sha256": "57f1a030504a92fbf01da0278e43c7c5a373a08a2e45ffd261f95b38092c1dd3",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_draw.cpp",
+      "bytes": 223523,
+      "sha256": "0ffc6f8d3bac00c1a154db3f1e658360e2d8302dcb2954205b4663e9ce843f91",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_pipecache.cpp",
+      "bytes": 18677,
+      "sha256": "d46d5b3bb6da3ebfebcbf311da55aa2447dcc4cd88702dac202600cbe1642e6f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_bcn.h",
+      "bytes": 5136,
+      "sha256": "3d5d7e9e9caee58ef5f23d3a5ed4d5e38329027c569a4fe8e3fa794ff771e123",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_bc7.cpp",
+      "bytes": 6610,
+      "sha256": "ed2558e1f6ec4b7eac0e2ac8d50b0481cb86fe344ae675413508e1b7adea67b2",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/render/rx_core.cpp",
+      "bytes": 216517,
+      "sha256": "b0749ffbab51809960a114e225a7d2791dbb6a49e33cb3c6f7dfbc1fae4641d5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/environment.h",
+      "bytes": 4347,
+      "sha256": "fcda393c69015c58dfa1b410ec6b46e1fcd77e1ad28f1a25e88b720c2c31d8d0",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/precompiled_headers.h",
+      "bytes": 211,
+      "sha256": "d1771e484fe6332c3617feeceb512748105f18bd050f4f57efe8f738c1b8a261",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/CMakeLists.txt",
+      "bytes": 11907,
+      "sha256": "32c5ea38f7bca740ce050ee90d298f81ae4fca6fe695465cae8389005f12627d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/profile.h",
+      "bytes": 4312,
+      "sha256": "237c541129decd073fa5b8147efa2aae5e8e24c07995b42372307e587fca262f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/host_translate_info.h",
+      "bytes": 3108,
+      "sha256": "6212271592381e2b31af13ee8f0d9181a4e20337c1ed00a8e28cd867a3cac68d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/exception.h",
+      "bytes": 1834,
+      "sha256": "dd8b7b8ac8e783087fac92b165b83f8511746b1d7d7915da5c53329f21661101",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/program_header.h",
+      "bytes": 7909,
+      "sha256": "01d7fc51fc18df5e7631b96a73f0c5ba50bf8063d9a1fd4fbd106261258654b3",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/object_pool.h",
+      "bytes": 2842,
+      "sha256": "bdc825b50ea19aa09040c924b7a1b47cf2bd6e8ff2ed96150a822259d21af2dd",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/stage.h",
+      "bytes": 527,
+      "sha256": "6f50eafd32df622328adb633de31ed5469c8e8c3f2118429832088cebda1619f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/runtime_info.h",
+      "bytes": 2806,
+      "sha256": "b253d8a6263cec20dda6081bbae0190f61655337378bb49301e4881a58bddb4c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/varying_state.h",
+      "bytes": 2456,
+      "sha256": "087abc450bf11ad4efcbfb27419b178003628d7fb2b6af9570535e97f7ab2d5b",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/shader_info.h",
+      "bytes": 8263,
+      "sha256": "a6b7210b42fd3441b66cdf0743975b904fca3da9af1e177fcec32fc7fca4e1af",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/bindings.h",
+      "bytes": 411,
+      "sha256": "1bbe020437f18bed45a6d3aff4976e054088a8916a69052745ade3a8711f1ca5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/ssa_rewrite_pass.cpp",
+      "bytes": 15097,
+      "sha256": "9bdafb35454d8d3c10e6d38ad0eff57ef8d4e0681da70fe334478f9afdc950a1",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/passes.h",
+      "bytes": 1479,
+      "sha256": "5d25fbfb287f5b4c7d3963ee95cbee7b7fbed91ac52d6e41bf89f0316cfb42f1",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/conditional_barrier_pass.cpp",
+      "bytes": 3990,
+      "sha256": "d57a0d468b0f6a6d7583e9edd89351bcaa8d7c54b413e3a5c677199ba927484e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/global_memory_to_storage_buffer_pass.cpp",
+      "bytes": 23387,
+      "sha256": "934f3224d6f62c1e4f38adc63dcb64d910671a153b7ee92ff7c70d852f898337",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/dead_code_elimination_pass.cpp",
+      "bytes": 876,
+      "sha256": "7f4f5031f8ac7db517edb44fe813cd47344a9749d2a705fa9ff43b86d6bcbad5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/constant_propagation_pass.cpp",
+      "bytes": 40744,
+      "sha256": "f4e5c6a2ffd2af8177641ed84e13cea0019cf78a820d1c45279fac548269e2f7",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/rescaling_pass.cpp",
+      "bytes": 13868,
+      "sha256": "f2c3578fb0991d9c0b9a6a3be1351d2b2b571ea3399ea4b8b18383452ae39900",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/identity_removal_pass.cpp",
+      "bytes": 1493,
+      "sha256": "22e185026b09059149752047b5bd0f438db5e7eadea5b7d225b444f0860c46c6",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/layer_pass.cpp",
+      "bytes": 2185,
+      "sha256": "b54783f49495f854bd9a8b4dc1a7b0f391d7c5855ae3005e2ae3e7159d3ba0e4",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/position_pass.cpp",
+      "bytes": 2522,
+      "sha256": "be96683994f1837c8679a35140712047cbcb4100767e066a4a62a7319994164f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/vendor_workaround_pass.cpp",
+      "bytes": 2724,
+      "sha256": "d61ef5701770758483dbb17c962461cd2032b2f5325bdd0256aaf5856516ed64",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/collect_shader_info_pass.cpp",
+      "bytes": 37325,
+      "sha256": "6a6a2f18a8e0e1d3b2f71ea12dc00889ce3241f508fdc804e6c98426f4a676ac",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/texture_pass.cpp",
+      "bytes": 37068,
+      "sha256": "fd2740812f7d5f31446e55416cbf8ae25098e84a33e06e0e4dbbc21c5b34bfe4",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/lower_int64_to_int32.cpp",
+      "bytes": 9824,
+      "sha256": "b27fa0c8fe0f80d74bbf71dd1fb2995be159b000b0b586b69ac7e5701155ea74",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/verification_pass.cpp",
+      "bytes": 3300,
+      "sha256": "81ef1acc2aaa1367c43165bcf7319a00dd0e12dcf7410b40c25a59f8589e9220",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/lower_fp16_to_fp32.cpp",
+      "bytes": 5330,
+      "sha256": "4e0a38224992cd5305cba4c1a33b71a086bfd88b224a947197c84616f7730694",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/lower_fp64_to_fp32.cpp",
+      "bytes": 7532,
+      "sha256": "fc947541ac92e5cba9969574eef50cc9a5ed51e956a9ed350a355890f4a57b1d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/ir_opt/dual_vertex_pass.cpp",
+      "bytes": 864,
+      "sha256": "3e5ecf374285c8ca3785a188af731038a375eb782059d689007efa41351f3131",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_integer.cpp",
+      "bytes": 10576,
+      "sha256": "f91491d9b6cf4076d4b6ca438b95c76c0d0ad1384345b81706aca1bea9aced50",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl.cpp",
+      "bytes": 9528,
+      "sha256": "39ee1a6533418193667ba8930f97b028aa1d2ab582e62a98477290dbfb5f07d4",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_warp.cpp",
+      "bytes": 11132,
+      "sha256": "359e631d1151954b5b90a7e1a8217ef37f2822f987e1bb8a9944f580c2bf598e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/glsl_emit_context.h",
+      "bytes": 5251,
+      "sha256": "a6fe9ab978c5f43f10d4ce390109b8f62c134e9bf593251978b585a2b562540a",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_atomic.cpp",
+      "bytes": 26663,
+      "sha256": "b5d4e9a5f8a8860ee38821b2acdee35c381d7347a6aea5f96e5bdba9e5632b8d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_instructions.h",
+      "bytes": 52686,
+      "sha256": "d3955d06df79b24209d5cb0fc5cb3e97314f2c330949e9c66108b2f073834343",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/var_alloc.cpp",
+      "bytes": 8705,
+      "sha256": "ed585b792370f50af8ef0c80d4bcfceba7d9d9778cb3d5adb6a3a6c9bad62623",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl.h",
+      "bytes": 736,
+      "sha256": "bbf0d5bebd766d729f4d4ab871543471cba9433fbf2e8592b51c3f9fcd7d8fc6",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/var_alloc.h",
+      "bytes": 2482,
+      "sha256": "424dba8e301fdd5e71c20c893a19239b1de03f35395895c70a78338978e60860",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_special.cpp",
+      "bytes": 3872,
+      "sha256": "210e486a6cb72b004d562ac378ca97aa8ec9b5da0e0a8c5e01a5529beea250fc",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_logical.cpp",
+      "bytes": 901,
+      "sha256": "d21d697964d31130f0f2f7475862d08c76b78b6854c3b149d1855429c2fbc2dc",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_context_get_set.cpp",
+      "bytes": 18693,
+      "sha256": "f310ebbb469216c46b6246a54cfd9ccf177b50648b7bd3f5bbb0f0b285bfe20e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_floating_point.cpp",
+      "bytes": 16299,
+      "sha256": "031ea74995e913ed82067245dd35228a71a00e3c0021146612a5267a24c6306f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_composite.cpp",
+      "bytes": 8858,
+      "sha256": "bead369a97588358ad1385f727062b4793cfafc6c5b23387b1d2e7c0344a30ae",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/glsl_emit_context.cpp",
+      "bytes": 29277,
+      "sha256": "d405c7ef77a9527b36acb3402e860966d74d0e3a58dfc3ce333bfbe4d074f69f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_memory.cpp",
+      "bytes": 8570,
+      "sha256": "7193b53fc53a0ad85ada776394da335c5b7dc81714162f79e71f4ff69a446163",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_select.cpp",
+      "bytes": 2274,
+      "sha256": "062ec5d5b5b56d3fb3b462524ea583b460cd797ce3e48b7f5952163f474708c4",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_undefined.cpp",
+      "bytes": 757,
+      "sha256": "a597b6f0ee1327135dcb634abc550f1866a713e41fadce5cb931c27fe1d12dc9",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_bitwise_conversion.cpp",
+      "bytes": 3252,
+      "sha256": "edb826f50106b410b3c9e375579757f5946b9b326da955f6571e0ca6337c3f9a",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_shared_memory.cpp",
+      "bytes": 3250,
+      "sha256": "39bd3f088827f2be29530561db0d54ef7b0062ab578e7255eae2bf52092acbf3",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_convert.cpp",
+      "bytes": 9193,
+      "sha256": "91e8280a60d28c4e958755a0c1a18050026e92ee78edeb262d127f5d7dd9019f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_image.cpp",
+      "bytes": 34797,
+      "sha256": "4dd1a80590bfe234002025019e0a76e5b6eb28db965a2bb9aede1e81cf11f551",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_barriers.cpp",
+      "bytes": 555,
+      "sha256": "08439ae9e1313cef8754289a9764f527a6112678443d58bff9f09900a323aa73",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_control_flow.cpp",
+      "bytes": 532,
+      "sha256": "981f4f0b0c865548de97ae6618e4543788c4c1e00ba86e469ac905683c1e6d04",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/glsl/emit_glsl_not_implemented.cpp",
+      "bytes": 1864,
+      "sha256": "75b7bdceaf41947c2d092cc4060f555391320bcc0062170bf5f037b5f34cb6ec",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_integer.cpp",
+      "bytes": 10694,
+      "sha256": "531875b1ac621e22a31474868b4ee720f8c0efc66aeac70750ffe091245de1f4",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_not_implemented.cpp",
+      "bytes": 1864,
+      "sha256": "35a2754a4e439627d790395cd1abb84404afc206f229c32d2e8b6badaec6b7b8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_image.cpp",
+      "bytes": 25648,
+      "sha256": "d91b9938e8658dda400ea1c1e14c31005e794298f72401ef3ec75a61a6dd106e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_instructions.h",
+      "bytes": 52686,
+      "sha256": "c1e278dfe748b8b25c31265a8f62aac195acfc3591e4f3cf9b72bdd9485ae79c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_control_flow.cpp",
+      "bytes": 532,
+      "sha256": "82eb05546397618e76dfb0342f3d6e439e8a5ccce2785cb5df5aead89b95e2a3",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_context_get_set.cpp",
+      "bytes": 19011,
+      "sha256": "539f4171550f04ba8ad30f579821ed8cea8633c51d509ee64b4539ce3e9f771b",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_atomic.cpp",
+      "bytes": 16035,
+      "sha256": "cd8dbdd40489bff735900b4b032a6611dae257c0de745a3a66882163ad62fe48",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_logical.cpp",
+      "bytes": 901,
+      "sha256": "ed636467cdcfc6f4ff174ba6851c4e43f4e10cbfca8a7e81374f4d10fc186caa",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_composite.cpp",
+      "bytes": 8885,
+      "sha256": "9f51436dd0c8dfe5e06da637e6c46048287fab016cfe02b2778ed9ea0d5d9979",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/var_alloc.cpp",
+      "bytes": 8682,
+      "sha256": "97eccc11c902c7b4faf6714912209b2a8e5c8f68540f6c8f220912669a2ef650",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/var_alloc.h",
+      "bytes": 2482,
+      "sha256": "ace6bd5e11207f844e5d3e07df75b9f0c106d748144dc8b1c46c562e3c5a77c7",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_select.cpp",
+      "bytes": 2314,
+      "sha256": "455682e6abf85f68be2800e7459f0ff1df5a93f430a4a184e42e6c28933fc2c5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_floating_point.cpp",
+      "bytes": 17900,
+      "sha256": "f7d2b610d01707025d54dc27126bdf2214fa4a2f6bfa3ad5f4b1dbcb632afd69",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_memory.cpp",
+      "bytes": 9731,
+      "sha256": "9caf4220dad3f1b1830c90423ff05063b8ce555aff4b60f829c414c9b8bcab6e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_bitwise_conversion.cpp",
+      "bytes": 3142,
+      "sha256": "e0978455c597248116d1511c5ec3b2f925be043fb1722bd081fbd6bfc40ba2a9",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/wgsl_emit_context.h",
+      "bytes": 7936,
+      "sha256": "f8b2b742df1e518fa0592c388ebeb2bc28e12566b4b388e1683cc77dd4408ecb",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_warp.cpp",
+      "bytes": 8695,
+      "sha256": "8130e25dcd44c0e91bbe3304e93e41056aa8a9d66200aa93f57373612be0d815",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_undefined.cpp",
+      "bytes": 768,
+      "sha256": "ece805a9e01e2152462c03fc80fda4f78bf9f2774f6ba91cdd8f1786670844ac",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_special.cpp",
+      "bytes": 3854,
+      "sha256": "6d661f632d36f3c4c5e3d623d3647963a8eb5c7d3189896ed3f506b8bea89f65",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl.h",
+      "bytes": 3957,
+      "sha256": "0dd234616fe57026c6871c6d4695252bbb972c4201a2c4a77545c4d3ac95026c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_barriers.cpp",
+      "bytes": 563,
+      "sha256": "8e39d7feb453fcf7704dfbfb519ccdc985a327c716998f1364e1a65d4909cbe8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/wgsl_emit_context.cpp",
+      "bytes": 24858,
+      "sha256": "7784b90bbae6ae735c9aa94b2333f9e4f0f2bda208e69831ee6a2701e45ca4bb",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_convert.cpp",
+      "bytes": 9178,
+      "sha256": "9a48ea39fd16d1732de499f0b914e743242323c92dfde031ddf6029bd04c2cf5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl_shared_memory.cpp",
+      "bytes": 3627,
+      "sha256": "1b535a729fff43edb6da03f1961685f1d1c3ce4445276359f9e692044754ff7d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/backend/wgsl/emit_wgsl.cpp",
+      "bytes": 27754,
+      "sha256": "0c08d8e7079141f08ef2d61efe6d06658c04e730e11356a1d43bd77e3e2ba274",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/patch.h",
+      "bytes": 2667,
+      "sha256": "ad2c58a5b4a9c0bd16da7b88f55985ead9a08e02e35787ce4ef1d81b8c82cc9e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/ir_emitter.h",
+      "bytes": 23746,
+      "sha256": "8ca1572a199e58fabf98939171c17d3ea4bcdcd88c81c1b1cae6d55a546bf878",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/opcodes.cpp",
+      "bytes": 1180,
+      "sha256": "bd7a902c62a1b5fed1becf2e494cd1e3a1e262bfe5bb6e9d47684f58fce57fd2",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/condition.cpp",
+      "bytes": 632,
+      "sha256": "15ff1e1e83be6e931b0efecf92ef66064c3bfe2f96babaa3d488ebfaeb11ed43",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/opcodes.inc",
+      "bytes": 84835,
+      "sha256": "79e9b734753fb1d505953119aace9b6c18408134e6b0e18fb4f965fa401fa46f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/basic_block.cpp",
+      "bytes": 5675,
+      "sha256": "063af6e17e85e98f47bd39811e644cf89291023baeddb6b8bccb7d919dede0eb",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/patch.cpp",
+      "bytes": 806,
+      "sha256": "d6c46973a4dce9f7b6c80ea24a87aaf4b581421db527edf9b8b3d6a71854ba23",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/attribute.cpp",
+      "bytes": 15360,
+      "sha256": "5c2597899f7f7a7e979d57d8893e03006f1059f8ce863d2c7a91c2ab6d7ac2fe",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/opcodes.h",
+      "bytes": 2924,
+      "sha256": "ef8700a03cdaa0b1dd162f73430ad1199ecd80aba202254f63f9138817a8b4c6",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/microinstruction.cpp",
+      "bytes": 14999,
+      "sha256": "dec315a03275eb3880847cef8662a253a7dcf2ad0f9768af11dc4e61894620a7",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/abstract_syntax_list.h",
+      "bytes": 1096,
+      "sha256": "8a3d6e084efbe67aefa4729c244f1ba30f199607c7af012b925188e359ffc6e8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/reg.h",
+      "bytes": 4468,
+      "sha256": "2a81fc2d730d073c8e5a0ff1d3adffa86f7e957102c95f11dc9954f96e9ee798",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/value.h",
+      "bytes": 11763,
+      "sha256": "d957e74bfcedd0e36f20834aae08a3a9128b7ef2fc0d57be434be4a49a45bde5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/type.cpp",
+      "bytes": 1080,
+      "sha256": "734328384ede91a553e165ca21ba30ffa0d4653edf44d0508e7299a2b960b793",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/program.cpp",
+      "bytes": 858,
+      "sha256": "cb04d352f4b50e58ed4de5a0943cd8a1f9d923ec5db807aed2681d46a68391d8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/value.cpp",
+      "bytes": 2653,
+      "sha256": "161e9900799210af1ed4e7c499dbb703eb6a98238eceaa99c58e18152f8b34d8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/breadth_first_search.h",
+      "bytes": 1791,
+      "sha256": "b981f1675737e2611d4a33f66b1b561476585703b1594a5b987811e787f8c365",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/flow_test.cpp",
+      "bytes": 1898,
+      "sha256": "545a6f2b56c1e725de374eaa50f375d6f1ccd8ae3783c499e07a8dd34c0d319e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/condition.h",
+      "bytes": 1635,
+      "sha256": "2f318c2e6751d46f4c5621818a2568f1abf7bb97f00bcb9f98ec7e8fb0a26378",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/attribute.h",
+      "bytes": 11894,
+      "sha256": "59a8ba5ee44d48b3df37c4d6891592fd35c31253f2ce73553a0256a6b127013d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/pred.h",
+      "bytes": 929,
+      "sha256": "3924b4d8f3588a83a9fd444c9dcaf02871a3d4315db0f78ea1d2cfc2c08aa403",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/post_order.h",
+      "bytes": 348,
+      "sha256": "85d4bafcaf2aea06e75f9cd29497b166204db73d1c2679ad066846ed8cbad682",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/basic_block.h",
+      "bytes": 6330,
+      "sha256": "a9d270681072cb868f56ce40c8fce05cf45b670ec2e6b383b34b08cbde5a5760",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/type.h",
+      "bytes": 1303,
+      "sha256": "0d9c1b867ad900084a92cb8cf379343a0a08bdc5e2e91ea3c3cd7ccbad8ef6b7",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/program.h",
+      "bytes": 890,
+      "sha256": "c5d294094eca387b2bf3891e6254887ad3737fa790af85d02ea1f16106f88d31",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/ir_emitter.cpp",
+      "bytes": 72301,
+      "sha256": "01c972744946b04f3320a02dbba44c574813d0245915ce2071cfb0e7f5e323ab",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/modifiers.h",
+      "bytes": 1923,
+      "sha256": "732219a310e0142f985fe0f4c2b4bc58618d919141be0827f278cc359207d9d5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/post_order.cpp",
+      "bytes": 1450,
+      "sha256": "59b366eaeee4132666d4214956c66f2770754f838fe59a35c6c85e435cd44793",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ir/flow_test.h",
+      "bytes": 2192,
+      "sha256": "6793e2f68f1eaa3e80bf7038d5173d74ebbbbc2aece5a3f400f29008f78db013",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/control_flow.h",
+      "bytes": 4592,
+      "sha256": "6c5810a9a378f1c39ae2fdf8bbc4f40feecafa931d2faec5f1d131f83a9ab947",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/opcodes.cpp",
+      "bytes": 770,
+      "sha256": "926b29396048a9fe9bbce36a5c71b3a3de8cd4f6000ca6d5d7f59d2f5abaebd2",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/indirect_branch_table_track.h",
+      "bytes": 730,
+      "sha256": "9d48359b94a963a3726e1df40b1f95ccd726bb6c33e3871f8629be5d6d724361",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/structured_control_flow.cpp",
+      "bytes": 40124,
+      "sha256": "9479ccdeeec77cd051b7779476e9bd010f920d32fb862fb74631b842a001375c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/maxwell.inc",
+      "bytes": 16910,
+      "sha256": "9be5e4566f5bbfba9dcdff88a8bf5bbbe0273353f39261a80b7d04fdec4a9b67",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/indirect_branch_table_track.cpp",
+      "bytes": 3902,
+      "sha256": "850ba654bdd172b7b1a67d6cf8040eab310b4750b641211da527ef5f88cc5b2d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/opcodes.h",
+      "bytes": 687,
+      "sha256": "6f7b2605e0a00fc70632fdddad5047807bd9a1bbdb030501c493419660dbc40e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/control_flow.cpp",
+      "bytes": 24427,
+      "sha256": "afa64e53f5b11711f5a0ccc4b9c5b16a06cd43e76ab3b6c289a96a7bc093969d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate_program.cpp",
+      "bytes": 18495,
+      "sha256": "e562cf96b5c6f2c7072e21ba4d161d6f136f9617930d90a8787a7900263fb58a",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/instruction.h",
+      "bytes": 1576,
+      "sha256": "290fc9932c611e614ec66090f143afb7a1b4fa9730d06af53c231395bd1d2ebc",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/location.h",
+      "bytes": 2544,
+      "sha256": "779f8ee7772120d12f57f63de5700243c008df2851f937c296ebd549896ff8c3",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/decode.cpp",
+      "bytes": 1424,
+      "sha256": "a588710f45b629d238e6dc96fe8ebf2e4665b3acaffb8f37874109cede05f52c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate_program.h",
+      "bytes": 1930,
+      "sha256": "9a52c2da1f546d1f9648e7c62fd3d6c2021090d1f217e0a6fe8d5480d3750a76",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/decode.h",
+      "bytes": 314,
+      "sha256": "104eb1009ec933f883fe0700a30ccf7c58a7a2a1d2a04aec504e4fb7635f0490",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/structured_control_flow.h",
+      "bytes": 829,
+      "sha256": "9bae1f4588042dae5efacf1f5b6df153e523af598a17077121c96dcfe245e168",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ampere/program_address_map.h",
+      "bytes": 1299,
+      "sha256": "eed3d4e632cd12bdec1b63d8a50f8d698e9308f3adfc0a0399bb1d2a97c932ee",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ampere/program_capture.h",
+      "bytes": 2637,
+      "sha256": "63fe3be6c8a3e90a4b7f5ecf61b2a779e51dc3be01951583c0e40faf49f06a1b",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ampere/program_override.h",
+      "bytes": 4418,
+      "sha256": "d1e87ccc7eae084dcb3745b8df6193626511a9ca2600bdc15848330b7b193c51",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/ampere/lower_to_maxwell.h",
+      "bytes": 145466,
+      "sha256": "0b025a45827bb79529e0d35c413b249ec2fd878da5965905f40e401657b8edc9",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/translate.h",
+      "bytes": 374,
+      "sha256": "d1a35607624620eb5e1406d8feb780e4d0d78fb7253bf993840f4f0b0cab5ce3",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/translate.cpp",
+      "bytes": 1202,
+      "sha256": "961eaa060c74f436a5b46e5639b2af76a2fc0681a13e24e2e37a61e67e9db0bc",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/condition_code_set.cpp",
+      "bytes": 2382,
+      "sha256": "e89dd4305bd79906cb5c61ababbbc8b4a14ed3ef3cb541ac855e5756a9c45657",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_load.cpp",
+      "bytes": 5500,
+      "sha256": "f3a4cf8ab02d9b80eea69a4e1c67bccc32a904f948a5310f004e29b245b15dbd",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/double_multiply.cpp",
+      "bytes": 1421,
+      "sha256": "7f0efd2d762085ff4e375bbc590c0e960fcb8dd01a47fe80f4e844f397dd912a",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/branch_indirect.cpp",
+      "bytes": 840,
+      "sha256": "5281c675ca5eadf5741e81e148cdb290c453a25f6681271b8f16e769cd879903",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_gather_swizzled.cpp",
+      "bytes": 4348,
+      "sha256": "b9a20d56a58982f21c25f826e5f8816092e4d265558caa8e333eca6129d93e66",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_min_max.cpp",
+      "bytes": 1867,
+      "sha256": "dcf2362aa389310133e8c9257e513ac286fb22872b294ca760b1fd177ad821d0",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/warp_shuffle.cpp",
+      "bytes": 2493,
+      "sha256": "93905d2bad3923d209c3f3fe285766d0b67974add0e0445d3652983b5a770034",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/exit_program.cpp",
+      "bytes": 1410,
+      "sha256": "88d646b9226a90c65874ce291912a6411b2414a0401f46bd717135c2df76bb36",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_add.cpp",
+      "bytes": 2632,
+      "sha256": "3510de66ee08cfd671aa009dc75f57eb62773b53843ceafd68eb53c0a51e0eb4",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/impl.cpp",
+      "bytes": 7987,
+      "sha256": "5765ca92977afd93423f662e8b12f648e497ed1e03ffebfe8d08c6ee82424425",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_multiply.cpp",
+      "bytes": 3767,
+      "sha256": "bf753d2fe608a3315d8281522f75abb09889d2326847b0d42865b2c5d2dda469",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/double_add.cpp",
+      "bytes": 1652,
+      "sha256": "3b3b154722ce1299ffcee27f9598bc2fa12d97c2a9008b36ae4987d01566516e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_fused_multiply_add.cpp",
+      "bytes": 3358,
+      "sha256": "4affb74c81dfbaf73e8ae3926278ad31937701785f849a61cbc8918d8daea2cb",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/half_floating_point_set.cpp",
+      "bytes": 4372,
+      "sha256": "72913019fb0f9ddaafcd2d8876717a0ba4150ee16ed8388136f3ec63c496ca40",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/half_floating_point_helper.h",
+      "bytes": 840,
+      "sha256": "a6251b99d5520e11265759637241338d4a04865150318c251456549a1fa4e10d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/atomic_operations_global_memory.cpp",
+      "bytes": 6786,
+      "sha256": "39061205580903327abac125df22df981d91b2408a7e521341ef34b7fa7ae1da",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_add.cpp",
+      "bytes": 3069,
+      "sha256": "60e3b7bb1aa0ab3fef2b96580fc2c0bf1a2b688f6bcb982f9eaf9e018b3d0b08",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/video_minimum_maximum.cpp",
+      "bytes": 3013,
+      "sha256": "ef88933f2dd05b83f1ce4dc676bcaad7e293a0ae60324383b5f1b6c8624be829",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_funnel_shift.cpp",
+      "bytes": 2740,
+      "sha256": "b7572415e7d4a48e8a0cca99ffc5eb5f8c1dbb17b5b204dcd3caf56bfce60396",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/logic_operation.cpp",
+      "bytes": 3448,
+      "sha256": "e830df5b5cd7d4421f2f086be13b583db789f4c4ce5a632d89a962e1e71e9142",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_short_multiply_add.cpp",
+      "bytes": 4306,
+      "sha256": "ef4e450fa08a7215e332735d35ae8c18341365c2c7582f8bef0454c3707505e3",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_fetch_swizzled.cpp",
+      "bytes": 9061,
+      "sha256": "5bfd85bab088cf3362e4cb93caaf1313f816092078a5cf982ae8228486e33eb7",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_fetch.cpp",
+      "bytes": 7450,
+      "sha256": "d84f1e120c8608ad8f9c39fbfd4b5adf859a61532c3390023c743510bd40d2a1",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/logic_operation_three_input_lut3.py",
+      "bytes": 2801,
+      "sha256": "1e267e1f629dd4e2a03248c427917ef88fd1c0dc6d3307ab2236262bc936f5b1",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/predicate_set_predicate.cpp",
+      "bytes": 1521,
+      "sha256": "1a47cc93a59b2665d74f7d5668412b6022b392d8102ab5f813d81cabad902bbf",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/bitfield_extract.cpp",
+      "bytes": 2575,
+      "sha256": "03802f0b90166c7f4f6332c3fa4730121365fa773ca66a7dca9c3b91e10a358e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/load_constant.cpp",
+      "bytes": 2587,
+      "sha256": "0b4724e17668cfab53e5847ac6d5af5f9baa65eb6ad465cb0a46d86b247fad86",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/common_funcs.cpp",
+      "bytes": 6235,
+      "sha256": "9cbd20254c02cb45f8faeba6fbd75cc3fc964d928916df2eaa212e5dc0aeddc5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/double_fused_multiply_add.cpp",
+      "bytes": 1767,
+      "sha256": "75fdd32d70bd1ad1509ce5739e50b5bb971ab67e825402305befdc3c2d7fa662",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_conversion_floating_point.cpp",
+      "bytes": 6518,
+      "sha256": "f00ef6591c86da0670624952811665ff881c982d9cacae76b3667a3fe268a2f1",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/load_store_attribute.cpp",
+      "bytes": 7220,
+      "sha256": "36b0c3c41ba44a7fb7472162027f8d8f3b5fdadb1e42e82a5045ac6cf6f148c0",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/video_set_predicate.cpp",
+      "bytes": 3508,
+      "sha256": "fa934e3140b6ae0db5412e5bae789eaccba949ec9806a5e133bb09c2c5b3012b",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/double_set_predicate.cpp",
+      "bytes": 1988,
+      "sha256": "d34bb6c89b58f5f7344e74b8328582461a534e640cb7d1a57b04007a93fa1e2e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_conversion_integer.cpp",
+      "bytes": 8976,
+      "sha256": "a80050986b8932ae62bcc4d487be352a1cf779c97b243182bd5e2a997f256aca",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/vote.cpp",
+      "bytes": 1442,
+      "sha256": "a950f894d5a86b44dd4f343c371baf26f43443d91d957c9dfb3659ba74f596e2",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/surface_atomic_operations.cpp",
+      "bytes": 6667,
+      "sha256": "1c6ca98c13ef494085e19c9b192deb906613c9771286475cfe80c0469ec084c8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_compare.cpp",
+      "bytes": 1467,
+      "sha256": "237fde68714725ace97d1ce2edd01f4051b9bfc09949c164ecf4e9c739526eb8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/half_floating_point_fused_multiply_add.cpp",
+      "bytes": 6277,
+      "sha256": "e1b90fc4c0286567467a02dc6da7bbe4bb577322071c7fb41a75684d53c2a62a",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/load_store_local_shared.cpp",
+      "bytes": 6801,
+      "sha256": "ad384bf9105bcff8e72997d990a1d13329db5997213795b1196cd88e5f2bc9d0",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/surface_load_store.cpp",
+      "bytes": 8566,
+      "sha256": "991f9d8ba190e45a4da8fdb48cd83fc0c4e3f53bdbd8e037b344f27fbe169ee4",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_add_three_input.cpp",
+      "bytes": 3801,
+      "sha256": "253bfecf8e53afb3b997cee52f8d6d542e8549d53d0bd9c8777ba9b20773b7b0",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_compare.cpp",
+      "bytes": 1809,
+      "sha256": "459eb49d55dfc0ce8e082c8b41c01e7de4c520cb361c2982cba70fc3824e2d19",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/move_predicate_to_register.cpp",
+      "bytes": 1957,
+      "sha256": "934315224849ae9bb6fa0131e99433be2186d7573d6e18c3368a92b51743803e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/move_register.cpp",
+      "bytes": 1182,
+      "sha256": "3094f0116eae008417b49d971487054797a50c1f66a760d085513754022b5f3d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/move_special_register.cpp",
+      "bytes": 5222,
+      "sha256": "17053cc92ecff116f1bda468ef46d21926b00fade584ea4089aba97efcf9b25c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/half_floating_point_add.cpp",
+      "bytes": 4236,
+      "sha256": "7dbb6199fe41e438fbb1d6c912c1189056c69ac518539029e17e9e1193993a32",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_compare_and_set.cpp",
+      "bytes": 2585,
+      "sha256": "a174a322ce0f12ee6d7e5af63484e2b86ea721a837d9b272aa5ecd49dec0729b",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_multi_function.cpp",
+      "bytes": 2111,
+      "sha256": "bbcb868146883ea7ab42df57af57a08e43d32f52f97303dfb5c5b13152baa7e6",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/pixel_load.cpp",
+      "bytes": 1206,
+      "sha256": "f0b0139e4cdaaa3380daa4b1d963084c1495358b3afd6afb321aac32d5341baa",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/attribute_memory_to_physical.cpp",
+      "bytes": 964,
+      "sha256": "a1ebdaf30d1932daf878242a8eda9c3bd93afb322adb7a098fe0074c5a382541",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_query.cpp",
+      "bytes": 2112,
+      "sha256": "a20146ca2df5fdf7738f76c5f2dbe3f317a329f8c31274b1742fd3c8fe7d477b",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/atomic_operations_shared_memory.cpp",
+      "bytes": 3199,
+      "sha256": "d0f737b12f366d41c99b8071b5d4aeec357fc955b486208a3cb207837d884f4d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/impl.h",
+      "bytes": 2782,
+      "sha256": "69d035d524a1aa0d45cc576c5478ef25e2e2a51098ba1539340051b308bc31a8",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/double_min_max.cpp",
+      "bytes": 1626,
+      "sha256": "0fb94a00167ecddfb52c0cce5c8cbb4fbc9d6e80261cb235c42e67c4e6817e23",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/load_store_memory.cpp",
+      "bytes": 5753,
+      "sha256": "664c64e6399d620bf7ebb0083e4f6539fa88c3f455846fd742925ea7416c70cf",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/video_helper.h",
+      "bytes": 632,
+      "sha256": "528c4c4ba82ae97976666e514b7dfdc0d042cff49fec27ea30bb4496600dbfb0",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/load_constant.h",
+      "bytes": 690,
+      "sha256": "b0f86e7bdd5874c27eff8f2f2e895aaef036ddd03b11bbf002c965f97fa779a2",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/output_geometry.cpp",
+      "bytes": 1233,
+      "sha256": "37f0accf45e57be2cc3fa50f25012660d8cbb5ebc9b1d66d0a926fc5e32e630c",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_set_predicate.cpp",
+      "bytes": 2163,
+      "sha256": "865619d0ac0563df38cbe212fe5cedc904d9e86d37d320e6b161e59b471845e7",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_set_predicate.cpp",
+      "bytes": 2225,
+      "sha256": "e7d7b2271651a2f07b348c4242c40402ce1f5bc769716bab2f542af6fc9b5385",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/load_effective_address.cpp",
+      "bytes": 3365,
+      "sha256": "e6547e90ad2092c96bb7ea154e7bffae37b5083fdf8dd72e14944989f28bfc60",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_shift_right.cpp",
+      "bytes": 2022,
+      "sha256": "ea2aff2a99311e0b41c30129c11eb65a6263624d51af3576e8f27c108b869dd7",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/half_floating_point_set_predicate.cpp",
+      "bytes": 4365,
+      "sha256": "440980fb83a8efc7cda40bf5ca72aaed88b406f26a28cd5d15deeba68ec922ff",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/predicate_set_register.cpp",
+      "bytes": 1779,
+      "sha256": "cd676900c9353c8d3a5a3e2908c358ca973e1dda2b2c9be6cc55f5fb77d065a5",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/half_floating_point_multiply.cpp",
+      "bytes": 5185,
+      "sha256": "a97f8a353065025c628a81187dc9a154aad2374a2461e2214c3d36e0ef3ba738",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/common_funcs.h",
+      "bytes": 1262,
+      "sha256": "65cdf08f3d30421484f62c4b7136efd386abcd70c6febb33cc02241dfe36898e",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/find_leading_one.cpp",
+      "bytes": 1347,
+      "sha256": "c16713fc42f1f952b417abc4b7b9671818b7937c3032a7225409fa7ad286520d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/video_helper.cpp",
+      "bytes": 1042,
+      "sha256": "1050ba9fb47de137bbb810ee20e54a384b75006868ce6da854c8acf20a7be23d",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/internal_stage_buffer_entry_read.cpp",
+      "bytes": 3573,
+      "sha256": "fc75b2869ffdcbca64ad2c900bc007967bc63db37ddd6b382b35c9385384b846",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/not_implemented.cpp",
+      "bytes": 6111,
+      "sha256": "73663b82f6ba6f4a4e3d4ea7f3161127e47ec36707f871fc92529b3c7e91cf31",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_popcount.cpp",
+      "bytes": 955,
+      "sha256": "09498c151d5623e0a41136cb4d5db96604b2a46ba223e287f5a7d9453f30e94f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/barrier_operations.cpp",
+      "bytes": 2531,
+      "sha256": "0095bb03cab65cba42e02ecad5e55d1a62a998d4eb9f8bee3e314ae130988ce7",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/common_encoding.h",
+      "bytes": 1380,
+      "sha256": "fbda15a143aca63efc1fa4aa4ca396a08345f93b66b973c840be0897851a0302",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_gather.cpp",
+      "bytes": 7021,
+      "sha256": "e1048c4f4aa51e24c83819f7cb7430cac4233cb489b5dffc39b6728c1fdf3614",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_gradient.cpp",
+      "bytes": 5779,
+      "sha256": "7c805b18a6c6bc4f58e6935d654849b33eb35bf6eb0d6d213490fb2750ea62af",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/logic_operation_three_input.cpp",
+      "bytes": 24308,
+      "sha256": "fdb97ea691af860bb6d3118f343b7436c5825b46da383798d6a8222612a706a2",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_load_swizzled.cpp",
+      "bytes": 7301,
+      "sha256": "139c57e8c2c1cb8726d622aec79a1c9cc45aad59b0e74b2f6c3b1545e5019049",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/bitfield_insert.cpp",
+      "bytes": 2006,
+      "sha256": "8c7812fa7e0882634aacb0a9eca42033a8d0e52d7a3d304eb3b12210a427a415",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_minimum_maximum.cpp",
+      "bytes": 1688,
+      "sha256": "1a3d88110189ce07d43fc8ac1148a7b4d2a4e7d1b07b84d060290a140253155a",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_floating_point_conversion.cpp",
+      "bytes": 5808,
+      "sha256": "8adc32f7068e86817979c1f70a14aec9643a86d933cc8ffa5c5decf0be7e4432",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_to_integer_conversion.cpp",
+      "bytes": 4262,
+      "sha256": "f15a7c567db5db9029dba3666b81304ecdfb8b27ce0792606b819cda0695ff9f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/half_floating_point_helper.cpp",
+      "bytes": 2109,
+      "sha256": "fcaf823612aee13845370e0efda9b7a662cbc6b978b5aaf5825ead56365fe6eb",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/double_compare_and_set.cpp",
+      "bytes": 2349,
+      "sha256": "0589824a019da3663402b029caf3e1c448307bc13d3ce95751e4788cd526dd28",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_compare_and_set.cpp",
+      "bytes": 2610,
+      "sha256": "c4c93bc8f32d3d727f9821ab2dd4e696f150e570cd1fa65d846c1d8ba0d61115",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/move_register_to_predicate.cpp",
+      "bytes": 2383,
+      "sha256": "06d625121215c1628b58579576cd6d306ea1a003460e0d5abdc3a3a7cbc78ce9",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_range_reduction.cpp",
+      "bytes": 993,
+      "sha256": "45167d18272f5ad57cdfd4d15b1e0b284b45d45a7751d9b7cdb3e01b2c009c88",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_shift_left.cpp",
+      "bytes": 2708,
+      "sha256": "0ab3de44400a523dba9817e4fc67eea1f16a91e17562c956ef94c6bb4b453d30",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/texture_mipmap_level.cpp",
+      "bytes": 3973,
+      "sha256": "c55f8e652e529921a08effdcb629d7199ff7ace7c543b25b310e33b47a8abed1",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/integer_scaled_add.cpp",
+      "bytes": 2570,
+      "sha256": "333cdf81ddfc2499426de449908c75c59e9345791d6f9535efc92b8c89ebd636",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/floating_point_swizzled_add.cpp",
+      "bytes": 1383,
+      "sha256": "e13a7dcb1b1644626d2236357671d4b8a10a41cc4d8a85f10cdcf577659acf12",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/select_source_with_predicate.cpp",
+      "bytes": 1136,
+      "sha256": "4f5540a3fd22227f438a18bd1cf08443eafa5ced4c53ee6c1c05fd44f61d6513",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/third_party/suyu/shader_recompiler/frontend/maxwell/translate/impl/video_multiply_add.cpp",
+      "bytes": 2436,
+      "sha256": "57435c68d12c086a1de8c2b100d0de909b6c0f4b1ef00ba7338330d2d6fccf1f",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/shadertool.cpp",
+      "bytes": 9586,
+      "sha256": "16731cb64470cb47b6bc622684e5ecdb99220ee72da0093e161ba99611af4f56",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "gpu/build-shadertool.bat",
+      "bytes": 724,
+      "sha256": "5e489521fae7ad35ffd705dab2949296b2449cef7efc5137c98127f1d3d348b0",
+      "reason": "unused WebGPU renderer / Suyu recompiler; outside the active Vulkan and host include graph"
+    },
+    {
+      "path": "Compilar-AkynoLeyend.cmd",
+      "bytes": 374,
+      "sha256": "03de0ca58fcbfcd30f4e113b16991c97b344daa7019a5c95b48e85cb9997dd2b",
+      "reason": "obsolete duplicate entry point or superseded release instructions"
+    },
+    {
+      "path": "LEIA-ME-CORRECAO-LIFT.txt",
+      "bytes": 872,
+      "sha256": "77414c2c20c8b5c10d293fe71f9262bc4d66b32a71f833059ff34ffaf40ac5e6",
+      "reason": "obsolete duplicate entry point or superseded release instructions"
+    },
+    {
+      "path": "LEIA-PRIMEIRO-VISUAL-041.txt",
+      "bytes": 812,
+      "sha256": "04dc91c2e5ba9084d85fa295a295524f3e3f6e6d381f1ba00e947eb0379ad3e6",
+      "reason": "obsolete duplicate entry point or superseded release instructions"
+    }
+  ]
+}

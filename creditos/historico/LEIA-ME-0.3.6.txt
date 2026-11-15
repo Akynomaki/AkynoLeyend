@@ -1,0 +1,67 @@
+OCARINA BUILDER 0.3.6-dev.1 - INSTALACAO COMPLETA
+
+Este pacote contem a interface, fontes, Python, LLVM-MinGW e dependencias.
+Nao precisa baixar os pacotes antigos nem um ZIP separado de fontes.
+Nao contem jogo, chaves, saves, caches ou executavel recompilado do jogo.
+
+INSTALACAO NOVA
+1. Extraia TODO o ZIP para uma pasta curta, por exemplo C:\OcarinaHookshot.
+2. Abra Verificar.cmd e depois OcarinaBuilder.exe.
+3. Selecione sua copia .nup suportada ou o par exefs/romfs e o destino.
+   A raiz romfs deve conter as pastas System e Pack diretamente.
+4. Clique Criar. Automático usa a RAM disponivel depois da traducao.
+   Nos detalhes aparecem os jobs, a memoria considerada e o arquivo/PID
+   ainda em compilacao a cada 15 segundos. Porcentagem conta arquivos.
+5. Ao terminar, use Jogar. Para comparar o cache limitado, feche o jogo
+   e use Jogar-Streaming.cmd na mesma cena e configuracao.
+
+SE JA TEM UMA INSTALACAO COM WORK/JOGO
+Feche Builder e jogo e guarde uma copia de jogo\user\save. Extraia o ZIP
+separadamente; copie O CONTEUDO da pasta Ocarina-Hookshot-0.3.6 sobre a
+pasta existente que contem manage.py, ferramentas e OcarinaBuilder.exe.
+Mantenha o nome e o caminho existentes. Preserve work e jogo.
+Selecione a mesma entrada, destino e pasta de trabalho; repita Criar.
+Objetos inalterados permanecem elegiveis ao cache. Alteracoes nativas
+precisam ser compiladas; copiar o ZIP sozinho nao altera o EXE do jogo.
+O tradutor/ABI mudou; o cache de programas pode ser reconstruido no inicio.
+Nao ha promessa de compilacao em 40 minutos nem de FPS fixo.
+
+ROMFS E CRASH ANTES DE ABRIR
+Use Auditar-RomFS.cmd para conferir a pasta registrada sem compilar/abrir:
+  Auditar-RomFS.cmd --romfs "E:\SuaPasta\romfs"
+Se faltarem System/Pack, escolha a raiz correta ou confira a extracao.
+A auditoria mostra sondagens de arquivos; nao certifica todos os dados.
+Um alias curto nao recupera arquivos ausentes ou uma pasta errada.
+
+DIAGNOSTICO
+Depois de fechar o jogo, use Coletar-Crash.cmd e envie o ZIP informado.
+Para reproduzir com trace de arquivos, use Jogar-Teste-Crash.cmd.
+Para audio/pausas, use Jogar-Suporte.cmd.
+Destinos diferentes: acrescente --out "D:\SeuJogo" aos CMDs.
+Coletas sem encerramento nem CRASH passam a ser recusadas explicitamente.
+Preserve work\logs\compile.log e work\build-request.json para lentidao.
+
+O QUE MUDOU
+- Integra foliage-linux-updater e movie-sync: folhagem/iluminacao,
+  backoff de memoria, tempo real, rumble e clock/PTS do filme; solicitacao da
+  GPU dedicada em notebooks e correcoes cumulativas do renderizador.
+- Preserva WASAPI/waveOut, caminhos longos e Streaming opcional da base.
+- UTF-8 explicito nos processos Python isolados e no transporte de logs.
+- Jobs automaticos escolhidos apos o lift; log com memoria e espera/PID.
+- Checagem da raiz RomFS e auditoria sem compilar ou alterar recursos.
+- Coleta distingue tentativa sem resultado e crash com status ausente.
+
+LIMITES
+76 testes descobertos: 69 passaram; sete PowerShell nao executados no host.
+356 unidades no conjunto sintetico: EXE host e DLL Vulkan ligados;
+exports de GPU conferidos nesse EXE sem codigo/dados do jogo. Nao houve jogo/GPU/audio fisico testado aqui.
+As mudancas de folhagem/iluminacao da origem foram incorporadas, mas precisam
+de teste real. Bordas, flashes, device lost e crash guest 0 podem persistir. Nao foram mascarados por no-ops.
+A interface WPF e a publicacao anterior; a versao do motor esta em VERSION.
+
+PARA OUTRA IA
+Leia primeiro docs\HANDOFF-OUTRA-IA.md, AGENTS.md, README.md e upstream.json.
+O relatorio inclui o que foi feito, evidencias, testes e proximos passos.
+
+Escopo: Windows. O AppImage Linux e o atualizador automatico do Builder
+original nao foram integrados nesta adaptacao.

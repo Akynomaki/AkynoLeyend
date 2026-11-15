@@ -1,0 +1,1106 @@
+--- /dev/null
++++ b/Compilar-AkynoLeyend.cmd
+@@ -0,0 +1,9 @@
++@echo off
++setlocal
++cd /d "%~dp0"
++echo AkynoLeyend 0.4.2: criando o host desta revisao com sua entrada original.
++echo Use a pasta NOVA deste pacote; o jogo anterior pode continuar na pasta antiga.
++powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0compilar.ps1" %*
++set "akyno_status=%errorlevel%"
++if not "%akyno_status%"=="0" pause
++exit /b %akyno_status%
+--- a/Compilar-Interface-041.cmd
++++ /dev/null
+@@ -1,33 +0,0 @@
+-@echo off
+-chcp 65001 >nul
+-setlocal
+-cd /d "%~dp0"
+-where dotnet >nul 2>nul
+-if errorlevel 1 (
+-  echo Nao encontrei o SDK .NET 8 no Windows.
+-  echo Voce pode compilar o jogo com Compilar-Visual-041.cmd mesmo sem isto.
+-  echo Para atualizar a INTERFACE instale o SDK .NET 8 em https://dotnet.microsoft.com/download/dotnet/8.0
+-  pause
+-  exit /b 1
+-)
+-echo Recompilando a interface WPF para incluir as opcoes atuais dos fontes.
+-dotnet publish "%~dp0builder\AkynoLeyendBuilder\AkynoLeyendBuilder.csproj" -c Release -r win-x64 --self-contained true -o "%~dp0builder\publish-Visual041"
+-if errorlevel 1 (
+- echo Erro de compilacao da interface. O executavel anterior nao foi substituido.
+- pause
+- exit /b 1
+-)
+-if not exist "%~dp0builder\publish-Visual041\AkynoLeyendBuilder.exe" (
+- echo Falta o executavel compilado. A interface anterior foi preservada.
+- pause
+- exit /b 1
+-)
+-copy /Y "%~dp0builder\publish-Visual041\AkynoLeyendBuilder.exe" "%~dp0AkynoLeyendBuilder.exe" >nul
+-if errorlevel 1 (
+- echo Nao foi possivel copiar o EXE. Feche a interface e tente novamente.
+- pause
+- exit /b 1
+-)
+-echo Interface Windows recompilada com sucesso; confira a versao no rodape.
+-pause
+-exit /b 0
+--- a/Compilar-Visual-041.cmd
++++ /dev/null
+@@ -1,16 +0,0 @@
+-@echo off
+-chcp 65001 >nul
+-setlocal
+-cd /d "%~dp0"
+-echo AkynoLeyend 0.4.1 Visual: recompilacao NATIVA de host + renderizador.
+-echo Os arquivos antigos do jogo e os saves NAO serao substituidos.
+-echo.
+-echo Destino NOVO: "%~dp0jogo-Visual041"
+-echo Area de trabalho NOVA: "%~dp0work-Visual041"
+-echo Selecione seu arquivo NUP original na janela que sera aberta.
+-echo.
+-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0compilar.ps1" -RenderizadorDosFontes -Destino "%~dp0jogo-Visual041" -Trabalho "%~dp0work-Visual041" %*
+-set "akyno_exit=%errorlevel%"
+-if not "%akyno_exit%"=="0" echo Falha: consulte a saida acima e nao misture builds.
+-pause
+-exit /b %akyno_exit%
+--- a/Jogar-Comparacao-041.cmd
++++ /dev/null
+@@ -1,10 +0,0 @@
+-@echo off
+-chcp 65001 >nul
+-setlocal
+-cd /d "%~dp0"
+-echo AkynoLeyend Visual 0.4.1: A/B com patch de culling e retencao DESLIGADOS.
+-echo Mantem o MESMO jogo e configuracoes para localizar regressoes.
+-"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --require-current-build --out "%~dp0jogo-Visual041" --visual-mode comparison --profile original --resolution 100 --upscaling lanczos --sharpness 0 --framegen 0 --collect-crash %*
+-set "akyno_exit=%errorlevel%"
+-if not "%akyno_exit%"=="0" pause
+-exit /b %akyno_exit%
+--- /dev/null
++++ b/Jogar-Comparacao.cmd
+@@ -0,0 +1,7 @@
++@echo off
++setlocal
++echo AkynoLeyend 0.4.2: visual comparison, escala 100%%, nitidez 0, sem quadros gerados.
++"%~dp0ferramentas\python\python.exe" -I -X utf8 "%~dp0manage.py" run --require-current-build --visual-mode comparison --profile original --resolution 100 --upscaling lanczos --sharpness 0 --framegen 0 --collect-crash %*
++set "akyno_status=%errorlevel%"
++if not "%akyno_status%"=="0" pause
++exit /b %akyno_status%
+--- /dev/null
++++ b/Jogar-Escala-125.cmd
+@@ -0,0 +1,8 @@
++@echo off
++setlocal
++rem Escala interna experimental. Nao equivale ao mod Max Resolution do emulador.
++echo AkynoLeyend: escala 125%% experimental. Exige o host 0.4.2 recompilado.
++"%~dp0ferramentas\python\python.exe" -I -X utf8 "%~dp0manage.py" run --require-current-build --resolution 125 --upscaling lanczos --framegen 0 %*
++set "akyno_status=%errorlevel%"
++if not "%akyno_status%"=="0" pause
++exit /b %akyno_status%
+--- /dev/null
++++ b/Jogar-Escala-150.cmd
+@@ -0,0 +1,8 @@
++@echo off
++setlocal
++rem Escala interna experimental. Nao equivale ao mod Max Resolution do emulador.
++echo AkynoLeyend: escala 150%% experimental. Exige o host 0.4.2 recompilado.
++"%~dp0ferramentas\python\python.exe" -I -X utf8 "%~dp0manage.py" run --require-current-build --resolution 150 --upscaling lanczos --framegen 0 %*
++set "akyno_status=%errorlevel%"
++if not "%akyno_status%"=="0" pause
++exit /b %akyno_status%
+--- a/Jogar-MaxResolucao-125.cmd
++++ /dev/null
+@@ -1,11 +0,0 @@
+-@echo off
+-rem Escala interna experimental via host nativo; NAO e o patch IPS do emulador.
+-rem Para jogar com instalacao antiga preservada:
+-rem   Jogar-MaxResolucao-125.cmd --out "C:\caminho\instalacao-antiga\jogo"
+-echo AkynoLeyend: solicitando escala interna fixa de 125%%.
+-echo O menu Insert pode indicar 100%%: a confirmacao do host recompilado aparece em saida.log.
+-echo Este recurso nao e o mod Max Resolution do emulador e nao garante 4K.
+-"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --resolution 125 --upscaling lanczos --framegen 0 %*
+-set "akyno_exit=%errorlevel%"
+-if not "%akyno_exit%"=="0" pause
+-exit /b %akyno_exit%
+--- a/Jogar-MaxResolucao-150.cmd
++++ /dev/null
+@@ -1,11 +0,0 @@
+-@echo off
+-rem Escala interna experimental via host nativo; NAO e o patch IPS do emulador.
+-rem Para jogar com instalacao antiga preservada:
+-rem   Jogar-MaxResolucao-150.cmd --out "C:\caminho\instalacao-antiga\jogo"
+-echo AkynoLeyend: solicitando escala interna fixa de 150%%.
+-echo O menu Insert pode indicar 100%%: a confirmacao do host recompilado aparece em saida.log.
+-echo Este recurso nao e o mod Max Resolution do emulador e nao garante 4K.
+-"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --resolution 150 --upscaling lanczos --framegen 0 %*
+-set "akyno_exit=%errorlevel%"
+-if not "%akyno_exit%"=="0" pause
+-exit /b %akyno_exit%
+--- a/Jogar-Visual-041.cmd
++++ /dev/null
+@@ -1,10 +0,0 @@
+-@echo off
+-chcp 65001 >nul
+-setlocal
+-cd /d "%~dp0"
+-echo AkynoLeyend Visual 0.4.1: teste controlado, 100%%, nitidez 0, sem frame generation.
+-echo Pressione Ctrl+C se informar que o EXE ainda e de 0.4.0.
+-"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run --require-current-build --out "%~dp0jogo-Visual041" --visual-mode patched --profile original --resolution 100 --upscaling lanczos --sharpness 0 --framegen 0 --collect-crash %*
+-set "akyno_exit=%errorlevel%"
+-if not "%akyno_exit%"=="0" pause
+-exit /b %akyno_exit%
+--- /dev/null
++++ b/Jogar-Visual.cmd
+@@ -0,0 +1,7 @@
++@echo off
++setlocal
++echo AkynoLeyend 0.4.2: visual patched, escala 100%%, nitidez 0, sem quadros gerados.
++"%~dp0ferramentas\python\python.exe" -I -X utf8 "%~dp0manage.py" run --require-current-build --visual-mode patched --profile original --resolution 100 --upscaling lanczos --sharpness 0 --framegen 0 --collect-crash %*
++set "akyno_status=%errorlevel%"
++if not "%akyno_status%"=="0" pause
++exit /b %akyno_status%
+--- a/Jogar.cmd
++++ b/Jogar.cmd
+@@ -1,5 +1,6 @@
+ @echo off
+-"%~dp0ferramentas\python\python.exe" -I "%~dp0manage.py" run %*
+-set "ocarina_exit=%errorlevel%"
+-if not "%ocarina_exit%"=="0" pause
+-exit /b %ocarina_exit%
++setlocal
++"%~dp0ferramentas\python\python.exe" -I -X utf8 "%~dp0manage.py" run --require-current-build %*
++set "akyno_status=%errorlevel%"
++if not "%akyno_status%"=="0" pause
++exit /b %akyno_status%
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.4.1-visual-rc1
++0.4.2-rc.1
+--- a/akynoleyend/__init__.py
++++ b/akynoleyend/__init__.py
+@@ -1 +1 @@
+-__version__ = "0.4.1-visual-rc1"
++__version__ = "0.4.2-rc.1"
+--- a/akynoleyend/build.py
++++ b/akynoleyend/build.py
+@@ -10,10 +10,12 @@
+ from pathlib import Path
+ 
+ from . import __version__
++from .coherence import HOST_REVISION
+ from .config import MANIFEST, ROOT, BuildRequest, compile_jobs, available_memory
+ from .errors import ProjectError
+ from .files import read_json, sha256, write_json, workspace_lock, workspace_stage
+ from .preflight import require_tools
++from .prebuilt import renderer_identity
+ from .process import run
+ from .game import verify_version, verify_nup
+ from .hot import configure_hot, has_fresh_hot_source
+@@ -210,6 +212,7 @@
+             "schema": 1,
+             "project": "AkynoLeyend",
+             "version": __version__,
++            "host_revision": HOST_REVISION,
+             "source_sha256": source_identity(),
+             "game_build_id": identity,
+             "files": hashes,
+@@ -218,6 +221,8 @@
+             "language": request.language,
+             "seconds": round(time.monotonic() - started, 2),
+             "renderer": "vulkan",
++            "renderer_version": __version__,
++            "renderer_source_sha256": renderer_identity(ROOT, request.tools / "deps"),
+             "toolchain": "llvm-mingw",
+         }
+         # Published last. A mixed or interrupted update cannot pass the launcher's hash check.
+--- a/akynoleyend/cli.py
++++ b/akynoleyend/cli.py
+@@ -17,7 +17,7 @@
+ from .access import FileAccessError, save_access_report
+ from .shader_prepare import prepare_shaders, update_renderer
+ from .graphics import RESOLUTIONS, SPEEDS, FILTERS, graphics_environment
+-from .legacy import migrate_build, organize_project
++from .legacy import organize_project
+ 
+ 
+ def absolute(value: str) -> Path:
+@@ -75,11 +75,20 @@
+         default="original",
+         help="Streaming/Equilibrado: leitura e pre-aquecimento limitados.",
+     )
+-    player.add_argument("--require-current-build", action="store_true",
+-                        help="Recusa EXE/DLL de versao anterior ou de outra revisao dos fontes.")
+-    player.add_argument("--visual-mode", choices=tuple(VISUAL_MODES), default="patched",
+-                        help="Correcoes visuais ou comparacao com correcoes desativadas.")
+-    player.add_argument("--texture-mode",
++    player.add_argument(
++        "--require-current-build",
++        action="store_true",
++        default=True,
++        help="Recusa EXE/DLL de versao anterior ou de outra revisao dos fontes.",
++    )
++    player.add_argument(
++        "--visual-mode",
++        choices=tuple(VISUAL_MODES),
++        default="patched",
++        help="Correcoes visuais ou comparacao com correcoes desativadas.",
++    )
++    player.add_argument(
++        "--texture-mode",
+         choices=tuple(TEXTURE_MODES),
+         default="auto",
+         help="Comparacao ASTC: auto preserva BC3 elegivel; rgba8 ou cpu-rgba8 dispensam BC3.",
+@@ -89,8 +98,12 @@
+     player.add_argument("--speed", choices=tuple(SPEEDS))
+     player.add_argument("--upscaling", choices=tuple(FILTERS))
+     player.add_argument("--sharpness", type=int)
+-    player.add_argument("--shader-workers", type=int, choices=range(1, 9),
+-                        help="Threads de compilacao Vulkan, de 1 a 8 (experimental).")
++    player.add_argument(
++        "--shader-workers",
++        type=int,
++        choices=range(1, 9),
++        help="Threads de compilacao Vulkan, de 1 a 8 (experimental).",
++    )
+     player.add_argument("--framegen", type=int, choices=(0, 2, 3, 4, 5, 6, 7, 8))
+     player.add_argument("--pacing", choices=("on", "off"))
+     player.add_argument(
+@@ -155,8 +168,12 @@
+     prepare.add_argument("--out", type=absolute, default=ROOT / "jogo")
+     prepare.add_argument("--work", type=absolute, default=ROOT / "work")
+     prepare.add_argument("--texture-mode", choices=tuple(TEXTURE_MODES), default="auto")
+-    prepare.add_argument("--shader-workers", type=int, choices=range(1, 9),
+-                         help="Threads no pre-aquecimento Vulkan (1-8).")
++    prepare.add_argument(
++        "--shader-workers",
++        type=int,
++        choices=range(1, 9),
++        help="Threads no pre-aquecimento Vulkan (1-8).",
++    )
+     prepare.add_argument(
+         "--force", action="store_true", help="Refaz o banco sem apagar o cache do driver."
+     )
+@@ -199,13 +216,10 @@
+             )
+             return int(not good)
+         if args.command == "update-renderer":
+-            migrate_build(args.out)
+             update_renderer(args.out, args.work)
+             organize_project(ROOT)
+             return 0
+         if args.command == "prepare-shaders":
+-            if migrate_build(args.out):
+-                update_renderer(args.out, args.work)
+             return prepare_shaders(
+                 args.out,
+                 args.work,
+@@ -253,8 +267,6 @@
+             framegen=args.framegen,
+             pacing=None if args.pacing is None else args.pacing == "on",
+         )
+-        if migrate_build(args.out):
+-            update_renderer(args.out, args.work)
+         return launch(
+             args.out,
+             args.profile,
+--- /dev/null
++++ b/akynoleyend/coherence.py
+@@ -0,0 +1,15 @@
++"""Runtime revision needed by the filesystem ABI and early texel replay fixes."""
++
++from . import __version__
++from .errors import ProjectError
++
++HOST_REVISION = "directory304-early-texels-v1"
++
++
++def require_host(manifest):
++    if manifest.get("version") != __version__ or manifest.get("host_revision") != HOST_REVISION:
++        raise ProjectError(
++            "Este build nao corresponde ao host/ABI desta revisao. Use Criar ou "
++            "Compilar-AkynoLeyend.cmd com sua entrada original e aguarde @@done. "
++            "Trocar apenas a DLL nao aplica a correcao de diretorios/texturas iniciais."
++        )
+--- a/akynoleyend/graphics.py
++++ b/akynoleyend/graphics.py
+@@ -4,10 +4,9 @@
+ 
+ from .errors import ProjectError
+ 
+-# 125/150 reuse the native fixed-resolution path with an override scale.
+-# The in-game menu supports only Auto, 100, 75, 67 and 50; 125/150 appear
+-# as 100 there, but the native host can use HOS_RES_SCALE instead.
+-RESOLUTIONS = {"auto": 0, "100": 1, "75": 2, "67": 3, "50": 4, "125": 1, "150": 1}
++# Menu indices match the rebuilt native runtime. The host applies 125/150
++# through HOS_RES_SCALE; the menu identifies them as experimental scales.
++RESOLUTIONS = {"auto": 0, "100": 1, "75": 2, "67": 3, "50": 4, "125": 5, "150": 6}
+ EXPERIMENTAL_SCALES = {"125": "1.25", "150": "1.5"}
+ 
+ 
+@@ -23,8 +22,9 @@
+         while block := source.read(1024 * 1024):
+             if needle in overlap + block:
+                 return True
+-            overlap = block[-(len(needle) - 1):]
++            overlap = block[-(len(needle) - 1) :]
+     return False
++
+ 
+ SPEEDS = {"realtime": "1", "per-frame": "0"}
+ FILTERS = {"off": "0", "catmull-rom": "1", "lanczos": "2"}
+@@ -57,7 +57,7 @@
+     if resolution is not None:
+         result["HOS_DYNRES"] = "1" if resolution == "auto" else "0"
+         # Experimental fixed scale, not the emulator's ARM64 Max Resolution patch.
+-        # Menu still displays 100%; actual host selection must be checked in log.
++        # Actual host selection must also be checked in the execution log.
+         if resolution in EXPERIMENTAL_SCALES:
+             result["HOS_RES_SCALE"] = EXPERIMENTAL_SCALES[resolution]
+     if sharpness is not None:
+--- a/akynoleyend/launch.py
++++ b/akynoleyend/launch.py
+@@ -7,6 +7,7 @@
+ from pathlib import Path
+ 
+ from . import __version__
++from .coherence import require_host
+ from .config import MANIFEST, ROOT
+ from .crash_report import collect_run
+ from .windows_paths import short_romfs
+@@ -132,10 +133,11 @@
+         from .build import source_identity
+         if manifest.get("version") != __version__ or manifest.get("source_sha256") != source_identity():
+             raise ProjectError(
+-                "Este EXE/DLL nao corresponde aos fontes 0.4.1 Visual atuais. "
+-                "Execute Compilar-Visual-041.cmd em uma pasta NOVA, aguarde @@done "
++                "Este EXE/DLL nao corresponde aos fontes atuais. "
++                "Execute Compilar-AkynoLeyend.cmd em uma pasta NOVA, aguarde @@done "
+                 "e so entao teste o jogo. O build anterior nao foi alterado."
+             )
++        require_host(manifest)
+     if resolution in EXPERIMENTAL_SCALES:
+         # Do not silently claim 125/150 on an EXE that cannot even read the
+         # fixed-scale variable. This check is deliberately conservative.
+@@ -185,7 +187,7 @@
+     if resolution in EXPERIMENTAL_SCALES:
+         print(
+             f"Escala interna solicitada: {resolution}% (HOS_RES_SCALE={EXPERIMENTAL_SCALES[resolution]}; "
+-            "menu Insert pode mostrar 100%). O marcador nativo foi localizado no EXE, "
++            "menu Insert identifica a escala experimental). O marcador nativo foi localizado no EXE, "
+             "mas esta verificacao NAO mede pixels nem garante que o patch Max Resolution "
+             "de outro emulador esteja presente. Procure 'vi: fixed scale active' no saida.log "
+             "apos os primeiros quadros; se ausente, recompile o host.",
+--- /dev/null
++++ b/akynoleyend/release.py
+@@ -0,0 +1,61 @@
++"""Reject Windows packages whose launcher or renderer differs from their sources."""
++
++import hashlib
++from pathlib import Path
++
++from . import __version__
++from .errors import ProjectError
++from .files import read_json, sha256
++from .prebuilt import renderer_prebuilt
++
++
++def launcher_identity(root: Path) -> str:
++    folder = root / "builder/AkynoLeyendBuilder"
++    digest = hashlib.sha256()
++    for path in sorted(folder.rglob("*")):
++        if not path.is_file() or {"bin", "obj"}.intersection(path.relative_to(folder).parts):
++            continue
++        if path.suffix not in {".cs", ".xaml", ".csproj", ".manifest"}:
++            continue
++        digest.update(path.relative_to(folder).as_posix().encode() + b"\0")
++        digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
++    for name in ("AkynoLeyend.ico", "AkynoLeyend.png"):
++        path = root / "assets" / name
++        digest.update(name.encode() + b"\0" + path.read_bytes())
++    return digest.hexdigest()
++
++
++def verify_launcher(root: Path):
++    receipt = read_json(root / "builder/launcher-build.json")
++    binary = root / "AkynoLeyendBuilder.exe"
++    if (
++        receipt.get("schema") != 1
++        or receipt.get("version") != __version__
++        or receipt.get("source_sha256") != launcher_identity(root)
++        or receipt.get("binary_sha256") != sha256(binary)
++        or receipt.get("pe_product_version") != __version__
++    ):
++        raise ProjectError(
++            "O launcher nao corresponde a esta revisao. Republique a interface antes de empacotar."
++        )
++    with binary.open("rb") as stream:
++        if stream.read(2) != b"MZ":
++            raise ProjectError("Launcher sem cabecalho Windows PE.")
++
++
++def verify_windows_release(root: Path):
++    verify_launcher(root)
++    ready = renderer_prebuilt(
++        root,
++        root / "ferramentas/deps",
++        root / "ferramentas/prebuilt",
++        {"OCARINA_TARGET": "windows-gnu", "RX_RELEASE": "1"},
++        lambda _: None,
++    )
++    if ready is None:
++        raise ProjectError(
++            "A DLL da distribuicao nao corresponde aos fontes, dependencias e configuracao."
++        )
++    metadata = read_json(ready.parent / "renderer.json")
++    if metadata.get("release") != __version__:
++        raise ProjectError("A DLL generica pertence a outra revisao.")
+--- a/akynoleyend/shader_prepare.py
++++ b/akynoleyend/shader_prepare.py
+@@ -9,6 +9,7 @@
+ import sys
+ 
+ from . import __version__
++from .coherence import require_host
+ from .access import FileAccessError
+ from .config import MANIFEST, ROOT, SUPPORTED_BUILD
+ from .environment import clean_environment
+@@ -18,16 +19,6 @@
+ from .prebuilt import renderer_prebuilt
+ from .process import run
+ 
+-ABI_COMPATIBLE = {
+-    "0.3.6-dev.1",
+-    "0.3.7-dev.1",
+-    "0.3.8-dev.1",
+-    "0.3.8-dev.2",
+-    "0.3.9-dev.1",
+-    "0.4.0-dev.1",
+-}
+-
+-
+ def copy_chunks(source: Path, target: Path) -> None:
+     with source.open("rb") as input_file, target.open("wb") as output:
+         while block := input_file.read(64 << 10):
+@@ -35,19 +26,17 @@
+ 
+ 
+ def update_renderer(folder: Path, work: Path, *, report=print) -> dict:
+-    """No lifted C rebuild; vk_api.h ABI is unchanged from the listed releases."""
++    """Refresh only the DLL of a host already built from this runtime revision."""
+     with workspace_lock(work):
+         manifest = checked_build(folder)
+         return _update_renderer(folder, manifest, report)
+ 
+ 
+ def _update_renderer(folder: Path, manifest: dict, report) -> dict:
+-    if manifest.get("version") not in ABI_COMPATIBLE or not str(
+-        manifest.get("game_build_id", "")
+-    ).startswith(SUPPORTED_BUILD):
++    require_host(manifest)
++    if not str(manifest.get("game_build_id", "")).startswith(SUPPORTED_BUILD):
+         raise ProjectError(
+-            "Atualizacao isolada de DLL aceita somente builds locais 0.3.6/0.3.7/0.3.8/0.3.9 "
+-            "com ABI conferida. Para outra base, use Criar."
++            "Build ID sem ABI conferida para esta atualizacao. Use Criar com a entrada suportada."
+         )
+     source = renderer_prebuilt(
+         ROOT,
+@@ -208,9 +197,12 @@
+         # Banco idêntico: nao grave gigabytes desnecessarios em cada preparacao.
+         # Confere o hash REAL do arquivo publicado (e tamanho) antes de reutilizar.
+         dest = folder / bank.name
+-        if (dest.is_file() and not dest.is_symlink() and
+-                dest.stat().st_size == bank.stat().st_size and
+-                sha256(dest) == known_digest):
++        if (
++            dest.is_file()
++            and not dest.is_symlink()
++            and dest.stat().st_size == bank.stat().st_size
++            and sha256(dest) == known_digest
++        ):
+             report("Banco de shaders ja instalado e conferido; copia dispensada.")
+         else:
+             with workspace_stage(prefix=".shader-publish-", dir=folder) as directory:
+--- a/builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj
++++ b/builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj
+@@ -9,7 +9,7 @@
+     <ImplicitUsings>enable</ImplicitUsings>
+     <AssemblyName>AkynoLeyendBuilder</AssemblyName>
+     <RootNamespace>AkynoLeyendBuilder</RootNamespace>
+-    <Version>0.4.1-visual-rc1</Version>
++    <Version>0.4.2-rc.1</Version>
+     <Product>AkynoLeyend</Product>
+     <ApplicationIcon>../../assets/AkynoLeyend.ico</ApplicationIcon>
+     <ApplicationManifest>app.manifest</ApplicationManifest>
+--- a/builder/AkynoLeyendBuilder/MainWindow.xaml
++++ b/builder/AkynoLeyendBuilder/MainWindow.xaml
+@@ -182,7 +182,7 @@
+         </StackPanel>
+         <StackPanel Grid.Row="2">
+           <Border Height="1" Background="{StaticResource Line}" Margin="0,0,0,16" />
+-          <TextBlock Text="0.4.1 · VISUAL (CANDIDATO)" FontSize="10" Foreground="{StaticResource InkFaint}" />
++          <TextBlock Text="0.4.2 · CANDIDATO" FontSize="10" Foreground="{StaticResource InkFaint}" />
+           <TextBlock Text="Construído para explorar." Style="{StaticResource Note}" FontSize="11" Margin="0,8,0,0" />
+         </StackPanel>
+       </Grid>
+--- a/builder/AkynoLeyendBuilder/MainWindow.xaml.cs
++++ b/builder/AkynoLeyendBuilder/MainWindow.xaml.cs
+@@ -346,7 +346,7 @@
+         BuildNote.Foreground = (Brush)FindResource("InkSoft");
+         ShowPage(building: true);
+         SetButtons(cancel: true);
+-        var args=new List<string>{"--out",finished,"--profile",ProfileBox.SelectedIndex switch{1=>"8gb",2=>"nitido",3=>"compatibilidade",_=>"original"}};
++        var args=new List<string>{"--require-current-build","--out",finished,"--profile",ProfileBox.SelectedIndex switch{1=>"8gb",2=>"nitido",3=>"compatibilidade",_=>"original"}};
+         try{args.AddRange(CaptureGraphics().Arguments());}
+         catch(Exception error){playing=false;BuildNote.Text=error.Message;SetButtons(back:true);return;}
+         runner=new Runner(tools,"run",args);
+--- a/builder/RunnerChecks/Program.cs
++++ b/builder/RunnerChecks/Program.cs
+@@ -38,6 +38,23 @@
+         try { LauncherSettings.Load(path); }
+         catch (System.Text.Json.JsonException) { refused = true; }
+         Require(refused, "Corrupt settings were accepted.");
++        File.Delete(path);
++        return Task.CompletedTask;
++    });
++    await Check("experimental scales and balanced cache persist and reach the CLI", () =>
++    {
++        var path = Path.Combine(folder, "experimental.json");
++        foreach (var scale in new[] { "125", "150" })
++        {
++            var graphics = new GraphicsSettings { Resolution = scale, Cache = "equilibrado" };
++            var saved = new LauncherSettings { Graphics = graphics };
++            saved.Save(path);
++            var restored = LauncherSettings.Load(path);
++            Require(restored == saved, "Experimental settings did not roundtrip.");
++            Require(restored!.Graphics.Arguments().SequenceEqual(new[] {
++                "--backend", "vulkan", "--resolution", scale, "--cache-mode", "equilibrado"
++            }), "Experimental settings did not reach the CLI.");
++        }
+         File.Delete(path);
+         return Task.CompletedTask;
+     });
+--- a/gpu/vk/cache_rate.h
++++ b/gpu/vk/cache_rate.h
+@@ -3,6 +3,7 @@
+ #include <algorithm>
+ #include <chrono>
+ #include <thread>
++#include <mutex>
+ namespace mkwvk::cache {
+ class TokenBucket {
+ public: using Clock = std::chrono::steady_clock;
+@@ -24,4 +25,12 @@
+         while (!try_take(Clock::now())) std::this_thread::sleep_for(std::chrono::duration<double>((1.0-tokens)/rate));
+     }
+ };
++class SharedTokenBucket {
++    std::mutex mutex;
++    TokenBucket bucket;
++public:
++    explicit SharedTokenBucket(double rate,TokenBucket::Clock::time_point now=TokenBucket::Clock::now()) : bucket(rate,now) {}
++    bool try_take(TokenBucket::Clock::time_point now) {std::lock_guard lock(mutex);return bucket.try_take(now);}
++    void take() {std::lock_guard lock(mutex);bucket.take();}
++};
+ }
+--- a/gpu/vk/cache_stream.h
++++ b/gpu/vk/cache_stream.h
+@@ -1,7 +1,8 @@
+ // A single background reader with byte reservations shared by queued,
+-// in-flight and ready payloads. Metadata and demand/driver allocations differ.
++// in-flight, ready and consumer-owned payloads. Metadata and demand/driver allocations differ.
+ #pragma once
+ #include <algorithm>
++#include <atomic>
+ #include <chrono>
+ #include <condition_variable>
+ #include <cstdint>
+@@ -18,6 +19,37 @@
+ struct Range { uint64_t offset; size_t size; };
+ class Stream {
+ public:
++    // Move-only payload: its bytes remain charged until decoding releases them.
++    class Payload {
++        friend class Stream;
++        std::shared_ptr<std::atomic<size_t>> consumed;
++        std::vector<uint8_t> bytes;
++        size_t charged=0;
++        Payload(std::vector<uint8_t>&& input,std::shared_ptr<std::atomic<size_t>> owner)
++            : consumed(std::move(owner)),bytes(std::move(input)),charged(bytes.size()) {
++            consumed->fetch_add(charged,std::memory_order_relaxed);
++        }
++        void release() {
++            std::vector<uint8_t>().swap(bytes); // Free allocation before releasing its budget.
++            if (consumed) consumed->fetch_sub(charged,std::memory_order_relaxed);
++            consumed.reset();charged=0;
++        }
++    public:
++        Payload()=default;
++        Payload(const Payload&)=delete;
++        Payload& operator=(const Payload&)=delete;
++        Payload(Payload&& other) noexcept
++            : consumed(std::move(other.consumed)),bytes(std::move(other.bytes)),charged(std::exchange(other.charged,0)) {}
++        Payload& operator=(Payload&& other) noexcept {
++            if (this!=&other) {release();consumed=std::move(other.consumed);bytes=std::move(other.bytes);charged=std::exchange(other.charged,0);}
++            return *this;
++        }
++        ~Payload(){release();}
++        bool empty() const {return bytes.empty();}
++        size_t size() const {return bytes.size();}
++        const uint8_t* data() const {return bytes.data();}
++        const uint8_t& operator[](size_t n) const {return bytes[n];}
++    };
+     using Read = std::function<bool(Range,uint8_t*)>;
+     struct Stats { size_t reserved=0, peak=0, pending=0, ready=0; uint64_t hits=0, misses=0, reads=0, dropped=0; };
+ private:
+@@ -31,6 +63,7 @@
+     std::unordered_map<uint64_t,std::shared_ptr<Entry>> entries;
+     std::list<uint64_t> lru;
+     Stats counters;
++    std::shared_ptr<std::atomic<size_t>> consumed=std::make_shared<std::atomic<size_t>>(0);
+     bool stopping=false;
+     std::thread worker;
+     bool evict() {
+@@ -61,8 +94,10 @@
+                     entry->bytes=std::move(data); entry->ready=true;
+                     lru.push_front(entry->range.offset); entry->lru=lru.begin(); ++counters.reads;
+                 } else {
++                    std::vector<uint8_t>().swap(data);
+                     counters.reserved-=entry->range.size; entries.erase(entry->range.offset); ++counters.dropped;
+                 }
++                entry.reset();
+                 changed.notify_all();
+             }
+         }
+@@ -84,22 +119,22 @@
+         if (stopping || !range.size || range.size>budget) {++counters.dropped;return false;}
+         if (auto it=entries.find(range.offset);it!=entries.end()) return it->second->range.size==range.size;
+         if (counters.pending>=queue_limit || !entry_limit) {++counters.dropped;return false;}
+-        while (range.size>budget-counters.reserved || entries.size()>=entry_limit)
++        while (range.size>budget-std::min(budget,counters.reserved+consumed->load(std::memory_order_relaxed)) || entries.size()>=entry_limit)
+             if (!evict()) {++counters.dropped;return false;}
+         auto e=std::make_shared<Entry>(); e->range=range;
+         entries.emplace(range.offset,e); queue.push_back(e);
+-        counters.reserved+=range.size; counters.peak=std::max(counters.peak,counters.reserved); ++counters.pending;
++        counters.reserved+=range.size; counters.peak=std::max(counters.peak,counters.reserved+consumed->load(std::memory_order_relaxed)); ++counters.pending;
+         changed.notify_all(); return true;
+     }
+-    std::vector<uint8_t> take(Range range) {
++    Payload take(Range range) {
+         std::lock_guard lock(mu);
+         auto it=entries.find(range.offset);
+         if (it==entries.end() || !it->second->ready || it->second->range.size!=range.size) {++counters.misses;return {};}
+-        auto data=std::move(it->second->bytes);
++        Payload data(std::move(it->second->bytes),consumed);
+         counters.reserved-=it->second->range.size; lru.erase(it->second->lru); entries.erase(it); ++counters.hits;
+         return data;
+     }
+-    Stats stats() const {std::lock_guard lock(mu);auto s=counters;s.ready=lru.size();return s;}
++    Stats stats() const {std::lock_guard lock(mu);auto s=counters;s.ready=lru.size();s.reserved+=consumed->load(std::memory_order_relaxed);return s;}
+     bool wait_idle(std::chrono::milliseconds timeout) {std::unique_lock lock(mu);return changed.wait_for(lock,timeout,[&]{return !counters.pending || stopping;});}
+ };
+ }
+--- a/gpu/vk/vk_draw.cpp
++++ b/gpu/vk/vk_draw.cpp
+@@ -4826,9 +4826,9 @@
+     });
+     const size_t total = notes.size() + computes.size();
+     std::atomic<size_t> next{0}, done{0}, graphics_made{0}, compute_made{0};
++    cache::SharedTokenBucket admission((double)cache::policy().warm_per_second);
+     const auto worker = [&] {
+         SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);
+-        cache::TokenBucket admission((double)cache::policy().warm_per_second);
+         for (;;) {
+             const size_t i = next++;
+             if (i >= total) return;
+--- a/gpu/vk/vk_menu.cpp
++++ b/gpu/vk/vk_menu.cpp
+@@ -40,7 +40,7 @@
+     return b;
+ }
+ const char* tx_resolution(int v) {
+-    static const char* t[] = {"Auto", "100%", "75%", "67%", "50%"};
++    static const char* t[] = {"Auto", "100%", "75%", "67%", "50%", "125% (exp.)", "150% (exp.)"};
+     return t[v];
+ }
+ const char* tx_speed(int v) { return v ? "Real time" : "Per frame"; }
+@@ -55,7 +55,7 @@
+      "can show artifacts."},
+     {"Frame pacing", &opts.pace, 0, 1, 1, tx_onoff,
+      "Shows each frame at an even interval instead of as soon as it is ready. Less stutter, at up to one frame of delay."},
+-    {"Resolution", &opts.resolution, 0, 4, 1, tx_resolution,
++    {"Resolution", &opts.resolution, 0, 6, 1, tx_resolution,
+      "How sharp the 3D is drawn. Auto lets the game lower it when the GPU is busy. A fixed percentage stays steady: lower is "
+      "faster."},
+     {"Upscaling", &opts.upscale, 0, 2, 1, tx_upscale,
+@@ -352,7 +352,7 @@
+     if (const char* e = getenv("RX_VK_UPSCALE")) opts.upscale = atoi(e);
+     if (const char* e = getenv("HOS_REALTIME_STEP")) opts.realtime = atoi(e) != 0;
+     if (const char* e = getenv("HOS_DYNRES")) opts.resolution = atoi(e) != 0 ? 0 : 1;
+-    if (const char* e = getenv("AKYNO_RESOLUTION")) opts.resolution = std::clamp(atoi(e), 0, 4);
++    if (const char* e = getenv("AKYNO_RESOLUTION")) opts.resolution = std::clamp(atoi(e), 0, 6);
+     if (const char* e = getenv("AKYNO_FRAMEGEN")) { opts.framegen = std::clamp(atoi(e), 0, 8); if (opts.framegen == 1) opts.framegen = 0; }
+     if (const char* e = getenv("AKYNO_SHARPNESS")) opts.sharpness = std::clamp(atoi(e), 0, 100);
+ }
+--- a/gpu/vk/vk_replay.cpp
++++ b/gpu/vk/vk_replay.cpp
+@@ -3008,7 +3008,7 @@
+     t.nvn_present = present;
+     t.nvn_register_texture = register_texture_queued;
+     t.nvn_event_signal = event_signal_queued;
+-    t.option = [](int id) -> int { return id == 0 ? opts.realtime : id == 1 ? menu_is_open() : id == 2 ? opts.resolution == 0 : id == 3 ? (opts.resolution == 1 ? 100 : opts.resolution == 2 ? 75 : opts.resolution == 3 ? 67 : opts.resolution == 4 ? 50 : 0) : 0; };
++    t.option = [](int id) -> int { return id == 0 ? opts.realtime : id == 1 ? menu_is_open() : id == 2 ? opts.resolution == 0 : id == 3 ? (opts.resolution == 1 ? 100 : opts.resolution == 2 ? 75 : opts.resolution == 3 ? 67 : opts.resolution == 4 ? 50 : opts.resolution == 5 ? 125 : opts.resolution == 6 ? 150 : 0) : 0; };
+     t.nvn_register_sampler = register_sampler_queued;
+     t.nvn_set_texture_pool_size = set_texture_pool_size;
+     t.nvn_texture_released = texture_released_of;
+--- a/gpu/vk/vk_shader.cpp
++++ b/gpu/vk/vk_shader.cpp
+@@ -999,14 +999,16 @@
+         disk_records.erase(it);
+     }
+     for (const DiskRecord& d : recs) {
+-        std::vector<uint8_t> data=disk_stream ? disk_stream->take({(uint64_t)d.at,d.size}) : std::vector<uint8_t>{};
+-        if (data.empty()) {
+-            data.resize(d.size);
++        cache::Stream::Payload prefetched;
++        if (disk_stream) prefetched=disk_stream->take({(uint64_t)d.at,d.size});
++        std::vector<uint8_t> demand;
++        if (prefetched.empty()) {
++            demand.resize(d.size);
+             std::lock_guard lk(disk_mu);
+-            if (_fseeki64(disk_in,d.at,SEEK_SET) || !cache::read_chunks(disk_in,data.data(),d.size)) continue;
++            if (_fseeki64(disk_in,d.at,SEEK_SET) || !cache::read_chunks(disk_in,demand.data(),d.size)) continue;
+         }
+         if (read_ahead) prefetch_after(d);
+-        Reader r{data.data(),data.size()};
++        Reader r{prefetched.empty()?demand.data():prefetched.data(),d.size};
+         auto p = std::make_unique<Program>();
+         try {
+         p->key = key;
+--- a/tests/native/test_cache_stream.cpp
++++ b/tests/native/test_cache_stream.cpp
+@@ -34,7 +34,8 @@
+         CHECK(reads==3 && s.take({0,40}).empty());
+         auto a=s.take({40,40}),b=s.take({80,40});CHECK(a.size()==40 && b.size()==40);
+         for (unsigned i=0;i<40;++i) CHECK(a[i]==i+40 && b[i]==i+80);
+-        CHECK(!s.request({1,81}));auto stats=s.stats();CHECK(stats.hits==2 && stats.misses==1 && stats.peak<=80 && !stats.reserved);
++        CHECK(!s.request({1,81}));auto stats=s.stats();CHECK(stats.hits==2 && stats.misses==1 && stats.peak<=80 && stats.reserved==80);
++        CHECK(!s.request({120,1}));a={};b={};CHECK(!s.stats().reserved);
+     }
+     std::fclose(file);
+     {
+--- a/tests/test_access.py
++++ b/tests/test_access.py
+@@ -10,6 +10,9 @@
+ import zipfile
+ 
+ from akynoleyend import launch as launcher
++from akynoleyend import __version__
++from akynoleyend.coherence import HOST_REVISION
++from akynoleyend.build import source_identity
+ from akynoleyend.access import FileAccessError, access_hint, inspect_file, save_access_report
+ from akynoleyend.cli import main
+ from akynoleyend.environment import runtime_environment
+@@ -31,7 +34,7 @@
+         for name in names:
+             (self.game / name).write_bytes(b"synthetic, never execute")
+         write_json(self.game / "AkynoLeyend-build.json", {
+-            "schema": 1, "project": "AkynoLeyend", "romfs": str(self.romfs),
++            "schema": 1, "project": "AkynoLeyend", "romfs": str(self.romfs), "version": __version__, "host_revision": HOST_REVISION, "source_sha256": source_identity(),
+             "files": {name: sha256(self.game / name) for name in names}})
+ 
+     def test_denied_hash_becomes_actionable_error_and_never_starts_the_game(self):
+--- a/tests/test_integracao_041.py
++++ b/tests/test_integracao_041.py
+@@ -22,7 +22,7 @@
+             with self.subTest(scale=scale):
+                 e=graphics_environment(resolution=scale)
+                 self.assertEqual(e['HOS_RES_SCALE'], str(int(scale)/100))
+-                self.assertEqual(e['AKYNO_RESOLUTION'], '1')
++                self.assertEqual(e['AKYNO_RESOLUTION'], '5' if scale == '125' else '6')
+                 self.assertEqual(e['HOS_DYNRES'], '0')
+         self.assertEqual(graphics_environment(resolution='100').get('HOS_RES_SCALE'),None)
+         self.assertEqual(graphics_environment(resolution='auto').get('HOS_RES_SCALE'),None)
+--- /dev/null
++++ b/tests/test_release042.py
+@@ -0,0 +1,180 @@
++"""Release coherence, old-host rejection and real bounded cache ownership."""
++
++import contextlib
++import io
++from pathlib import Path
++import shutil
++import subprocess
++import tempfile
++import unittest
++from unittest.mock import patch
++
++from akynoleyend import __version__
++from akynoleyend.cli import main, parser
++from akynoleyend.errors import ProjectError
++from akynoleyend.files import sha256, write_json
++from akynoleyend.release import launcher_identity, verify_launcher
++from akynoleyend.shader_prepare import _update_renderer
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++class CoherenceTests(unittest.TestCase):
++    def test_public_run_defaults_to_current_revision_and_never_starts_old_host(self):
++        self.assertTrue(parser().parse_args(["run"]).require_current_build)
++        with tempfile.TemporaryDirectory() as d:
++            root = Path(d)
++            keep = root / "old-save"
++            keep.write_bytes(b"preserve")
++            with (
++                patch("akynoleyend.launch.checked_build", return_value={"version": "0.4.0-dev.1"}),
++                patch("akynoleyend.launch.subprocess.Popen") as child,
++                contextlib.redirect_stdout(io.StringIO()) as output,
++            ):
++                self.assertEqual(main(["run", "--out", str(root)]), 1)
++            child.assert_not_called()
++            self.assertIn("nao corresponde", output.getvalue())
++            self.assertEqual(list(root.iterdir()), [keep])
++            self.assertEqual(keep.read_bytes(), b"preserve")
++
++    def test_old_host_cannot_receive_new_visual_dll(self):
++        with patch(
++            "akynoleyend.shader_prepare.renderer_prebuilt",
++            side_effect=AssertionError("must reject first"),
++        ):
++            with self.assertRaisesRegex(ProjectError, "host/ABI"):
++                _update_renderer(Path("unused"), {"version": "0.4.0-dev.1"}, lambda _: None)
++
++    def test_launcher_receipt_rejects_old_binary_and_changed_source(self):
++        with tempfile.TemporaryDirectory() as d:
++            root = Path(d)
++            (root / "builder/AkynoLeyendBuilder").mkdir(parents=True)
++            (root / "assets").mkdir()
++            for name in ("AkynoLeyend.ico", "AkynoLeyend.png"):
++                (root / "assets" / name).write_bytes(b"synthetic icon")
++            source = root / "builder/AkynoLeyendBuilder/MainWindow.cs"
++            source.write_text("// fixture source\n")
++            binary = root / "AkynoLeyendBuilder.exe"
++            binary.write_bytes(b"MZ synthetic current launcher")
++            receipt = {
++                "schema": 1,
++                "version": __version__,
++                "pe_product_version": __version__,
++                "source_sha256": launcher_identity(root),
++                "binary_sha256": sha256(binary),
++            }
++            write_json(root / "builder/launcher-build.json", receipt)
++            verify_launcher(root)
++            binary.write_bytes(b"MZ synthetic old launcher")
++            with self.assertRaises(ProjectError):
++                verify_launcher(root)
++            binary.write_bytes(b"MZ synthetic current launcher")
++            source.write_text("// modified since publication\n")
++            with self.assertRaises(ProjectError):
++                verify_launcher(root)
++
++
++class NativeReleaseTests(unittest.TestCase):
++    def compile_run(self, source):
++        compiler = shutil.which("c++")
++        if not compiler:
++            self.skipTest("C++ compiler unavailable")
++        with tempfile.TemporaryDirectory() as d:
++            root = Path(d)
++            path = root / "fixture.cpp"
++            path.write_text(source)
++            child = subprocess.run(
++                [
++                    compiler,
++                    "-std=c++20",
++                    "-O1",
++                    "-Wall",
++                    "-Wextra",
++                    "-Werror",
++                    "-pthread",
++                    "-I" + str(ROOT / "gpu/vk"),
++                    str(path),
++                    "-o",
++                    str(root / "fixture"),
++                ],
++                capture_output=True,
++                text=True,
++                timeout=60,
++            )
++            self.assertEqual(child.returncode, 0, child.stderr)
++            child = subprocess.run(
++                [str(root / "fixture")], capture_output=True, text=True, timeout=15
++            )
++            self.assertEqual(child.returncode, 0, child.stderr)
++
++    def test_read_ahead_counts_borrowed_bytes_and_payload_outlives_reader(self):
++        self.compile_run("""
++        #include "cache_stream.h"
++        #include <cassert>
++        #include <cstring>
++        using namespace mkwvk::cache;
++        int main(){
++          Stream::Payload surviving;
++          {
++            Stream s(64,2,2,0,[](Range r,uint8_t* p){std::memset(p,42,r.size);return true;});
++            assert(s.request({1,64}));assert(s.wait_idle(std::chrono::seconds(2)));
++            auto payload=s.take({1,64});assert(s.stats().reserved==64);
++            assert(!s.request({2,1}));assert(s.stats().peak==64);
++            surviving=std::move(payload);assert(payload.empty());
++            assert(!s.request({3,1}));s.stop();assert(s.stats().reserved==64);
++          }
++          assert(surviving.size()==64&&surviving[63]==42);surviving={};
++        }""")
++
++    def test_precompile_rate_is_shared_across_eight_workers(self):
++        self.compile_run("""
++        #include "cache_rate.h"
++        #include <atomic>
++        #include <cassert>
++        #include <vector>
++        using namespace mkwvk::cache;
++        int main(){auto now=TokenBucket::Clock::now();SharedTokenBucket bucket(5,now);
++          std::atomic<int> admitted=0;std::vector<std::thread> threads;
++          for(int i=0;i<8;i++)threads.emplace_back([&]{if(bucket.try_take(now))admitted++;});
++          for(auto& t:threads){t.join();}
++          assert(admitted==1);
++          assert(!bucket.try_take(now+std::chrono::milliseconds(199)));
++          assert(bucket.try_take(now+std::chrono::milliseconds(201)));
++          assert(!bucket.try_take(now+std::chrono::milliseconds(201)));
++        }""")
++        text = (ROOT / "gpu/vk/vk_draw.cpp").read_text()
++        start = text.index("void precompile_run(")
++        block = text[start : text.index("void dispatch(", start)]
++        self.assertLess(
++            block.index("SharedTokenBucket admission"), block.index("const auto worker")
++        )
++
++    def test_actual_resolution_menu_and_runtime_agree_on_experimental_scales(self):
++        menu = (ROOT / "gpu/vk/vk_menu.cpp").read_text()
++        function = menu[
++            menu.index("const char* tx_resolution(") : menu.index("const char* tx_speed(")
++        ]
++        replay = (ROOT / "gpu/vk/vk_replay.cpp").read_text()
++        callback = next(
++            line.strip() for line in replay.splitlines() if "t.option = [](int id)" in line
++        )
++        self.compile_run(
++            """#include <cassert>
++        #include <cstring>
++        struct Options{int realtime=1,resolution=0;}opts;
++        bool menu_is_open(){return false;}
++        struct Table{int(*option)(int);}t;
++        """
++            + function
++            + "\nint main(){"
++            + callback
++            + """
++          int expected[]={0,100,75,67,50,125,150};
++          for(int i=0;i<7;i++){opts.resolution=i;assert(t.option(3)==expected[i]);}
++          assert(strstr(tx_resolution(5),"125%"));assert(strstr(tx_resolution(6),"150%"));
++        }"""
++        )
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/tests/test_resolution_override.py
++++ b/tests/test_resolution_override.py
+@@ -10,10 +10,10 @@
+ 
+ class ResolutionOverrideTests(unittest.TestCase):
+     def test_env_wires_requested_scale(self):
+-        for value, expected in (("125","1.25"),("150","1.5")):
++        for value, expected, menu_index in (("125","1.25", "5"),("150","1.5", "6")):
+             with self.subTest(value=value):
+                 env=graphics_environment(resolution=value)
+-                self.assertEqual(env['AKYNO_RESOLUTION'], '1')
++                self.assertEqual(env['AKYNO_RESOLUTION'], menu_index)
+                 self.assertEqual(env['HOS_DYNRES'], '0')
+                 self.assertEqual(env['HOS_RES_SCALE'], expected)
+ 
+--- a/tests/test_shader_prepare.py
++++ b/tests/test_shader_prepare.py
+@@ -10,6 +10,8 @@
+ from unittest.mock import patch
+ 
+ from akynoleyend.config import ROOT
++from akynoleyend import __version__
++from akynoleyend.coherence import HOST_REVISION
+ from akynoleyend.errors import ProjectError
+ from akynoleyend.files import read_json, sha256, write_json
+ from akynoleyend.launch import verify_build
+@@ -97,7 +99,7 @@
+             (folder / "user/save").mkdir(parents=True); save = folder / "user/save/keep"; save.write_bytes(b"save")
+             dll = ready / "AkynoLeyend.dll"; dll.write_bytes(b"new generic renderer")
+             write_json(ready / "renderer.json", {"source_sha256": "fixture", "binary_sha256": sha256(dll)})
+-            old = {"schema": 1, "project": "AkynoLeyend", "version": "0.3.7-dev.1",
++            old = {"schema": 1, "project": "AkynoLeyend", "version": __version__, "host_revision": HOST_REVISION,
+                    "game_build_id": "e0f3ccfa", "romfs": str(romfs),
+                    "files": {name: sha256(folder / name) for name in ("AkynoLeyend.exe", "image.bin", "AkynoLeyend.dll")}}
+             write_json(folder / "AkynoLeyend-build.json", old)
+@@ -105,7 +107,7 @@
+             with patch("akynoleyend.shader_prepare.renderer_prebuilt", return_value=dll):
+                 updated = _update_renderer(folder, old, lambda _: None)
+             for p, data in before.items(): self.assertEqual(p.read_bytes(), data)
+-            self.assertEqual(updated["version"], "0.3.7-dev.1")
++            self.assertEqual(updated["version"], __version__)
+             self.assertEqual(verify_build(folder)["files"], updated["files"])
+             self.assertEqual((folder / "AkynoLeyend.dll").read_bytes(), dll.read_bytes())
+             # A denied final manifest write rolls the DLL and metadata back.
+@@ -146,7 +148,7 @@
+             for name in ("AkynoLeyend.exe", "image.bin", "AkynoLeyend.dll"): (folder / name).write_bytes(name.encode())
+             dll = ready / "AkynoLeyend.dll"; dll.write_bytes(b"new generic renderer")
+             write_json(ready / "renderer.json", {"source_sha256": "fixture", "binary_sha256": sha256(dll)})
+-            manifest = {"schema": 1, "project": "AkynoLeyend", "version": "0.3.7-dev.1",
++            manifest = {"schema": 1, "project": "AkynoLeyend", "version": __version__, "host_revision": HOST_REVISION,
+                         "game_build_id": "e0f3ccfa", "romfs": str(romfs),
+                         "files": {name: sha256(folder / name) for name in ("AkynoLeyend.exe", "image.bin", "AkynoLeyend.dll")}}
+             write_json(folder / "AkynoLeyend-build.json", manifest)
+--- a/tools/make_distribution.py
++++ b/tools/make_distribution.py
+@@ -3,10 +3,21 @@
+ import argparse
+ import re
+ import zipfile
++import sys
+ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parent.parent
+-OMIT_TOP = {"work", "jogo", "diagnosticos-acesso", ".git", ".venv", "dist", ".ruff_cache"}
++sys.path.insert(0, str(ROOT))
++OMIT_TOP = {
++    "work",
++    "jogo",
++    "analysis",
++    "diagnosticos-acesso",
++    ".git",
++    ".venv",
++    "dist",
++    ".ruff_cache",
++}
+ OMIT_PARTS = {"__pycache__"}
+ OMIT_SUFFIXES = {".pyc", ".pyo", ".so", ".o", ".obj", ".sha1", ".sha256", ".building"}
+ 
+@@ -52,11 +63,17 @@
+     parser.add_argument("--out", type=Path, required=True)
+     parser.add_argument("--source-only", action="store_true")
+     parser.add_argument(
+-        "--update", action="store_true", help="Flat overlay, retaining the installed toolchain."
++        "--update", action="store_true", help="Indisponivel nesta revisao: exige pacote completo em pasta nova."
+     )
+     args = parser.parse_args()
+     if args.source_only and args.update:
+         parser.error("Choose source-only or update.")
++    if args.update:
++        parser.error("Esta revisao altera o host. Gere o pacote completo para uma pasta nova.")
++    if not args.source_only:
++        from akynoleyend.release import verify_windows_release
++
++        verify_windows_release(ROOT)
+     if ROOT in args.out.resolve().parents:
+         raise SystemExit("Write the archive outside the source tree.")
+     paths = list(files(args.source_only, args.update))

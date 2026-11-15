@@ -1,0 +1,33 @@
+{
+  "version": "0.3.5-dev.1",
+  "host": "Linux",
+  "target": "Windows x64",
+  "compiler": "LLVM-MinGW 20261020 / Clang 23.1.5",
+  "vulkan_translation_units": 181,
+  "vulkan_dll_link": "success",
+  "export_verified": "mkwvk_init",
+  "changed_host_units_cross_compiled": [
+    "host/nvn_native.c"
+  ],
+  "host_fixture": "Generated generic a64 runtime header and empty suyu/fpx declarations; no game",
+  "current_game_executable_linked": false,
+  "game_executed": false,
+  "gpu_tested": false,
+  "audio_tested": false,
+  "wpf_republished": false,
+  "tests_discovered": 70,
+  "tests_passed": 63,
+  "tests_skipped": 7,
+  "tests_skip_reason": "PowerShell runtime absent on this Linux host",
+  "native_test": "Real disk/background I/O, hard byte/queue bounds, deduplication, LRU, cancellation, corrupted records, chunk I/O and token admission",
+  "sanitizers": "AddressSanitizer and UBSan passed; LeakSanitizer unavailable under ptrace, leak detection disabled",
+  "cache_identity": {
+    "unchanged_files": 244,
+    "old_stamp": "234d9fba458b54ba",
+    "current_source_sha256": "e4b25bfe3f6ab6074c10739a3ce69aecdf1c957e33ac90d09b13518ad1deab6a",
+    "current_fresh_stamp": "1ee438e80cb2c092"
+  },
+  "driver_versions": "Documentation references only: NVIDIA Studio 621.14 WHQL and AMD26.10.1 WHQL; neither installed nor tested",
+  "external_rx580_log": "Analysis only; not our build and not a validation of this version",
+  "packaged_game_data": false
+}

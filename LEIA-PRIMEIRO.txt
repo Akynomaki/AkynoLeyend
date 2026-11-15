@@ -1,0 +1,78 @@
+AkynoLeyend 0.4.8 — pacote completo para Windows x64
+
+1. Extraia o ZIP inteiro em uma pasta curta, como C:\Jogos.
+2. Na pasta AkynoLeyend-0.4.8, abra AkynoLeyendBuilder.exe.
+3. Selecione o seu arquivo .nup compatível ou as pastas romfs e exefs do seu dump.
+4. Deixe Processos de compilação em Automático, clique em Criar e aguarde.
+5. Quando o build terminar, clique em Jogar. A primeira abertura prepara os
+   shaders para a sua GPU e o seu driver.
+
+O pacote inclui o launcher, o renderizador, o Python e o compilador. O jogo
+é criado no seu PC a partir do dump local. Mantenha a pasta inteira junta.
+
+Já tem o jogo criado (Teste 4, 0.4.4, 0.4.5, qualquer 0.4.5-test, a unificada
+0.4.5-test.1, a 0.4.6 ou a 0.4.7)? Use o ZIP de atualização em Atualizações >
+Selecionar atualização (.zip), ou o AkynoLeyend-Atualizador-0.4.8.exe. O jogo não é
+traduzido de novo: só os blocos dos ganchos novos são recompilados e o EXE é
+religado. Os shaders já preparados continuam valendo.
+
+A 0.4.8 pré-carrega shaders e pipelines a cada início, como o NX2navi: os
+programas e pipelines que as suas partidas já encontraram são lidos do cache e
+montados na ordem em que apareceram. Os de compute ficam prontos antes de
+abrir; o início espera os gráficos por até 20 segundos e os que faltam são
+montados em segundo plano, com prioridade mínima, enquanto você joga. Antes, nos
+modos Streaming e Equilibrado, só uma fração deles era pré-carregada (11 de
+3.759 pipelines gráficos no Teste-1).
+Notas completas em docs/origem.md.
+
+Versões anteriores:
+A 0.4.7 junta os dois ramos que saíram da 0.4.5-test.1:
+- Linha principal (test.2 a 0.4.6): esperas curtas exatas (todos os sonos curtos
+  giram no relógio), texturas e alvos de render em grupos separados na VRAM,
+  alvos reaproveitados com a VRAM cheia e o visual novo do launcher. O Teste de
+  desempenho saiu do launcher; a medição continua em manage.py run --measure.
+- Ramo unificado: F1 > Tela > Distância de renderização (do jogo até 60 m, muda
+  na hora), write-back que reserva VRAM só onde há dados a comparar, política de
+  VRAM por placa (inclusive integradas), soma atômica nativa de volta, preparo
+  dos pipelines de malha por Compute antes de jogar e aviso de pouca RAM com os
+  processos que mais usam memória.
+DLSS e DLAA continuam disponíveis em placas NVIDIA (o launcher baixa o
+nvngx_dlss.dll da NVIDIA); FSR em todas. A Geração de quadros Dinâmica e a
+Distância de renderização ainda precisam ser conferidas jogando em mais placas.
+Notas completas em docs/origem.md.
+
+A 0.4.5 deixa o Criar mais rápido: a compilação usa todos os núcleos enquanto
+houver memória livre (antes, um processo só num PC de 16 GB) e começa pelos
+blocos mais demorados; a extração grava cada arquivo direto e descomprime uma
+vez só. Num Ryzen 5 3500X com 16 GB, a compilação caiu de 115 para 24 minutos.
+O jogo criado é o mesmo. Medidas em docs/analises-0.4.5.md.
+A 0.4.4 junta a r13j com o ramo Intel (r13d e r13e feitas em paralelo a partir da
+r13c): na GPU integrada da Intel o jogo não perde mais a placa na tela de título e
+Link aparece iluminado; em placas AMD e Intel valem três correções de shaders do
+Hookshot v2.1.0 (na NVIDIA nada muda); o launcher explica o código 0xC000013A e
+avisa sobre pouca RAM antes de preparar shaders. Análises em docs/analises-0.4.4.md.
+Na r13j, o Criar confere o processador: em CPUs sem AVX2 (Core i de 2ª/3ª
+geração, AMD FX, Phenom) o jogo e o renderizador são compilados para o nível que
+a CPU executa, em vez de fechar na abertura com o código 0xC000001D (nesses PCs
+sem DLSS; FSR continua). Um jogo já criado antes nesses PCs precisa de Criar de novo.
+Na r13i, as árvores no ar (sem chão) nas placas NVIDIA são corrigidas (Hookshot,
+PR 1334; a primeira abertura prepara de novo só os shaders de malha), em CPUs de
+até 6 núcleos as threads ociosas do jogo dormem de verdade em vez de ocupar um
+núcleo, e perto do limite de VRAM o descarte de texturas tira só o excesso.
+Na r13h, a oclusão do jogo volta a ser ligada, com contagem real pela placa, para
+o jogo descartar o que está escondido (em teste: desenhos a mais).
+Para o comportamento antigo: Jogar.cmd --visual-mode sem-oclusao.
+Na r13g, o descarte de uma textura antiga não apaga mais a nova criada no mesmo
+lugar (imagens piscando), e em placas de 8 GB quase todo ASTC fica em BC3.
+Na r13f, os desenhos de pontos feitos por mesh shaders passam a ser traduzidos
+e desenhados nas placas com mesh shaders (antes eram pulados em todo quadro).
+Na r13e, perto do limite de memória de vídeo o renderizador devolve ao driver
+os blocos com texturas sem uso, em vez de deixar o excesso ir para a RAM; em
+placas de 8 GB usa blocos menores e mais texturas compactadas (BC3). Na r13d,
+cada placa de vídeo passou a ter seus próprios shaders preparados, e uma perda
+da placa durante o jogo (código 70) fica registrada no diagnóstico. Em notebook
+com duas placas, deixe F1 > Tela > Placa de vídeo em Automático. Mesh shaders
+também em Automático. Consulte docs/origem.md para as notas da revisão.
+
+Este pacote usa a toolchain Windows do Teste 3.
+O launcher e a DLL pré-compilada foram conferidos com os fontes e SDKs incluídos.

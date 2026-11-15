@@ -1,0 +1,26 @@
+// AMD FSR 1 EASU. Official, unmodified GPUOpen algorithm in ffx/; crop before this pass.
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2D input_image;
+layout(binding = 1, rgba16f) uniform writeonly image2D output_image;
+#define A_GPU 1
+#define A_GLSL 1
+#include "ffx/ffx_a.h"
+#define FSR_EASU_F 1
+AF4 FsrEasuRF(AF2 p) { return textureGather(input_image, p, 0); }
+AF4 FsrEasuGF(AF2 p) { return textureGather(input_image, p, 1); }
+AF4 FsrEasuBF(AF2 p) { return textureGather(input_image, p, 2); }
+#include "ffx/ffx_fsr1.h"
+void main() {
+    const uvec2 pixel = gl_GlobalInvocationID.xy;
+    const ivec2 extent = imageSize(output_image);
+    if (any(greaterThanEqual(pixel, uvec2(extent)))) return;
+    const vec2 source = vec2(textureSize(input_image, 0));
+    AU4 con0, con1, con2, con3;
+    FsrEasuCon(con0, con1, con2, con3, source.x, source.y, source.x, source.y,
+               float(extent.x), float(extent.y));
+    AF3 color;
+    FsrEasuF(color, pixel, con0, con1, con2, con3);
+    imageStore(output_image, ivec2(pixel), vec4(color, 1.0));
+}
