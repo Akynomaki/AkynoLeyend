@@ -2,7 +2,7 @@
 
 **Ferramenta independente de recompilação estática e pesquisa de compatibilidade para Windows x64.**
 
-O AkynoLeyend desenvolve um fluxo para traduzir código ARM64 a partir de arquivos locais e executar o resultado com um runtime nativo e um renderizador Vulkan. O alvo em desenvolvimento é a edição para Nintendo Switch 2 de *The Legend of Zelda: Ocarina of Time*. O trabalho parte do [Hookshot](https://github.com/NotRexed/Hookshot), de NotRexed e colaboradores.
+O AkynoLeyend desenvolve um fluxo para traduzir código ARM64 a partir de arquivos locais e executar o resultado com um runtime nativo e um renderizador Vulkan. O trabalho parte do [Hookshot](https://github.com/NotRexed/Hookshot), de NotRexed e colaboradores.
 
 O repositório apresenta a documentação do projeto. A publicação dos fontes e a distribuição de binários estão em preparação.
 
