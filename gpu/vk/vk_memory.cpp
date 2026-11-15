@@ -64,6 +64,7 @@ struct Pool {
     enum : uint8_t { MIRROR_NONE, MIRROR_WANTED, MIRROR_ON, MIRROR_REFUSED } mstate = MIRROR_NONE;
     VkBuffer mirror = VK_NULL_HANDLE;
     VmaAllocation mirror_alloc = nullptr;
+    VkDeviceAddress mirror_address = 0;
     uint32_t synced_gen = 0;     // every page stamped up to this generation is in the mirror
     uint64_t synced_epoch = 0;   // the submission that last brought it up to date
     uint64_t sync_seg = 0;       // (and the parallel replay's segment whose uploads did)
@@ -1852,9 +1853,7 @@ BufferRef gpu_buffer_bind(uint64_t gpu, uint64_t size, bool written) {
 // A mirror was never freed: the retired pools' stayed (every pool remade larger, or taken in by a larger one, kept
 // its VRAM), and pools the game no longer used kept theirs until the mirrors' budget was full; the pools after that
 // stayed in system memory for good (the GPU read them over PCIe). Now a retired pool's mirror goes once the GPU is done
-// with the submissions that bound it; a mirror not bound for kIdleEpochs submissions goes when a wanted one does not
-// fit, or after kLongIdle; and a pool refused for the budget is tried again when it is next bound.
-constexpr uint64_t kIdleEpochs = 600, kLongIdle = 6000;
+// with the submissions that bound it. An idle mirror can also be returned under memory pressure.
 int64_t st_mirrors_freed = 0;
 uint64_t st_mirror_bytes_freed = 0;
 // (hookshot) A freed mirror's buffer is destroyed only once the GPU is past everything recorded until then. Its pool's
@@ -1879,28 +1878,35 @@ void mirror_free(Pool& p) {
     dead_mirrors.push_back({p.mirror, p.mirror_alloc, std::max(mem_rec_value, p.last_value)});
     shadow_free(p);
     p.mirror = VK_NULL_HANDLE, p.mirror_alloc = nullptr;
+    p.mirror_address = 0;
     mirror_bytes -= p.hi - p.lo;
     st_mirror_bytes_freed += p.hi - p.lo;
     st_mirrors_freed++;
     p.mstate = Pool::MIRROR_NONE;
     pools_gen++;   // (a parallel replay thread's pool cache: looked up again)
 }
-void mirrors_give_back(uint64_t want_bytes) {   // (pools_mu held)
+void mirrors_give_back(uint64_t want_bytes, bool pressure) {   // (pools_mu held)
     static const bool keep = getenv("RX_VK_MIRROR_KEEP") != nullptr;   // (A/B: mirrors kept, as before)
     if (keep) return;
     for (auto& nh : retired_pools) {
         Pool& p = nh.mapped();
         // (EvilOOT: kept while the pool that took it in has not made its mirror, for 600 submissions at most)
-        if (p.inherit_pending && mirror_epoch - p.retired_epoch > kIdleEpochs) p.inherit_pending = false;
+        if (p.inherit_pending && mirror_epoch - p.retired_epoch > kMirrorInheritEpochs) p.inherit_pending = false;
         if (p.mstate == Pool::MIRROR_ON && p.retired_value <= mem_completed && !p.inherit_pending) mirror_free(p);
     }
     std::vector<Pool*> idle;
     for (auto& [lo, p] : imported)
-        if (p.mstate == Pool::MIRROR_ON && mirror_epoch - p.synced_epoch > kIdleEpochs && p.last_value <= mem_completed)
+        if (p.mstate == Pool::MIRROR_ON && idle_mirror_can_retire(mirror_epoch - p.synced_epoch, p.last_value, mem_completed))
             idle.push_back(&p);
     std::sort(idle.begin(), idle.end(), [](const Pool* a, const Pool* b) { return a->synced_epoch < b->synced_epoch; });
-    for (Pool* p : idle)
-        if (mirror_epoch - p->synced_epoch > kLongIdle || mirror_bytes + want_bytes > mirror_budget()) mirror_free(*p);
+    uint64_t pressure_freed = 0;
+    for (Pool* p : idle) {
+        if (mirror_epoch - p->synced_epoch > kMirrorLongIdleEpochs || mirror_bytes + want_bytes > mirror_budget() ||
+            (pressure && pressure_freed < kMirrorPressureTrimBytes)) {
+            pressure_freed += p->hi - p->lo;
+            mirror_free(*p);
+        }
+    }
     static int64_t logged_at;
     if (st_mirrors_freed / 16 != logged_at) {
         logged_at = st_mirrors_freed / 16;
@@ -1955,7 +1961,9 @@ void memory_begin_submission() {
     {
         uint64_t want = 0;
         for (Pool* p : mirror_wanted) want += p->hi - p->lo;
-        if (mirror_epoch % 64 == 0 || mirror_bytes + want > mirror_budget()) mirrors_give_back(want);
+        const bool pressure = vram_level_now() >= VRAM_OVER || commit_pressure_now();
+        if (mirror_epoch % 64 == 0 || (!pressure && mirror_bytes + want > mirror_budget()))
+            mirrors_give_back(pressure ? 0 : want, pressure);
     }
     if (mirror_wanted.empty()) return;
     for (Pool* p : mirror_wanted) mirror_make(*p);
@@ -1996,10 +2004,9 @@ bool mirror_make(Pool& pool) {
         // the GPU read game memory over PCIe)
         static const bool tight_rule = getenv("RX_VK_MIRROR_TIGHT") != nullptr;
         uint64_t used = 0, allowed = 0;
-        // (AkynoLeyend r13e: and none while the process is over what the driver allows, vram_policy.h. Those already made stay:
-        // the pool would be read over PCIe again, and the driver is paging VRAM out already)
+        // Do not refill the mirrors while the driver or Windows is trying to reclaim memory.
         const bool tight = (tight_rule && vram_usage(&used, &allowed) && allowed && used > allowed / 100 * 90) ||
-                           vram_level_now() >= VRAM_OVER;
+                           vram_level_now() >= VRAM_OVER || commit_pressure_now();
         if (mirror_bytes + n > mirror_budget() || n > (1ull << 30) || tight) {
             p->mstate = n > (1ull << 30) ? Pool::MIRROR_REFUSED : Pool::MIRROR_NONE;
             static int logged;
@@ -2016,7 +2023,8 @@ bool mirror_make(Pool& pool) {
         {   // (hookshot) the page table points at the mirror: what the GPU wrote is there, and guest memory has it only after the write-back
             VkBufferDeviceAddressInfo da{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
             da.buffer = p->mirror;
-            guest_pages_set(p->lo, p->hi, vkGetBufferDeviceAddress(dev.device, &da));
+            p->mirror_address = vkGetBufferDeviceAddress(dev.device, &da);
+            guest_pages_set(p->lo, p->hi, p->mirror_address);
         }
         const VkBufferCopy all{0, 0, n};
         vkCmdCopyBuffer(upload_command_buffer(), p->buffer, p->mirror, 1, &all);   // (all of it, at this generation)
@@ -2171,15 +2179,13 @@ void shadows_reap() {
         dead_shadows.pop_front();
     }
 }
-// (Hookshot 2.1.0) The shadows' two rules read what is really allocated (the driver's count less the free space inside VMA's
-// blocks: vram_pressure.h), not the count alone. By the count alone they went at 95% and came back only under 85%: at 4K the
-// texture cache keeps the count at 90-98% with gigabytes free inside the blocks, so the shadows went and never returned, and
-// the write-backs were whole copies again for the rest of the session. RX_VK_SHADOW_RAW=1: by the count alone, as before
+// Keep the write-back's 2 MiB shadows when the VMA blocks still have room.
+// RX_VK_SHADOW_RAW=1 uses the driver's reported count alone.
 bool shadow_rules_raw() {
     static const bool v = getenv("RX_VK_SHADOW_RAW") != nullptr;
     return v;
 }
-bool shadow_room(uint64_t n) {   // (the shadows' budget, and room in VRAM: the textures and the mirrors come first)
+bool shadow_room(uint64_t n, bool& existing_block_only) {
     static const uint64_t cap = [] {
         if (const char* e = getenv("RX_VK_WB_SHADOW_MB")) {
             const long long mib = atoll(e);
@@ -2190,22 +2196,31 @@ bool shadow_room(uint64_t n) {   // (the shadows' budget, and room in VRAM: the 
         // (an integrated GPU's VRAM is the system's RAM: 512 MB at most there)
         return dev.props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? std::min<uint64_t>(eighth, (uint64_t)512 << 20) : eighth;
     }();
-    if (shadow_bytes + n > cap) return false;
+    if (shadow_bytes + n > cap || commit_pressure_now()) return false;
     uint64_t used = 0, allowed = 0, block_free = 0;
     if (!vram_usage(&used, &allowed, &block_free) || !allowed) return true;
     if (shadow_rules_raw()) return used + n <= allowed / 100 * 85;
-    return vram_pressure::shadow_fits(n, used, allowed, block_free);
+    if (vram_pressure::shadow_fits(n, used, allowed, block_free)) return true;
+    existing_block_only = true;
+    return vram_pressure::shadow_reuse_fits(n, used, allowed, block_free);
 }
 WritebackShadow* shadow_region(Pool& p, uint64_t offset) {
     auto it = p.writeback_shadows.find(offset);
     if (it != p.writeback_shadows.end()) return &it->second;
 
     const uint64_t bytes = std::min(kWritebackShadowBytes, p.hi - p.lo - offset);
-    if (!p.mirror || !shadow_room(bytes)) return nullptr;
+    bool existing_block_only = false;
+    if (!p.mirror || !shadow_room(bytes, existing_block_only)) return nullptr;
+    // Heap-wide holes can belong to a different pool. Back off if no compatible buffer block fits.
+    static uint64_t reuse_retry_at = 0;
+    if (existing_block_only && mirror_epoch < reuse_retry_at) return nullptr;
     WritebackShadow region{};
     if (!create_device_buffer(bytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, region.buffer, region.allocation))
+                                         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, region.buffer, region.allocation,
+                                         existing_block_only)) {
+        if (existing_block_only) reuse_retry_at = mirror_epoch + 64;
         return nullptr;
+    }
     const VkBufferDeviceAddressInfo da{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, region.buffer};
     region.address = vkGetBufferDeviceAddress(dev.device, &da);
     if (!region.address) {
@@ -2215,14 +2230,18 @@ WritebackShadow* shadow_region(Pool& p, uint64_t offset) {
     shadow_bytes += bytes;
     return &p.writeback_shadows.emplace_hint(it, offset, region)->second;
 }
-// (pools_mu held) every shadow given back while VRAM is really 95% full, or the driver's count at 99% (every 120 write-back
-// submissions): made again when there is room
+// Sample every 120 write-back submissions while shadows are present (pools_mu held).
 void shadows_check_room() {
     static int64_t n;
     if (!shadow_bytes || ++n % 120) return;
     uint64_t used = 0, allowed = 0, block_free = 0;
-    if (!vram_usage(&used, &allowed, &block_free) || !allowed) return;
-    if (shadow_rules_raw() ? used <= allowed / 100 * 95 : !vram_pressure::shadows_go(used, allowed, block_free)) return;
+    const bool commit_tight = commit_pressure_now();
+    if (vram_usage(&used, &allowed, &block_free) && allowed) {
+        if (!commit_tight && (shadow_rules_raw() ? used <= allowed / 100 * 95
+                                                : !vram_pressure::shadows_go(used, allowed, block_free))) return;
+    } else if (!commit_tight) {
+        return;
+    }
     const size_t before = dead_shadows.size();
     for (auto& [lo, p] : imported) shadow_free(p);
     for (auto& nh : retired_pools) shadow_free(nh.mapped());
@@ -2230,8 +2249,8 @@ void shadows_check_room() {
     for (size_t i = before; i < dead_shadows.size(); ++i) had += dead_shadows[i].bytes;
     static int logged;
     if (had && logged++ < 8)
-        logf("vk: write-back diff: VRAM %llu of %llu MB: the shadows given back (%llu MB)", (unsigned long long)(used >> 20),
-             (unsigned long long)(allowed >> 20), (unsigned long long)(had >> 20));
+        logf("vk: write-back diff: VRAM %llu of %llu MB: the shadows given back (%llu MB)%s", (unsigned long long)(used >> 20),
+             (unsigned long long)(allowed >> 20), (unsigned long long)(had >> 20), commit_tight ? " due to Windows commit" : "");
 }
 // (pools_mu held) a range of the pool (offsets) unknown to its shadow again
 void shadow_forget(Pool& p, uint64_t at, uint64_t len) {
@@ -2268,10 +2287,13 @@ void shadows_forget_written() {
         if (pages.empty()) continue;
         std::sort(pages.begin(), pages.end());
         Pool* p = nullptr;
+        uint64_t region_base = UINT64_MAX;
+        WritebackShadow* region = nullptr;
         for (uint32_t pg : pages) {
             const uint64_t a = (uint64_t)pg << kPageShift;
             if (!p || a < p->lo || a >= p->hi) {
                 p = nullptr;
+                region_base = UINT64_MAX;
                 auto it = imported.upper_bound(a);
                 if (it == imported.begin()) continue;
                 --it;
@@ -2279,10 +2301,15 @@ void shadows_forget_written() {
                 if (!p) continue;
             }
             const uint64_t offset = a - p->lo;
-            const auto it = p->writeback_shadows.find(writeback_region_base(offset, kWritebackShadowBytes));
-            if (it == p->writeback_shadows.end()) continue;
-            const uint64_t i = (offset - it->first) >> kPageShift;
-            uint64_t& bits = it->second.known[i >> 6];
+            const uint64_t base = writeback_region_base(offset, kWritebackShadowBytes);
+            if (base != region_base) {
+                region_base = base;
+                const auto it = p->writeback_shadows.find(base);
+                region = it == p->writeback_shadows.end() ? nullptr : &it->second;
+            }
+            if (!region) continue;
+            const uint64_t i = (offset - base) >> kPageShift;
+            uint64_t& bits = region->known[i >> 6];
             if (bits & (1ull << (i & 63))) known++;
             bits &= ~(1ull << (i & 63));
         }
@@ -2495,7 +2522,7 @@ void memory_end_submission(VkCommandBuffer cmd) {
             return a.pool != b.pool ? a.pool < b.pool : a.lo < b.lo;
         });
         transfer_barrier(cmd);
-        std::vector<VkBufferCopy> runs;
+        static thread_local std::vector<VkBufferCopy> runs;
         // A retired import can alias its replacement in guest RAM. Keep all copies in
         // their original order for that submission; a delayed compute diff must not
         // overtake a full copy from the alias.
@@ -2529,16 +2556,12 @@ void memory_end_submission(VkCommandBuffer cmd) {
             whole.clear();
             segments.clear();
             const bool live_pool = imported.find(p->lo) != imported.end() && &imported.find(p->lo)->second == p;
-            VkDeviceAddress mirror_address = 0;
             // The comparison refreshes complete pages. A non-word copy could
             // write a byte in one of those pages alongside its transfer read.
             const bool aligned = std::all_of(runs.begin(), runs.end(), [](const VkBufferCopy& r) {
                 return ((r.dstOffset | r.size) & 3) == 0;
             });
-            if (diff && live_pool && p->address && p->mirror && aligned) {
-                const VkBufferDeviceAddressInfo da{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, p->mirror};
-                mirror_address = vkGetBufferDeviceAddress(dev.device, &da);
-            }
+            const VkDeviceAddress mirror_address = diff && live_pool && p->address && aligned ? p->mirror_address : 0;
             for (const VkBufferCopy& r : runs) {
                 if (!mirror_address) {
                     whole.push_back(r);

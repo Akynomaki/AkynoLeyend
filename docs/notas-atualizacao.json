@@ -5,6 +5,7 @@
   "candidate_id": "0.4.8",
   "notes": {
     "new": [
+      "Gráficos > NVIDIA RTX · 1600p DLSS Qualidade combina escala interna de 67%, saída 2560×1600, cache Equilibrado e orçamentos Vulkan ajustados. A geração de quadros fica desligada.",
       "Pré-carregamento a cada início, como o do NX2navi: o jogo pré-carrega os shaders (traduções já guardadas) e os pipelines que as suas partidas encontraram, na ordem em que apareceram. Os de compute ficam prontos antes de abrir. O início espera os gráficos por até 20 segundos, e os que faltam continuam sendo montados em segundo plano, com prioridade mínima, enquanto você joga. Um desenho que chega a um deles usa o pipeline pronto em vez de esperar. RX_VK_PRELOAD_WAIT_MS muda a espera (0 espera todos, como antes); RX_VK_PRELOAD_THREADS, quantos continuam em segundo plano (2).",
       "Visual novo do launcher: tema preto e dourado, navegação lateral, janela que maximiza e restaura, seletor de saves com barra própria e Cancelar sempre visível. O botão EXPORTAR SAVES passa a se chamar Exportar Save.",
       "F1 > Tela > Distância de renderização: do jogo, 2500, 1200, 700, 400, 250, 150, 100 ou 60 m. Muda na hora, sem reiniciar. Distâncias curtas reduzem os objetos desenhados e aliviam a CPU. A escolha fica salva no AkynoLeyend_opts.ini.",
@@ -25,6 +26,9 @@
       "F1 > Tela: Mesh shaders (Automático, Nativos ou Compute): placas sem mesh shaders (GTX 10xx, RX 5000 e anteriores) passam a desenhar boa parte do cenário por compute, como no Hookshot v2.1.0. Vale ao reiniciar."
     ],
     "fixes": [
+      "O cache de texturas elimina o excesso sobre o orçamento com uma margem de 64 MiB. A destruição de texturas concluídas é distribuída entre quadros quando há folga de memória.",
+      "O Vulkan lê e reinicializa em lotes as consultas de oclusão já concluídas, reaproveita vínculos de índice idênticos na mesma gravação e deixa de medir diagnósticos após o limite de mensagens.",
+      "Ajuste de desempenho Vulkan: mantém a cópia diferencial quando há espaço nos blocos de VRAM já reservados. Também reduz o trabalho de CPU ao atualizar as páginas modificadas e descarta memória ociosa quando a VRAM ou o commit do Windows ficam sob pressão.",
       "Nos modos de cache Streaming e Equilibrado, o pré-carregamento do início ficava quase todo com os programas de compute: no Teste-1 ele carregava 128 programas e montava só 11 dos 3.759 pipelines gráficos anotados. Agora os programas das anotações e os de compute dividem o limite, e os limites subiram (Streaming: 2.048 programas, 4.096 pipelines; Equilibrado: 4.096 e 8.192).",
       "Esperas curtas exatas: em processadores com até 6 threads (como o Ryzen 5 3500X), as esperas de menos de 1 ms do jogo usavam o timer do Windows, que acorda cerca de 0,5 ms atrasado; a espera de 20 µs pelas tarefas de cada quadro durava ~537 µs. Agora todos os sonos curtos giram no relógio (21 µs medidos na test.8), e uma thread que espera um núcleo virtual gira 150 µs antes de dormir (84% das esperas terminam no giro). Custa mais processador: cerca de um quarto de núcleo em cada uma das cinco threads de tarefas. HOS_SHORT_SLEEP_SPIN=0 e HOS_VCORE_SPIN_US=0 voltam ao comportamento anterior.",
       "A prioridade alta da thread que grava os comandos da GPU, testada na test.8, saiu: não houve ganho medido (25,8 FPS com, 26,2 sem).",

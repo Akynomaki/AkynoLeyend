@@ -69,21 +69,19 @@ inline uint64_t evict_min_unused(VramLevel level, uint64_t configured) {
     return level >= VRAM_CRITICAL ? std::min<uint64_t>(configured, 8) : configured;
 }
 
-/// (AkynoLeyend r13i, Hookshot PR 2826) What the eviction pass lets the textures go down to (`total` bytes of them). size_budget:
-/// the budget as a size (the card's default, RX_VK_VRAM_MB or the Quality preset's); budget: what the 90% rule, the driver's
-/// limit (97%) and the commit rule made of it, never more. Those rules are not sizes: each is "what the textures hold less the
-/// excess over a line", crossed again whenever anything grows. Cut to 7/8 of it, a few MB over the line took an eighth of the
-/// cache: Castle Town Market on an RTX 3060 Ti went 2.95 -> 2.5 -> 2.95 GB every few seconds, the textures on screen again
-/// within the camera's turn, made again (this PC's log: "504 textures retired (2080 left, 2562 MB)" after 2936 MB). So for
-/// them what goes is the excess and `slack` (64 MB) more, so that not every pass is one; the size still asks for its 7/8.
-/// UINT64_MAX: nothing. excess_only false (RX_VK_EVICT_EXCESS=0): budget's 7/8, as before.
+/// Goal after the card, driver and commit limits have supplied the effective budget. Leave a small margin
+/// so new uploads have room. A fixed budget needs the same margin as the pressure-adjusted budget:
+/// dropping to 7/8 at the 6 GiB limit added 768 MiB of eviction to each pass.
 inline constexpr uint64_t kEvictExcessSlack = 64ull << 20;
-inline uint64_t evict_target(uint64_t total, uint64_t size_budget, uint64_t budget, bool excess_only = true,
-                             uint64_t slack = kEvictExcessSlack) {
-    if (!excess_only || budget >= size_budget) return budget / 8 * 7;
-    uint64_t to = total > size_budget ? size_budget / 8 * 7 : UINT64_MAX;
-    if (total > budget) to = std::min(to, budget - std::min(budget, slack));
-    return to;
+inline uint64_t evict_target(uint64_t total, uint64_t budget, bool excess_only = true) {
+    if (!excess_only) return budget / 8 * 7;   // RX_VK_EVICT_EXCESS=0
+    return total > budget ? budget - std::min(budget, kEvictExcessSlack) : UINT64_MAX;
+}
+
+/// Let the render thread spread driver destruction calls over several presents while memory permits it.
+/// A large backlog or critical memory pressure takes precedence over the per-present batch size.
+inline bool release_retired_texture(size_t released, size_t pending, uint64_t pending_bytes, bool urgent) {
+    return urgent || released < 24 || pending > 192 || pending_bytes > (128ull << 20);
 }
 
 /// Whether the blocks are worth compacting: critical or over, with more than `slack` (256 MB) free inside them.

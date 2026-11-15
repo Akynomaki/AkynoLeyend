@@ -103,7 +103,7 @@ class Renderer(unittest.TestCase):
 
     def test_eviction_from_critical_on(self):
         texture = source("gpu/vk/vk_texture.cpp")
-        self.assertIn("const uint64_t unused_min = evict_min_unused(level, min_unused);", texture)
+        self.assertIn("evict_min_unused(commit_pressure_now() ? VRAM_CRITICAL : level, min_unused);", texture)
         self.assertIn("frame_no - last < (sweep ? std::max<uint64_t>(120, min_unused) : unused_min)) break;", texture)
 
     def test_blocks_counted_where_images_are_made_and_destroyed(self):

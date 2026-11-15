@@ -141,6 +141,13 @@ try
         var preset=GraphicsSettings.Preset("1600p");
         Require(preset.OutputResolution=="1600p"&&preset.Resolution=="67"&&preset.Upscaling=="lanczos"&&preset.Framegen=="0",
             "1600p profile mismatch.");
+        var dlss=GraphicsSettings.Preset("1600p-dlss");
+        Require(dlss.Arguments().SequenceEqual(new[]{"--backend", "vulkan", "--resolution", "67", "--output-resolution", "1600p",
+            "--speed", "realtime", "--upscaling", "dlss", "--sharpness", "10", "--framegen", "0", "--pacing", "on",
+            "--fps-counter", "on", "--handheld", "off", "--cache-mode", "equilibrado"}), "The 1600p DLSS preset arguments changed.");
+        var dlaa=dlss with {Upscaling="dlaa"};
+        var dlaaArgs=dlaa.Arguments();
+        Require(dlaaArgs[Array.IndexOf(dlaaArgs,"--resolution")+1]=="100", "Explicit DLAA lost native rendering.");
         return Task.CompletedTask;
     });
     await Check("a saved F1 change takes priority on the next play", () =>

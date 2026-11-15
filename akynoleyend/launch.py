@@ -265,14 +265,14 @@ def launch(
     if visual_mode not in VISUAL_MODES:
         raise ProjectError(f"Modo visual desconhecido: {visual_mode}")
     environment.update(VISUAL_MODES[visual_mode])
-    if shader_workers is None:
-        info = snapshot()
-        background = cache_mode in {"streaming", "equilibrado"}
-        environment["RX_VK_COMPILE_THREADS"] = str(automatic_shader_workers(info, background=background))
     if shader_workers is not None:
         if type(shader_workers) is not int or not 1 <= shader_workers <= 8:
             raise ProjectError("Workers de shaders devem estar entre 1 e 8.")
         environment["RX_VK_COMPILE_THREADS"] = str(shader_workers)
+    elif profile != "rtx-1600" or cache_mode != "equilibrado":
+        info = snapshot()
+        background = cache_mode in {"streaming", "equilibrado"}
+        environment["RX_VK_COMPILE_THREADS"] = str(automatic_shader_workers(info, background=background))
     if audio_backend != "auto":
         environment["HOS_AUDIO_BACKEND"] = audio_backend
     if trace_files:
@@ -342,8 +342,8 @@ def launch(
             )
     for key, value in PROFILES[profile].items():
         print(f"  {key}={value}")
-    for key, value in CACHE_MODES[cache_mode].items():
-        print(f"  {key}={value}")
+    for key in CACHE_MODES[cache_mode]:
+        print(f"  {key}={environment[key]}")
     for key, value in TEXTURE_MODES[texture_mode].items():
         print(f"  {key}={value}")
     if dry_run:

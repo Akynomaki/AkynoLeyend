@@ -29,6 +29,10 @@ PROFILES["compatibilidade"] = {
 # Opt-in A/B of Hookshot #1629. Only the mirror copy size changes.
 PROFILES["4k-wb-experimental"] = {"RX_VK_WB_MAX_KB": "1024"}
 PROFILES["desempenho-1600"] = {"RX_VK_ANISO": "4"}
+PROFILES["rtx-1600"] = {
+    "RX_VK_VRAM_MB": "3584",
+    "RX_VK_MIRROR_MB": "1536",
+}
 
 # Safe, explicit A/B controls; never trust inherited RX_/AKYNO_ environment variables.
 # These are applied by launch() after inherited variables are sanitized.
@@ -182,6 +186,8 @@ def runtime_environment(
     result = clean_environment(parent)
     result.update(selected)
     result.update(cache_settings)
+    if profile == "rtx-1600" and cache_mode == "equilibrado":
+        result["RX_VK_PREWARM_PER_SECOND"] = "100"
     result.update(texture_settings)
     if measure:
         result.update(MEASURE)

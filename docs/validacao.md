@@ -146,3 +146,28 @@ A continuação inclui nove regressões do reuso isolado e três de notas do pac
 O WPF com aba Atualizações compilou por .NET SDK 8.0.427, zero erros/avisos;
 13 checks C# de Runner/config/preview passaram em Linux. Isso verifica compilação
 e comportamento sem janela; não foi aberta a janela WPF no Windows.
+
+## 0.4.8 – verificação do ajuste de desempenho Vulkan
+
+DLL Windows x64 compilada com LLVM-MinGW e SDK NVIDIA NGX. Os testes direcionados cobrem a política de VRAM, a seleção de espelhos ociosos, o cache de alvos com commit baixo e a visibilidade das páginas alteradas para o write-back. O atualizador oficial instalou a DLL em uma cópia isolada e conferiu os hashes do executável e dos arquivos de jogo.
+
+A comparação usou o mesmo save e a câmera parada na Floresta Kokiri, com RTX 5070 Ti Laptop, DLAA 2560×1600 e geração de quadros desligada. Em duas amostras de 480 quadros após a carga inicial, a média foi 19,2 FPS em ambas. A mediana foi de 19,5 para 19,6 FPS, e o 1% low foi de 14,9 para 13,5 FPS. Ambas as execuções encerraram com código zero e ficaram dentro do orçamento de VRAM do driver. O teste físico permanece pendente para a regressão de `device_lost` após sessões longas na RTX 3060 Ti.
+
+## 0.4.8 – verificação da segunda rodada de desempenho
+
+O perfil de GPU registrou aproximadamente 16–17 ms por quadro em um único dispatch de compute no trecho medido. O shader também escreve em recursos de storage e executa operações atômicas. Ele continua no fluxo de renderização. A nova DLL foi testada com o preset opt-in que reduz a resolução interna a 1743×1090, mantém a saída em 2560×1600 com DLSS Qualidade, usa o cache Equilibrado, reserva 3.584 MiB para o orçamento de texturas e 1.536 MiB para os espelhos. A admissão de pipelines no pré-carregamento usa o limite de 100 por segundo desse perfil.
+
+O teste na RTX 5070 Ti Laptop usou a mesma plataforma de Kokiri, câmera parada, geração de quadros desligada e 480 quadros após a carga inicial em cada execução. A referência com DLAA a 2560×1600 teve 19,2 FPS médios e 14,9 FPS de 1% low. O DLSS Qualidade sem ajuste dos caches e espelhos ficou em 17,1 FPS médios. O preset completo chegou a 30,1 FPS médios, com 1% low de 13,2 FPS e oito quadros acima de 50 ms, ante 283 na referência. O tempo de GPU nos quatro intervalos do preset ficou entre 15,6 e 16,4 ms por quadro. Os testes usaram sessões distintas e, no preset, o driver disponibilizou aproximadamente 10 GiB de VRAM, ante 10,9 GiB na referência. A medição combina o preset e a nova DLL. Os resultados de outras áreas, da RTX 3060 Ti e de máquinas com i5 ainda precisam de validação.
+
+## 0.4.8 – atualização cumulativa de desempenho
+
+A DLL Windows x64 compilou e foi ligada com LLVM-MinGW e NVIDIA NGX. A suíte direcionada teve 46 testes aprovados e 11 ignorados pelas condições do ambiente. O teste nativo executa a rotina real de liberação de texturas com Vulkan simulado. Cobre espera pela conclusão da GPU, reutilização de alvos, limite por quadro, retomada imediata da liberação sob pressão e propriedade das views e da memória esparsa.
+
+O teste na RTX 5070 Ti Laptop comparou a segunda atualização com a cumulativa. As duas cópias usaram o mesmo executável, save, caches iniciais e preset NVIDIA RTX · 1600p DLSS Qualidade, com saída de 2560×1600, resolução interna de 1743×1090 e geração de quadros desligada. O teste coletou 480 quadros de câmera parada e cerca de 25 segundos de rotações da câmera, com o personagem parado no mesmo ponto da Floresta Kokiri. As duas sessões encerraram com código zero e se mantiveram dentro do orçamento de VRAM do driver.
+
+| Trecho | FPS médio | 1% low (FPS) | p99 de tempo de quadro | Quadros acima de 50 ms |
+| --- | --- | --- | --- | --- |
+| Câmera parada | 21,6 → 30,0 | 14,6 → 21,6 | 66,9 → 44,6 ms | 152 → 0 |
+| Rotação da câmera | 27,5 → 31,4 | 12,2 → 15,6 | 66,3 → 50,3 ms | 40 → 8 |
+
+A medição começa após a carga inicial e cobre uma cena. Ainda há picos de tempo de quadro ao girar a câmera. A inicialização do DLSS, a travessia entre áreas, a RTX 3060 Ti, o processador i5 e a estabilidade de uma sessão longa exigem medições próprias.

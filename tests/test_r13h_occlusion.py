@@ -40,14 +40,105 @@ def source(name):
     return (ROOT / name).read_text(encoding="utf-8")
 
 
+def batch_fixture():
+    occlusion = source("gpu/vk/vk_occlusion.cpp")
+    state = occlusion[occlusion.index("struct Entry {"):occlusion.index("void close_open(")]
+    start = occlusion.index("void occlusion_collect(")
+    collect = occlusion[start:occlusion.index("\n} // namespace mkwvk", start)]
+    return r'''
+#include <atomic>
+#include <cassert>
+#include <deque>
+#include <mutex>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+#include "occlusion_count.h"
+using namespace mkwvk;
+constexpr uint32_t kSlots = 8;
+std::atomic<uint8_t> busy[kSlots];
+std::atomic<int> state{1};
+struct Device { int device; } dev{};
+int pool;
+enum VkResult { VK_SUCCESS, VK_NOT_READY, VK_ERROR_DEVICE_LOST };
+enum { VK_QUERY_RESULT_64_BIT = 1, VK_QUERY_RESULT_WITH_AVAILABILITY_BIT = 2 };
+VkResult vkGetQueryPoolResults(int, int, uint32_t, uint32_t, size_t, void*, size_t, int);
+void vkResetQueryPool(int, int, uint32_t, uint32_t);
+void guest_cpu_write(uint64_t, const uint64_t*, size_t);
+void logf(const char*, ...) {}
+''' + state + collect + r'''
+using Span = std::pair<uint32_t, uint32_t>;
+std::vector<Span> reads, resets;
+std::vector<uint64_t> writes;
+
+VkResult vkGetQueryPoolResults(int, int, uint32_t first, uint32_t count, size_t size,
+                                void* data, size_t stride, int flags) {
+    reads.emplace_back(first, count);
+    assert(stride == sizeof(QueryResult) && size == count * stride);
+    assert(flags == (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+    assert(first + count <= kSlots);
+    if (first == 2) return VK_ERROR_DEVICE_LOST;
+    auto* returned = static_cast<QueryResult*>(data);
+    for (uint32_t i = 0; i < count; ++i) {
+        const uint32_t slot = first + i;
+        assert(busy[slot] == 1);
+        returned[i] = {slot == 0 ? 9u : slot == 1 ? 4u : 33u, slot != 7};
+    }
+    return first == 6 ? VK_NOT_READY : VK_SUCCESS;
+}
+
+void vkResetQueryPool(int, int, uint32_t first, uint32_t count) {
+    assert(reads.back() == Span(first, count));
+    for (uint32_t slot = first; slot < first + count; ++slot) assert(busy[slot] == 1);
+    resets.emplace_back(first, count);
+}
+
+void guest_cpu_write(uint64_t addr, const uint64_t* data, size_t size) {
+    assert(size == 16 && data[1] == addr * 10);
+    writes.push_back(addr);
+    writes.push_back(data[0]);
+}
+
+int main() {
+    for (const uint32_t slot : {6u, 7u, 0u, 1u, 2u}) busy[slot] = 1;
+    entries = {
+        {1, {6}, false, true, 0, 0},
+        {1, {7}, false, false, 1, 10},
+        {1, {0}, false, false, 2, 20},
+        {1, {1}, false, false, 3, 30},
+        {2, {}, false, true, 0, 0},
+        {2, {2}, false, false, 4, 40},
+    };
+    pending_reports = {{1, 1}, {2, 1}, {3, 1}, {4, 1}};
+    occlusion_collect(1);
+    assert((reads == std::vector<Span>{{6, 2}, {0, 2}}));
+    assert(reads == resets);
+    for (const uint32_t slot : {6u, 7u, 0u, 1u}) assert(busy[slot] == 0);
+    assert(busy[2] == 1 && entries.size() == 2 && pending_reports.size() == 1);
+    assert((writes == std::vector<uint64_t>{1, 1, 2, 9, 3, 13}));
+    results[2] = {999, 1};  // stale data from a previous use
+    occlusion_collect(2);
+    assert(reads.back() == Span(2, 1) && reads == resets);
+    assert(busy[2] == 0 && entries.empty() && pending_reports.empty());
+    assert(writes.size() == 8 && writes[6] == 4 && writes[7] == 1);
+}
+'''
+
+
 class Count(unittest.TestCase):
     def test_running_count_compiled_and_run(self):
+        self.check_native(FOLD)
+
+    def test_batches_only_completed_queries_preserving_reports(self):
+        self.check_native(batch_fixture())
+
+    def check_native(self, fixture):
         compiler = native_cxx()
         if not compiler:
             self.skipTest("C++ compiler unavailable")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
-            (path / "check.cpp").write_text(FOLD, encoding="utf-8")
+            (path / "check.cpp").write_text(fixture, encoding="utf-8")
             binary = path / ("check.exe" if os.name == "nt" else "check")
             flags = ["-std=c++20", "-O1", "-Wall", "-Wextra", "-Werror", "-I" + str(ROOT / "gpu/vk")]
             if os.name == "nt":
@@ -86,7 +177,10 @@ class Queries(unittest.TestCase):
         self.assertIn("entries.front().value <= done", collect)   # (in stream order, once the GPU is done)
         self.assertIn("occlusion_fold(running, sum, missed, e.reset)", collect)
         self.assertIn("guest_cpu_write(e.addr, rec, sizeof rec);", collect)
-        self.assertLess(collect.index("vkGetQueryPoolResults"), collect.index("vkResetQueryPool(dev.device, pool, s, 1);"))
+        read = occ[occ.index("void collect_query_range("):occ.index("void close_open(")]
+        self.assertIn("VK_QUERY_RESULT_WITH_AVAILABILITY_BIT", read)
+        self.assertLess(read.index("vkGetQueryPoolResults"), read.index("vkResetQueryPool"))
+        self.assertLess(read.index("vkResetQueryPool"), read.index("busy[slot].store"))
 
 
 class Replay(unittest.TestCase):

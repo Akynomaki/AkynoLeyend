@@ -147,6 +147,7 @@ int main() {
 #include <cassert>
 #include "texture_budget.h"
 using mkwvk::commit_limited_budget;
+using mkwvk::commit_pressure_held;
 int main() {
     constexpr uint64_t M=1ull<<20;
     assert(commit_limited_budget(6144*M, 5000*M, 8000*M) == 6144*M);   // room: as it was
@@ -155,6 +156,10 @@ int main() {
     assert(commit_limited_budget(3265*M, 5000*M, 2072*M) == 3265*M);   // never above the budget
     assert(commit_limited_budget(6144*M, 1000*M, 0) == 768*M);         // the floor
     assert(commit_limited_budget(512*M, 1000*M, 0) == 512*M);          // a budget under the floor stays
+    assert(!commit_pressure_held(false, 3072*M));
+    assert(commit_pressure_held(false, 3072*M - 1));
+    assert(commit_pressure_held(true, 4096*M - 1));
+    assert(!commit_pressure_held(true, 4096*M));
 }
 ''')
         source = (ROOT / "gpu/vk/vk_texture.cpp").read_text(encoding="utf-8")
@@ -323,6 +328,7 @@ struct Texture {VkImage image=0;VmaAllocation allocation=0;std::unordered_map<ui
 struct Dead {bool pool_eligible=true; VkImage image=1;VmaAllocation allocation=2;TargetImageKey pool_key{};
  std::unordered_map<uint64_t,VkImageView> view_map;uint64_t bytes=0;};
 struct {int device=0;} dev; uint64_t frame_no=1; int images_freed=0,views_freed=0;
+bool commit_pressure_now() { return false; }
 void vkDestroyImageView(int,uint64_t,const void*) {++views_freed;}
 void destroy_image(uint64_t,uint64_t) {++images_freed;}
 ''' + s[a:b] + r'''

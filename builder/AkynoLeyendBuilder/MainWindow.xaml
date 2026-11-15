@@ -118,6 +118,7 @@
                   <ComboBoxItem Content="Nítido (sem histórico temporal)" />
                   <ComboBoxItem Content="Compatibilidade (memória)" />
                   <ComboBoxItem Content="Desempenho · 2560×1600" />
+                  <ComboBoxItem Content="NVIDIA RTX · 1600p DLSS Qualidade" />
                 </ComboBox>
               </StackPanel>
             </Grid>
@@ -246,6 +247,8 @@
           <Button Content="Equilibrado" Tag="balanced" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
           <Button Content="Fluidez" Tag="smooth" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
           <Button Content="Desempenho · 2560×1600" Tag="1600p" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8" />
+          <Button Content="NVIDIA RTX · 1600p DLSS Qualidade" Tag="1600p-dlss" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,10,8"
+                  ToolTip="Requer GPU RTX e o runtime DLSS da NVIDIA, disponível em Ferramentas." />
           <Button Content="Usar opções do jogo" Tag="saved" Click="Preset" Style="{StaticResource Quiet}" Margin="0,0,0,8" />
         </WrapPanel>
         <Border Style="{StaticResource Card}">

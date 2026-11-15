@@ -1573,11 +1573,32 @@ void dump_input(char kind, uint32_t index, uint32_t handle, const Texture* tex) 
     dump_inputs += b;
 }
 
-/// (a descriptor that took over 2 ms to resolve: logged, 40 of them)
-void slow_descriptor(std::chrono::steady_clock::time_point t0, const char* what, uint64_t addr, uint64_t size) {
-    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-    static int logged;
-    if (ms >= 2.0 && logged++ < 40)
+struct SlowCallLog {
+    using Clock = std::chrono::steady_clock;
+    using TimePoint = Clock::time_point;
+
+    explicit SlowCallLog(unsigned limit) : limit(limit) {}
+
+    TimePoint start() const {
+        return claimed.load(std::memory_order_relaxed) < limit ? Clock::now() : TimePoint{};
+    }
+
+    bool claim() {
+        return claimed.fetch_add(1, std::memory_order_relaxed) < limit;
+    }
+
+private:
+    const unsigned limit;
+    std::atomic<unsigned> claimed{0};
+};
+
+SlowCallLog descriptor_log{40};
+
+/// Log the first 40 descriptor operations that take at least 2 ms to resolve.
+void slow_descriptor(SlowCallLog::TimePoint t0, const char* what, uint64_t addr, uint64_t size) {
+    if (t0 == SlowCallLog::TimePoint{}) return;
+    const double ms = std::chrono::duration<double, std::milli>(SlowCallLog::Clock::now() - t0).count();
+    if (ms >= 2.0 && descriptor_log.claim())
         logf("vk: slow descriptor %.1f ms: %s %#llx size %#llx", ms, what, (unsigned long long)addr, (unsigned long long)size);
 }
 
@@ -1674,7 +1695,7 @@ void build_descriptors(const NvnState& s, const Program& p) {
             VkWriteDescriptorSet w = write(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, d.count);
             const size_t first = dw.bufs.size();
             for (uint32_t k = 0; k < d.count; k++) {
-                const auto t0 = std::chrono::steady_clock::now();
+                const auto t0 = descriptor_log.start();
                 dw.bufs.push_back(uniform_range(s, st, d.index + k));
                 slow_descriptor(t0, "uniform buffer", d.index + k, dw.bufs.back().range);
             }
@@ -1736,7 +1757,7 @@ void build_descriptors(const NvnState& s, const Program& p) {
                     if (wide && d.count == 1 && addr)
                         if (const uint64_t end = gpu_pool_end(base); end > base + n) wide_n = std::min(end - base, wide) & ~3ull;
                 }
-                const auto t0 = std::chrono::steady_clock::now();
+                const auto t0 = descriptor_log.start();
                 // (hookshot) a storage buffer table's entries (count > 1, Info::global_tables): the ones past the table's
                 // end are whatever the constant buffer holds there, bound only when they look like a buffer
                 const bool plausible = d.count == 1 || (size && size <= (256ull << 20) && host->gpu_guest(base));
@@ -1882,7 +1903,7 @@ void build_descriptors(const NvnState& s, const Program& p) {
                     }
                 }
                 if (b && d.is_written) {
-                    const auto t1 = std::chrono::steady_clock::now();
+                    const auto t1 = descriptor_log.start();
                     const uint64_t guest = host->gpu_guest(base);
                     if (guest) { ParLock lk; memory_stamp_gpu(guest, n); }
                     slow_descriptor(t1, "stamp", base, n);
@@ -2242,6 +2263,21 @@ thread_local VkPipeline last_pipeline = VK_NULL_HANDLE;
 struct LastVb { VkBuffer b[16]; VkDeviceSize o[16], z[16], s[16]; };
 thread_local LastVb last_vb;
 thread_local bool last_vb_valid = false;
+struct LastIndexBinding {
+    VkCommandBuffer cmd;
+    VkBuffer buffer;
+    VkDeviceSize offset;
+    VkIndexType type;
+};
+thread_local LastIndexBinding last_index{};
+
+void bind_index_buffer(VkCommandBuffer cmd, VkBuffer buffer, VkDeviceSize offset, VkIndexType type) {
+    if (last_index.cmd == cmd && last_index.buffer == buffer && last_index.offset == offset && last_index.type == type)
+        return;
+    vkCmdBindIndexBuffer(cmd, buffer, offset, type);
+    last_index = {cmd, buffer, offset, type};
+}
+
 int64_t st_desc_reused;
 
 thread_local uint64_t targets_serial = ~0ull;   // (the state's render targets resolved once per NOP_SET_RT)
@@ -2879,6 +2915,7 @@ void draw_begin_recording(int slot, VkCommandBuffer cmd, uint64_t value) {
     pass = Pass{};
     work_since_barrier = false;
     last_dyn_valid = false, last_desc_valid = false, last_vb_valid = false, last_pipeline = VK_NULL_HANDLE;
+    last_index = {};
     descriptors_disturbed();
     static thread_local uint64_t hits_value = ~0ull;   // (resolved targets last a submission, through its parts: no CPU write is
     if (value != hits_value) {            // collected between them; resolved handles last while their slot and
@@ -4706,7 +4743,7 @@ void draw(VkCommandBuffer cmd, NvnState& s, const DrawArgs& d) {
             const uint32_t tri[6] = {v[0], v[1], v[2], v[0], v[2], v[3]};
             std::memcpy(out + q * 6, tri, sizeof tri);
         }
-        vkCmdBindIndexBuffer(cmd, cur->stream, at6, VK_INDEX_TYPE_UINT32);
+        bind_index_buffer(cmd, cur->stream, at6, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(cmd, quads * 6, (uint32_t)std::max(1, d.instances), 0, d.indexed ? d.base_vertex : 0,
                          (uint32_t)d.base_instance);
         st_draws++, pass.draws++;
@@ -4719,7 +4756,7 @@ void draw(VkCommandBuffer cmd, NvnState& s, const DrawArgs& d) {
         if (d.indexed) {
             BufferRef ib = gpu_buffer_bind(d.ibuf, 4, false);
             if (!ib) SKIP_HERE();
-            vkCmdBindIndexBuffer(cmd, ib.buffer, ib.offset, itype);
+            bind_index_buffer(cmd, ib.buffer, ib.offset, itype);
             if (cnt) vkCmdDrawIndexedIndirectCount(cmd, args.buffer, args.offset, cnt.buffer, cnt.offset, d.max, std::max(d.stride, 20));
             else vkCmdDrawIndexedIndirect(cmd, args.buffer, args.offset, std::max(d.max, 1), std::max(d.stride, 20));
         } else {
@@ -4730,7 +4767,7 @@ void draw(VkCommandBuffer cmd, NvnState& s, const DrawArgs& d) {
         const uint32_t unit = d.itype == 0 ? 1 : d.itype == 1 ? 2 : 4;
         BufferRef ib = gpu_buffer_bind(d.ibuf, (uint64_t)std::max(d.count, 1) * unit, false);
         if (!ib) SKIP_HERE();
-        vkCmdBindIndexBuffer(cmd, ib.buffer, ib.offset, itype);
+        bind_index_buffer(cmd, ib.buffer, ib.offset, itype);
         vkCmdDrawIndexed(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), 0, d.base_vertex, (uint32_t)d.base_instance);
     } else {
         vkCmdDraw(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), (uint32_t)d.first, (uint32_t)d.base_instance);
@@ -4738,17 +4775,22 @@ void draw(VkCommandBuffer cmd, NvnState& s, const DrawArgs& d) {
     st_draws++, pass.draws++;
 }
 
-struct DispatchClock {   // (a dispatch over 2 ms: logged, with where its time went)
-    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now(), t_prog{}, t_pipe{}, t_desc{};
+struct DispatchClock {   // Log the first 60 dispatches that take at least 2 ms.
+    static inline SlowCallLog log{60};
+    SlowCallLog::TimePoint t0 = log.start(), t_prog{}, t_pipe{}, t_desc{};
     uint64_t key = 0;
     bool made_pipeline = false;
+
+    void mark(SlowCallLog::TimePoint& t) const {
+        if (t0 != SlowCallLog::TimePoint{}) t = SlowCallLog::Clock::now();
+    }
+
     ~DispatchClock() {
-        const auto t1 = std::chrono::steady_clock::now();
+        if (t0 == SlowCallLog::TimePoint{}) return;
+        const auto t1 = SlowCallLog::Clock::now();
         const double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-        static int logged;
-        if (ms < 2.0 || logged >= 60) return;
-        logged++;
-        auto at = [&](std::chrono::steady_clock::time_point t) {
+        if (ms < 2.0 || !log.claim()) return;
+        auto at = [&](SlowCallLog::TimePoint t) {
             return t.time_since_epoch().count() ? std::chrono::duration<double, std::milli>(t - t0).count() : -1.0;
         };
         logf("vk: slow dispatch %.1f ms: program %016llx (picked at %.1f), pipeline%s at %.1f, descriptors at %.1f",
@@ -5460,7 +5502,7 @@ void dispatch(VkCommandBuffer cmd, NvnState& s, uint32_t x, uint32_t y, uint32_t
     }
     const uint8_t types[8]{};
     const Program* cp = program_for(s, ProgramKind::Compute, types);
-    dclock.t_prog = std::chrono::steady_clock::now();
+    dclock.mark(dclock.t_prog);
     // (a program still being translated is waited for, as a draw's is: a dispatch left out is work never done again.
     // MKW updates its terrain height clipmaps a region at a time as the camera moves, and makes its sky's tables
     // once; a skipped update left holes and flat patches in the terrain, garbage in the sky)
@@ -5577,11 +5619,11 @@ void dispatch(VkCommandBuffer cmd, NvnState& s, uint32_t x, uint32_t y, uint32_t
         pcache_built_since_save++;
     }
     if (plk.on) par_mutex().unlock(), plk.on = false;
-    dclock.t_pipe = std::chrono::steady_clock::now();
+    dclock.mark(dclock.t_pipe);
     end_pass(cmd);
     build_descriptors(s, p);
     grid_patch_want = false;
-    dclock.t_desc = std::chrono::steady_clock::now();
+    dclock.mark(dclock.t_desc);
     if (dump_on())
         logf("vk: dump-in %03d dispatch %ux%ux%u prog %016llx:%s", dump_seq(), x, y, z, (unsigned long long)p.key,
              dump_inputs.c_str());

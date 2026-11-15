@@ -49,7 +49,8 @@ sealed record GraphicsSettings {
  public static GraphicsSettings FsrPreset()=>Preset("smooth");
  public static GraphicsSettings Preset(string name)=>new(){
   Resolution=name=="amd-low"?"50":name=="quality"?"100":name=="balanced"?"75":"67",
-  OutputResolution=name=="1600p"?"1600p":"1080p",Speed="realtime",Upscaling=name=="1600p"?"lanczos":"fsr",Sharpness="10",Framegen="0",
+  OutputResolution=name is "1600p" or "1600p-dlss"?"1600p":"1080p",Speed="realtime",
+  Upscaling=name switch {"1600p"=>"lanczos", "1600p-dlss"=>"dlss", _=>"fsr"},Sharpness="10",Framegen="0",
   Pacing="on",FpsCounter="on",Handheld=name=="amd-low"?"on":"off",Cache="equilibrado"};
  public GraphicsSettings NormalizeLegacyOutput()=>Resolution=="native-1440"||Resolution=="native-4k"?
   this with {Resolution="100",OutputResolution=Resolution=="native-1440"?"1440p":"4k"}:this;

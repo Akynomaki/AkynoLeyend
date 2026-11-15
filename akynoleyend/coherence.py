@@ -240,6 +240,12 @@ PREVIOUS_HOST_SOURCES = {
         "7661e6c99c842080c46e0bbc56119109cbdee925b26c6651174fa9654b706f65",
         "b3c7d8cb699380bcc49c55668fe9f7cf93217b8c0d485ab067e25bd73faa32ff",
     },
+    "0.4.8": {
+        # Original Windows package and the two Vulkan performance updates use the same generated host.
+        "47c4982f115f741d470c06162e01070a57fda94d19385684322bf4b154d39f70",
+        "d2795b59e0d15f57515d8f65d5d69e11ad89a405124b7c9ffddd76ae25482b73",
+        "c56b011b501eb87f56b4a1cf6d26c8290d13cc3eb190ac725b9c8f86c559a90d",
+    },
 }
 
 

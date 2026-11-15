@@ -1468,3 +1468,33 @@ nenhum BNSH nem seção de controle NVN), e nenhum foi achado. Não vêm dos arq
 (provavelmente outra versão do jogo ou outro leitor), então o censo não mudou e o banco continua o mesmo. Um
 carimbo da preparação com o tamanho do banco chegou a ser escrito e foi retirado: sem shader novo, ele só faria
 todos repassarem a preparação inteira uma vez depois da atualização.
+
+## 0.4.8 – ajuste de desempenho Vulkan
+
+No registro da RTX 5070 Ti Laptop, os auxiliares de write-back foram descartados quando o driver registrou uso acima do orçamento. No trecho final houve cerca de 67 MiB de write-back por quadro em cópias completas, mesmo com mais de 3 GiB de espaço livre dentro dos blocos já alocados. Os auxiliares de 2 MiB podem continuar em uso enquanto a ocupação efetiva ficar abaixo de 95%, com tolerância de até 2% no orçamento reportado. Acima da faixa em que o alocador pode crescer, novos auxiliares só são admitidos em blocos compatíveis já existentes. Uma tentativa sem espaço aplica uma espera antes de repetir.
+
+Em pressão de VRAM ou de commit do Windows, o renderizador devolve espelhos que atendem à regra de ociosidade e cuja última submissão vinculada terminou. A atualização da tabela de páginas e a destruição adiada preservam a sequência original de liberação. Com menos de 3 GiB de commit, interrompe novas reservas de espelhos e auxiliares, esvazia o cache de alvos já aposentados e antecipa a seleção de texturas elegíveis para descarte. O regime de pressão termina a partir de 4 GiB livres.
+
+A CPU reutiliza a busca da região de write-back para páginas consecutivas e o endereço Vulkan do espelho enquanto ele vive. A limpeza de texturas remove as entradas diretamente pelos iteradores já ordenados. Mudança local nos fontes do renderizador, com ABI e carimbo dos shaders da 0.4.8. A manutenção reconhece o manifesto da versão Windows original e usa a atualização verificada da DLL por padrão.
+
+## 0.4.8 – segunda rodada de desempenho
+
+Mudanças locais de CPU e interface. O Vulkan agrupa consultas de oclusão contíguas da parte concluída da fila, verifica a disponibilidade por consulta e publica os relatórios na ordem original. O caminho anterior fazia uma leitura e um reset por consulta, cerca de 3 mil chamadas ao driver por quadro no trecho medido de Kokiri. O replay reaproveita um vínculo de índice apenas quando o buffer, offset e tipo coincidem dentro do mesmo command buffer. Os diagnósticos de descritores e dispatch param de consultar o relógio quando atingem seus limites de mensagens.
+
+O perfil opcional NVIDIA RTX · 1600p DLSS Qualidade no Builder usa renderização interna de 67%, saída 2560×1600 e geração de quadros desligada. O atalho passa pela validação de gráficos e do runtime DLSS já existente no launcher. O perfil DLAA continua disponível para renderizar a 100%.
+
+## 0.4.8 – cache de texturas e descarte entre quadros
+
+O log da sessão longa registrou 479 texturas retiradas numa limpeza, com a ocupação caindo de 6.432 para 5.375 MiB. Com o orçamento de 6.144 MiB naquele ponto, a regra antiga mirava 5.376 MiB. A regra agora aplica a margem fixa de 64 MiB ao orçamento efetivo, inclusive ao limite definido pelo perfil. Nesse exemplo, o alvo calculado passa a 6.080 MiB. A decisão continua respeitando a idade de uso, a fila da GPU e os limites do driver e do commit do Windows.
+
+A fila de destruição retém as imagens que a GPU ainda usa e devolve de imediato ao cache os alvos que podem ser reaproveitados. Em condições normais, libera 24 texturas por quadro e acelera a liberação se a fila passar de 192 entradas ou 128 MiB. A pressão crítica de VRAM e de commit libera todas as entradas concluídas. A limpeza compacta a fila numa única passagem e transfere as coleções de vistas e memória esparsa para a fila diretamente.
+
+O pacote cumulativo inclui o preset de 1600p, os ajustes de oclusão e comandos e os controles de memória das rodadas anteriores. Inclui a DLL genérica para Windows x64 com NGX. O atualizador reconhece os builds correspondentes ao ZIP original e às duas atualizações anteriores. Alterações locais nos fontes do renderizador e na tabela de revisões compatíveis.
+
+## 0.4.8 – pacote de desempenho publicado
+
+A atualização cumulativa de desempenho (ZIP `52184f25…`) foi aplicada sobre a 0.4.8 RC. Ela troca 31 arquivos e acrescenta 3 testes. Os recibos conferem com os fontes: renderizador `6ec39323…` e launcher `7dfafa99…`. A identidade do host desta árvore é `bc0d2166…`. Ela entra em `coherence.py["0.4.8"]` na próxima versão.
+
+A DLL do ZIP (`cb2357e3…`) foi recompilada destes fontes, com o mesmo LLVM-MinGW e o mesmo SDK NGX, numa pasta cujo caminho tem o mesmo comprimento da pasta original. `.text`, `.data`, `.pdata` e `.reloc` saíram idênticas. A diferença ficou só nos 180 bytes dos caminhos dos fontes gravados na DLL, no carimbo de data e no build id. O pacote leva essa recompilação (`1fecacf1…`): o código é o mesmo que rodou no jogo, sem o caminho local de quem compilou.
+
+O launcher foi republicado destes fontes com o .NET SDK 10.0.404, e o RunnerChecks passou 16 de 16.

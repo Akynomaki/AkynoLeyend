@@ -3,6 +3,12 @@
 #include <algorithm>
 #include <cstdint>
 namespace mkwvk {
+inline constexpr uint64_t kCommitReserve = 3072ull << 20;
+
+inline bool commit_pressure_held(bool held, uint64_t commit_free) {
+    return commit_free < kCommitReserve + (held ? 1024ull << 20 : 0);
+}
+
 inline uint64_t default_texture_budget(bool known, uint64_t allowed, bool integrated) {
     constexpr uint64_t mib = 1ull << 20;
     if (!known || !allowed) return integrated ? 2560 * mib : 4096 * mib;
@@ -18,7 +24,7 @@ inline uint64_t default_texture_budget(bool known, uint64_t allowed, bool integr
 // commit free, the texture budget is what the textures hold now less the shortfall, as near the driver's VRAM
 // limit; never under `floor`, below which the scene evicts what it draws.
 inline uint64_t commit_limited_budget(uint64_t budget, uint64_t textures, uint64_t commit_free,
-                                      uint64_t reserve = 3072ull << 20, uint64_t floor = 768ull << 20) {
+                                      uint64_t reserve = kCommitReserve, uint64_t floor = 768ull << 20) {
     if (commit_free >= reserve) return budget;
     const uint64_t over = reserve - commit_free;
     return std::min(budget, std::max(textures > over ? textures - over : 0, std::min(budget, floor)));

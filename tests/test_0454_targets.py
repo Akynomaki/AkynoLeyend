@@ -45,6 +45,8 @@ struct Texture {VkImage image=0;VmaAllocation allocation=0;std::unordered_map<ui
 struct Dead {bool pool_eligible=true; VkImage image=1;VmaAllocation allocation=2;TargetImageKey pool_key{};
  std::unordered_map<uint64_t,VkImageView> view_map;uint64_t bytes=0;};
 struct {int device=0;} dev; uint64_t frame_no=1; int images_freed=0,views_freed=0;
+bool low_commit = false;
+bool commit_pressure_now() { return low_commit; }
 void vkDestroyImageView(int,uint64_t,const void*) {++views_freed;}
 void destroy_image(uint64_t,uint64_t) {++images_freed;}
 ''' + s[a:b] + r'''
@@ -71,6 +73,12 @@ int main() {
     // not pressed: 120 frames as before
     target_pool_pressed=false; frame_no+=100; target_trim(); assert(target_pool_count==32);
     frame_no+=21; target_trim(); target_trim(); assert(target_pool_count==0);
+    assert(target_put(d));
+    low_commit = true;
+    assert(!target_put(d));
+    target_trim(); assert(target_pool_count==0);
+    low_commit = false;
+    assert(target_put(d));
     return 0;
 }
 '''

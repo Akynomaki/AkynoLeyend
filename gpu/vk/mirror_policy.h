@@ -13,4 +13,12 @@ inline uint64_t default_mirror_budget(uint64_t vram) {
     if (vram >= 11 * gib && vram <= 12 * gib + tolerance) return gib;
     return std::min<uint64_t>(vram / 4, 3 * gib);
 }
+
+inline bool idle_mirror_can_retire(uint64_t idle_epochs, uint64_t last_value, uint64_t completed) {
+    return idle_epochs > 600 && last_value <= completed;
+}
+
+inline constexpr uint64_t kMirrorInheritEpochs = 600;
+inline constexpr uint64_t kMirrorLongIdleEpochs = 6000;
+inline constexpr uint64_t kMirrorPressureTrimBytes = 128ull << 20;
 } // namespace mkwvk

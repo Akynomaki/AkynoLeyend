@@ -2,8 +2,8 @@
   "schema": 1,
   "version": "0.4.8",
   "pe_product_version": "0.4.8",
-  "source_sha256": "cba95ce5d77a1811a122a4e0aed189b0316f3ce6baee85de364b8796df072fb0",
-  "binary_sha256": "08da39aaa83ac25955a4ee1bf9af8a8d1574c4156185af7a9d19839bd04e75f6",
+  "source_sha256": "7dfafa99d5c98eec46070e2268f0d43d1516d35374e613aa45e218a4847b3553",
+  "binary_sha256": "5316425355a2b173ad89a8b5d0bce4be28dd903075177e1caf9161ea9d3bb596",
   "toolchain": ".NET SDK 10.0.404, net8.0-windows, self-contained win-x64 single-file",
   "runner_checks": "16/16 (Windows, .NET SDK 10.0.404 and the packaged Python 3.14.9)",
   "wpf_window_executed": false

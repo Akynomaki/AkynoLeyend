@@ -7,7 +7,7 @@ import time
 
 from . import __version__
 from .build import publish, source_identity
-from .coherence import R9_HOST_SOURCES, compatible_previous_host, require_host
+from .coherence import PREVIOUS_HOST_SOURCES, R9_HOST_SOURCES, compatible_previous_host, require_host
 from .config import ROOT, MANIFEST, BuildRequest, compile_jobs
 from .cpu import DEFAULT_MARCH, build_march, detect as detect_cpu, supports, unsupported_message
 from .errors import ProjectError
@@ -109,6 +109,14 @@ def maintain_build(folder: Path, work: Path, tools: Path, *, jobs=None, report=p
         if not compatible_previous_host(manifest):
             raise ProjectError("Este build nao tem uma revisao gerada compativel conhecida para atualizacao. Use Criar com sua entrada local.")
         require_host(manifest)
+        if (reuse_game_from is None and __version__ == manifest["version"] == "0.4.8"
+                and manifest["source_sha256"] in PREVIOUS_HOST_SOURCES["0.4.8"]
+                and build_march(manifest) == DEFAULT_MARCH
+                and tools.resolve() == (ROOT / "ferramentas").resolve()):
+            from .shader_prepare import _update_renderer
+            updated = _update_renderer(folder, manifest, report)
+            report("@@done " + str(folder))
+            return updated
         gen = work / "sa/gen"
         required = ["a64_table.c", "a64_hooks.c", "a64_suyu.c", "a64_stubs.c", "hos_image.c", "nvn2_exports.c"]
         if not all((gen/name).is_file() for name in required) or not list(gen.glob("code_*.c")):

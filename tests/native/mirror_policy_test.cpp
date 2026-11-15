@@ -11,4 +11,8 @@ int main() {
     assert(default_mirror_budget(12 * g + (512ull << 20)) == g);
     assert(default_mirror_budget(16 * g) == 3 * g);
     assert(default_mirror_budget(24 * g) == 3 * g);
+    using mkwvk::idle_mirror_can_retire;
+    assert(!idle_mirror_can_retire(600, 7, 7));
+    assert(!idle_mirror_can_retire(601, 8, 7));
+    assert(idle_mirror_can_retire(601, 7, 7));
 }

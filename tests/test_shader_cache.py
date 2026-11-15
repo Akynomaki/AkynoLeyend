@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from akynoleyend.build_support import shader_cache_stamp, shader_source_identity
-from akynoleyend.environment import runtime_environment
+from akynoleyend.environment import CACHE_MODES, runtime_environment
 from akynoleyend.errors import ProjectError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,3 +72,10 @@ class ShaderCacheTests(unittest.TestCase):
             self.assertNotIn("RX_VK_VALIDATION", env)
         with self.assertRaises(ProjectError):
             runtime_environment({}, "original", cache_mode="bad")
+
+    def test_rtx_1600_uses_the_measured_balanced_cache_budget(self):
+        env = runtime_environment({"RX_VK_VRAM_MB": "1"}, "rtx-1600", cache_mode="equilibrado")
+        self.assertEqual(env, {**CACHE_MODES["equilibrado"], "RX_VK_PREWARM_PER_SECOND": "100",
+                               "RX_VK_VRAM_MB": "3584", "RX_VK_MIRROR_MB": "1536", "RX_BACKEND": "vulkan"})
+        self.assertEqual(runtime_environment({}, "original", cache_mode="equilibrado")["RX_VK_PREWARM_PER_SECOND"], "10")
+        self.assertEqual(runtime_environment({}, "rtx-1600", cache_mode="streaming")["RX_VK_PREWARM_PER_SECOND"], "5")

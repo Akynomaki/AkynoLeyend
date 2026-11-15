@@ -48,7 +48,9 @@
 namespace mkwvk {
 // (AkynoLeyend r13e) the VRAM pressure texture_frame found last (vram_policy.h VramLevel): the mirrors read it
 std::atomic<int> vram_pressure_level{VRAM_NORMAL};
+static std::atomic<bool> commit_pressure{false};
 int vram_level_now() { return vram_pressure_level.load(std::memory_order_relaxed); }
+bool commit_pressure_now() { return commit_pressure.load(std::memory_order_relaxed); }
 
 namespace {
 
@@ -170,7 +172,6 @@ struct Dead {
     uint64_t value;
     VkImage image;
     VmaAllocation allocation;
-    std::vector<VkImageView> views;
     std::vector<VkDeviceMemory> memory;   // (a sparse image's)
     bool pool_eligible = false;
     TargetImageKey pool_key{};
@@ -178,6 +179,7 @@ struct Dead {
     uint64_t bytes = 0;
 };
 std::deque<Dead> dead;
+uint64_t dead_bytes = 0;
 
 // ---- retired target images (Hookshot #1416/#1436, adapted to this texture lifetime) ----
 // Only a target whose last GPU submission completed can enter this pool. Reuse
@@ -211,6 +213,7 @@ uint64_t target_pool_pressed_cap() {
     return mib << 20;
 }
 uint64_t target_pool_cap_now() {
+    if (commit_pressure_now()) return 0;
     return target_pool_pressed ? std::min(target_pool_cap(), target_pool_pressed_cap()) : target_pool_cap();
 }
 TargetImageKey target_key(const VkImageCreateInfo& ci) {
@@ -1334,14 +1337,12 @@ uint64_t destroy_gen = 1;   // (bumped when textures go: what was resolved to th
 
 void destroy_later(Texture& tex) {
     destroy_gen++;
-    Dead d{tex.last_value, tex.image, tex.allocation, {}, {}};
+    Dead d{tex.last_value, tex.image, tex.allocation, std::move(tex.sparse_chunks)};
     d.pool_eligible = tex.pool_eligible;
     d.pool_key = tex.pool_key;
     d.bytes = tex.bytes;
-    if (tex.pool_eligible) d.view_map = std::move(tex.views);
-    else for (auto& kv : tex.views)
-        if (kv.second) d.views.push_back(kv.second);
-    d.memory = tex.sparse_chunks;
+    d.view_map = std::move(tex.views);
+    dead_bytes += d.bytes;
     dead.push_back(std::move(d));
     total_bytes -= std::min(total_bytes, tex.bytes);
 }
@@ -2632,6 +2633,32 @@ Texture* texture_for_present(const nvn_tex* t) {
     return best ? best : tex;
 }
 
+void reap_textures(uint64_t completed) {
+    const bool urgent = vram_level_now() >= VRAM_CRITICAL || commit_pressure_now();
+    size_t remaining = dead.size(), destroyed = 0;
+    auto keep = dead.begin();
+    for (auto it = dead.begin(); it != dead.end(); ++it) {
+        const bool ready = it->value <= completed;
+        const bool pooled = ready && it->pool_eligible && target_put(*it);
+        const bool release = ready && release_retired_texture(destroyed, remaining, dead_bytes, urgent);
+        if (pooled || release) {
+            if (!pooled) {
+                for (const auto& view : it->view_map)
+                    if (view.second) vkDestroyImageView(dev.device, view.second, nullptr);
+                destroy_image(it->image, it->allocation);
+                ++destroyed;
+            }
+            for (VkDeviceMemory memory : it->memory) vkFreeMemory(dev.device, memory, nullptr);
+            dead_bytes -= it->bytes;
+            --remaining;
+        } else {
+            if (keep != it) *keep = std::move(*it);
+            ++keep;
+        }
+    }
+    dead.erase(keep, dead.end());
+}
+
 void texture_frame(uint64_t completed) {
     completed_value = completed;
     frame_no++;
@@ -2658,29 +2685,14 @@ void texture_frame(uint64_t completed) {
                      (unsigned long long)(pm.PrivateUsage >> 20), (unsigned long long)(kept >> 20), arenas.size());
         }
     }
-    for (auto it = dead.begin(); it != dead.end();) {
-        if (it->value > completed) {
-            ++it;
-            continue;
-        }
-        if (!target_put(*it)) {
-            for (VkImageView v : it->views) vkDestroyImageView(dev.device, v, nullptr);
-            for (const auto& view : it->view_map)
-                if (view.second) vkDestroyImageView(dev.device, view.second, nullptr);
-            destroy_image(it->image, it->allocation);
-        }
-        for (VkDeviceMemory m : it->memory) vkFreeMemory(dev.device, m, nullptr);
-        it = dead.erase(it);
-    }
+    reap_textures(completed);
     target_trim();
     if (frame_no % 600 == 0)
         logf("vk: target pool: %llu reused, %llu new, %llu retired; %llu images (%llu MB)",
              (unsigned long long)target_pool_reused, (unsigned long long)target_pool_made,
              (unsigned long long)target_pool_destroyed, (unsigned long long)target_pool_count,
              (unsigned long long)(target_pool_bytes >> 20));
-    // A texture budget with room for the rest of the renderer, reduced further near driver pressure.
-    // may have (other programs use the GPU too). The least recently used go first, down to 7/8 of it; nothing the
-    // last 8 presents used, nothing recorded work may still read.
+    // Reserve room for the rest of the renderer and reclaim the oldest idle textures first.
     static uint64_t own = 0;
     if (frame_no % 10) return;
     uint64_t used = 0, allowed = 0, block_free = 0;
@@ -2707,7 +2719,6 @@ void texture_frame(uint64_t completed) {
         }
     }
     uint64_t budget = own;
-    const uint64_t size_budget = budget;   // (r13i: the budget as a size, before the rules that take an excess off it: evict_target)
     // (near what the driver allows, the budget shrinks by the excess. The excess of what the process holds less the
     // free space in VMA's blocks, which new images take before VMA makes a block: measured by the blocks alone, the
     // textures evicted freed space inside them that the driver still counted, so 10 frames later the budget shrank
@@ -2728,11 +2739,17 @@ void texture_frame(uint64_t completed) {
     {   // (AkynoLeyend r8) short of system commit: texture_budget.h. RX_VK_TEST_COMMIT_FREE_MB: that figure, for tests
         static const char* const test_free = getenv("RX_VK_TEST_COMMIT_FREE_MB");
         static bool said = false;
-        uint64_t commit_free = ~0ull;
+        uint64_t commit_free = UINT64_MAX;
         MEMORYSTATUSEX ms;
         ms.dwLength = sizeof ms;
-        if (test_free) commit_free = (uint64_t)atoll(test_free) << 20;
+        if (test_free) commit_free = (uint64_t)std::clamp(atoll(test_free), 0ll, (long long)(UINT64_MAX >> 20)) << 20;
         else if (GlobalMemoryStatusEx(&ms)) commit_free = ms.ullAvailPageFile;
+        if (commit_free != UINT64_MAX) {
+            const bool tight_commit = commit_pressure_held(commit_pressure_now(), commit_free);
+            if (tight_commit != commit_pressure.exchange(tight_commit, std::memory_order_relaxed))
+                logf("vk: Windows commit pressure %s (%llu MB free)", tight_commit ? "on" : "off",
+                     (unsigned long long)(commit_free >> 20));
+        }
         const uint64_t limited = commit_limited_budget(budget, total_bytes, commit_free);
         if (limited < budget && (!said || frame_no % 600 == 0)) {
             said = true;
@@ -2868,11 +2885,11 @@ void texture_frame(uint64_t completed) {
     // (hookshot) under the budget, every 600 presents: the render targets drawn over since (below), unused for 120
     const bool sweep = total_bytes <= budget;
     if (no_evict || (sweep && frame_no % 600)) return;
-    std::vector<std::pair<uint64_t, Texture*>> order;
+    static std::vector<std::pair<uint64_t, decltype(textures)::iterator>> order;
+    order.clear();
     order.reserve(textures.size());
-    for (auto& kv : textures) order.push_back({kv.second->last_frame, kv.second.get()});
+    for (auto it = textures.begin(); it != textures.end(); ++it) order.emplace_back(it->second->last_frame, it);
     std::sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-    std::vector<Texture*> gone;
     /* The 260x260 terrain normal map may be GPU-rendered once, finalized when the chunk leaves,
        then recreated over the same GPU storage when the player returns. Evicting its only GPU
        image makes the remade texture sample unwritten/old bytes (Hookshot PR593, issues 107/386).
@@ -2896,8 +2913,8 @@ void texture_frame(uint64_t completed) {
     };
     uint64_t kept_finalized_bytes = 0;
     size_t kept_finalized_count = 0;
-    for (const auto& [last, tex] : order)
-        if (keep_finalized(tex)) kept_finalized_bytes += tex->bytes, kept_finalized_count++;
+    for (const auto& [last, it] : order)
+        if (keep_finalized(it->second.get())) kept_finalized_bytes += it->second->bytes, kept_finalized_count++;
     if (kept_finalized_count && frame_no % 600 == 0)
         logf("vk: finalized GPU-once textures retained: %zu (%llu MB), budget cap %llu MB",
              kept_finalized_count, (unsigned long long)(kept_finalized_bytes >> 20),
@@ -2906,12 +2923,12 @@ void texture_frame(uint64_t completed) {
         getenv("RX_VK_EVICT_MIN_UNUSED") ? (uint64_t)std::clamp(atoi(getenv("RX_VK_EVICT_MIN_UNUSED")), 1, 600) : 60;
     // (AkynoLeyend r13e) from critical on, what went unused for 8 presents may go: at 60, the 2-2.4 GB a scene used in 8
     // presents plus the rest held the textures at 2.8-3.3 GB against a budget under half of that (vram_policy.h)
-    const uint64_t unused_min = evict_min_unused(level, min_unused);
-    // (AkynoLeyend r13i, Hookshot PR 2826) the 90% rule, the driver's limit and the commit rule let go of their excess, not of an
-    // eighth of the cache: vram_policy.h evict_target. RX_VK_EVICT_EXCESS=0: to 7/8 of the budget, as before
+    const uint64_t unused_min = evict_min_unused(commit_pressure_now() ? VRAM_CRITICAL : level, min_unused);
+    // Apply the effective limit with a constant margin, including if it came from the profile's fixed budget.
     static const bool excess_only = !getenv("RX_VK_EVICT_EXCESS") || atoi(getenv("RX_VK_EVICT_EXCESS")) != 0;
-    const uint64_t evict_to = evict_target(total_bytes, size_budget, budget, excess_only);
-    for (auto& [last, tex] : order) {
+    const uint64_t evict_to = evict_target(total_bytes, budget, excess_only);
+    for (const auto& [last, it] : order) {
+        Texture* tex = it->second.get();
         if ((!sweep && total_bytes <= evict_to) ||
             frame_no - last < (sweep ? std::max<uint64_t>(120, min_unused) : unused_min)) break;
         if (tex->last_value > completed) continue;
@@ -2951,16 +2968,7 @@ void texture_frame(uint64_t completed) {
         watch_tex(tex, "evicted");
         destroy_later(*tex);
         forget_gpu(tex);
-        gone.push_back(tex);
-    }
-    for (auto it = textures.begin(); it != textures.end() && !gone.empty();) {
-        auto g = std::find(gone.begin(), gone.end(), it->second.get());
-        if (g != gone.end()) {
-            gone.erase(g);
-            it = textures.erase(it);
-        } else {
-            ++it;
-        }
+        textures.erase(it);   // unordered_map erase preserves the other iterators in order
     }
     const size_t n = order.size() - textures.size();
     if (n) logf("vk: %zu textures retired (%zu left, %llu MB)", n, textures.size(), (unsigned long long)(total_bytes >> 20));

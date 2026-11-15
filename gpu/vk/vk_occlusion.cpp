@@ -58,6 +58,24 @@ OcclusionRunning running;             // (occlusion_count.h)
 std::unordered_map<uint64_t, int> pending_reports;
 int64_t st_reports = 0, st_queries = 0, st_lost = 0, st_zero = 0;
 
+struct QueryResult {
+    uint64_t samples, available;
+};
+QueryResult results[kSlots];   // (shared scratch, protected by mu)
+
+void collect_query_range(uint32_t first, uint32_t count) {
+    if (!count) return;
+    const VkResult status = vkGetQueryPoolResults(dev.device, pool, first, count, count * sizeof(QueryResult),
+                                                   results + first, sizeof(QueryResult),
+                                                   VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+    if (status != VK_SUCCESS && status != VK_NOT_READY) {
+        for (uint32_t slot = first; slot < first + count; ++slot) results[slot].available = 0;
+    }
+    vkResetQueryPool(dev.device, pool, first, count);
+    for (uint32_t slot = first; slot < first + count; ++slot)
+        busy[slot].store(0, std::memory_order_release);
+}
+
 void close_open(VkCommandBuffer cmd) {
     if (open_slot < 0) return;
     vkCmdEndQuery(cmd, pool, (uint32_t)open_slot);
@@ -154,18 +172,29 @@ bool occlusion_pending(uint64_t addr) {
 void occlusion_collect(uint64_t done) {
     if (state <= 0) return;
     std::lock_guard lk(mu);
+    // Consecutive slots can be read together across reports, stopping at the completed
+    // prefix and splitting at the end of the ring. Fold the reports in their original order.
+    uint32_t first = 0, count = 0;
+    for (const Entry& e : entries) {
+        if (e.value > done) break;
+        for (const uint32_t slot : e.slots) {
+            if (slot != first + count || !count) {
+                collect_query_range(first, count);
+                first = slot;
+                count = 0;
+            }
+            ++count;
+        }
+    }
+    collect_query_range(first, count);
+
     while (!entries.empty() && entries.front().value <= done) {   // (0: recorded outside a submission, taken at once)
         Entry& e = entries.front();
         uint64_t sum = 0;
         bool missed = e.lost;
         for (const uint32_t s : e.slots) {
-            uint64_t samples = 0;
-            const VkResult r = vkGetQueryPoolResults(dev.device, pool, s, 1, sizeof samples, &samples, sizeof samples,
-                                                     VK_QUERY_RESULT_64_BIT);
-            if (r == VK_SUCCESS) sum += samples;
+            if (results[s].available) sum += results[s].samples;
             else missed = true;   // (not available after its submission: counted as seen)
-            vkResetQueryPool(dev.device, pool, s, 1);
-            busy[s].store(0, std::memory_order_release);
         }
         const uint64_t count = occlusion_fold(running, sum, missed, e.reset);
         if (!e.reset) {

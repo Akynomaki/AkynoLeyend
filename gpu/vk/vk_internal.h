@@ -210,7 +210,8 @@ bool create_buffer(uint64_t size, VkBufferUsageFlags usage, bool host_visible, V
                    VmaAllocation& allocation, void** mapped);
 void destroy_buffer(VkBuffer buffer, VmaAllocation allocation);
 /// A buffer in VRAM only (within the driver's budget), or false
-bool create_device_buffer(uint64_t size, VkBufferUsageFlags usage, VkBuffer& buffer, VmaAllocation& allocation);
+bool create_device_buffer(uint64_t size, VkBufferUsageFlags usage, VkBuffer& buffer, VmaAllocation& allocation,
+                          bool existing_block_only = false);
 /// Device-local memory this process uses and what the driver allows it now (VK_EXT_memory_budget), summed over the
 /// device-local heaps; false when unknown
 bool vram_usage(uint64_t* used, uint64_t* budget, uint64_t* block_free = nullptr);
@@ -225,6 +226,7 @@ uint64_t image_pool_block_of(VmaAllocation allocation, uint64_t* size = nullptr)
 void image_pool_blocks(std::unordered_map<uint64_t, uint64_t>& allocated);
 /// (AkynoLeyend r13e) the VRAM pressure the textures found last (vram_policy.h VramLevel; vk_texture.cpp)
 int vram_level_now();
+bool commit_pressure_now();
 PFN_vkGetInstanceProcAddr instance_proc();   // vk_main.cpp
 
 bool create_swapchain(uint32_t width, uint32_t height);

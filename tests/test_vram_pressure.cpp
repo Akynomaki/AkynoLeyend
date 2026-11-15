@@ -8,6 +8,7 @@
 
 using mkwvk::vram_pressure::allocated;
 using mkwvk::vram_pressure::shadow_fits;
+using mkwvk::vram_pressure::shadow_reuse_fits;
 using mkwvk::vram_pressure::shadows_go;
 
 int main() {
@@ -19,7 +20,9 @@ int main() {
     CHECK(!shadows_go(10462 * MB, 10732 * MB, 3472 * MB));    // (3.5 GB of it free inside the blocks: they stay)
     CHECK(!shadows_go(10462 * MB, 10732 * MB, 300 * MB));     // (94.7% really allocated)
     CHECK(shadows_go(10462 * MB, 10732 * MB, 0));             // (97.5% really allocated: they go)
-    CHECK(shadows_go(10650 * MB, 10732 * MB, 3472 * MB));     // (the driver's own count past 99%: they go whatever is free)
+    CHECK(!shadows_go(10650 * MB, 10732 * MB, 3472 * MB));   // Near the reported limit with actual headroom.
+    CHECK(!shadows_go(11376 * MB, 11176 * MB, 3467 * MB));   // Recorded RTX 5070 Ti Laptop session.
+    CHECK(shadows_go(11410 * MB, 11176 * MB, 3467 * MB));    // More than 2% over the raw budget.
     CHECK(!shadows_go(10462 * MB, 0, 0));                     // (no budget known: nothing to judge by)
     CHECK(!shadows_go(0, 10732 * MB, 0));
     // (a shadow is made only where, with it, the textures' own lines are not passed: 90% really allocated, a 97% count)
@@ -35,13 +38,12 @@ int main() {
     CHECK(!shadow_fits(shadows, 9600 * MB - shadows, allowed, 0));     // (9,200 + 400 MB: back at 96%)
     CHECK(!shadow_fits(shadows, 8700 * MB, allowed, 0));               // (and not at 91% either)
     CHECK(shadow_fits(shadows, 8600 * MB, allowed, 0));
-    // (nor by the count: the shadows are allocations of their own, so their going takes their whole size off the count.
-    // What goes at a 99% count only fits again at 97%: not at once, and not at the 98% it used to)
-    CHECK(shadows_go(9950 * MB, allowed, 3000 * MB));
-    CHECK(!shadow_fits(shadows, 9950 * MB - shadows, allowed, 3000 * MB));   // (9,550 + 400 MB: back over 99%)
-    CHECK(!shadow_fits(shadows, 9400 * MB, allowed, 3000 * MB));             // (9,800 MB: 98%, where they came back before)
-    CHECK(shadow_fits(shadows, 9300 * MB, allowed, 3000 * MB));              // (9,700 MB: 97%)
-    CHECK(!shadows_go(9700 * MB, allowed, 3000 * MB));                       // (and there they stay)
+    CHECK(!shadow_fits(2 * MB, 11376 * MB, 11176 * MB, 3467 * MB));
+    CHECK(shadow_reuse_fits(2 * MB, 11376 * MB, 11176 * MB, 3467 * MB));
+    CHECK(!shadow_reuse_fits(2 * MB, 11410 * MB, 11176 * MB, 3467 * MB));
+    CHECK(!shadow_reuse_fits(2 * MB, 11376 * MB, 11176 * MB, 0));
+    CHECK(!shadow_reuse_fits(2 * MB, 9850 * MB, allowed, 500 * MB));
+    CHECK(!shadow_reuse_fits(2 * MB, 11376 * MB, 0, 3467 * MB));
     std::printf("PASS: the shadows go by what is really allocated\n");
     return 0;
 }

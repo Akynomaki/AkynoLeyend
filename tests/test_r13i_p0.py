@@ -3,7 +3,7 @@
 - PR 2263: the game's short sleeps wait on the timer where the process has six logical processors or fewer (host/hos_thread.c).
 - PR 1334: the task and mesh stages inline the global-load helper, the floating trees (Eden's spirv_emit_context.cpp), and the
   program cache translates those programs again, once (gpu/vk/vk_shader.cpp, record kind 16).
-- PR 2826: the VRAM rules let go of their excess, not an eighth of the texture cache (gpu/vk/vram_policy.h evict_target).
+- PR 2826: VRAM eviction releases the excess together with a small margin (gpu/vk/vram_policy.h evict_target).
 
 The sleep choice, the stale-record rule and the eviction target are compiled and run; the rest is read from the sources. No game
 or GPU: none of this says how the game runs or what it draws."""
@@ -48,17 +48,18 @@ using namespace mkwvk;
 constexpr uint64_t MB = 1ull << 20;
 int main() {
     // this PC's log: 2936 MB of textures, a few dozen MB over the 90% line. Before: 7/8 of the rule's budget, ~360 MB gone
-    assert(evict_target(2936 * MB, 4096 * MB, 2876 * MB) == 2812 * MB);              // the excess and 64 MB more
-    assert(evict_target(2936 * MB, 4096 * MB, 2876 * MB, false) == 2876 * MB / 8 * 7);  // RX_VK_EVICT_EXCESS=0: as before
-    // no rule cut the budget: the size still asks for its 7/8
-    assert(evict_target(3500 * MB, 3000 * MB, 3000 * MB) == 3000 * MB / 8 * 7);
-    // over the size and over a rule: the lower of the two
-    assert(evict_target(3500 * MB, 3000 * MB, 2900 * MB) == 3000 * MB / 8 * 7);
-    assert(evict_target(3500 * MB, 3000 * MB, 2000 * MB) == 1936 * MB);
+    assert(evict_target(2936 * MB, 2876 * MB) == 2812 * MB);
+    assert(evict_target(2936 * MB, 2876 * MB, false) == 2876 * MB / 8 * 7);
+    // In the later log, a 6 GiB size limit pulled 6,432 MiB down to 5,375 MiB in one sweep.
+    assert(evict_target(6432 * MB, 6144 * MB) == 6080 * MB);
+    assert(evict_target(6432 * MB, 6144 * MB, false) == 5376 * MB);
+    assert(evict_target(3500 * MB, 3000 * MB) == 2936 * MB);
+    assert(evict_target(3500 * MB, 2900 * MB) == 2836 * MB);
+    assert(evict_target(3500 * MB, 2000 * MB) == 1936 * MB);
     // a rule's budget under the slack: down to 0, never below
-    assert(evict_target(100 * MB, 3000 * MB, 40 * MB) == 0);
-    // under the rule's budget (the pass is a sweep then): nothing asked for
-    assert(evict_target(1000 * MB, 3000 * MB, 2000 * MB) == UINT64_MAX);
+    assert(evict_target(100 * MB, 40 * MB) == 0);
+    assert(evict_target(1000 * MB, 2000 * MB) == UINT64_MAX);
+    assert(evict_target(2000 * MB, 2000 * MB) == UINT64_MAX);
 }
 '''
 
@@ -193,11 +194,9 @@ class Vram(unittest.TestCase):
 
     def test_the_eviction_pass_uses_it(self):
         texture = source("gpu/vk/vk_texture.cpp")
-        self.assertIn("const uint64_t size_budget = budget;", texture)
-        self.assertLess(texture.index("uint64_t budget = own;"), texture.index("const uint64_t size_budget = budget;"))
-        self.assertLess(texture.index("const uint64_t size_budget = budget;"),
-                        texture.index("if (known && pressure > allowed / 10 * 9) {"))
-        self.assertIn("const uint64_t evict_to = evict_target(total_bytes, size_budget, budget, excess_only);", texture)
+        target = "const uint64_t evict_to = evict_target(total_bytes, budget, excess_only);"
+        self.assertIn(target, texture)
+        self.assertLess(texture.index("budget = limited;"), texture.index(target))
         self.assertIn("if ((!sweep && total_bytes <= evict_to) ||", texture)
         self.assertNotIn("total_bytes <= budget / 8 * 7", texture)
 

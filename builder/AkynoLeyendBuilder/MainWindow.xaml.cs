@@ -425,7 +425,7 @@ public partial class MainWindow : Window
         BuildNote.Foreground = (Brush)FindResource("InkSoft");
         ShowPage(building: true);
         SetButtons(cancel: true);
-        var args=new List<string>{"--require-current-build","--out",finished,"--profile",ProfileBox.SelectedIndex switch{1=>"8gb",2=>"nitido",3=>"compatibilidade",4=>"desempenho-1600",_=>"original"}};
+        var args=new List<string>{"--require-current-build","--out",finished,"--profile",ProfileBox.SelectedIndex switch{1=>"8gb",2=>"nitido",3=>"compatibilidade",4=>"desempenho-1600",5=>"rtx-1600",_=>"original"}};
         try{args.AddRange(CaptureGraphics().Arguments());}   // (0.4.6) no Teste de desempenho
         catch(Exception error){playing=false;BuildNote.Text=error.Message;SetButtons(back:true);return;}
         runner=new Runner(tools,"run",args);
@@ -456,8 +456,9 @@ public partial class MainWindow : Window
     {
         var p=(sender as Button)?.Tag?.ToString();
         ApplyGraphics(p=="saved"?new GraphicsSettings():GraphicsSettings.Preset(p??"smooth"));
-        ProfileBox.SelectedIndex=p=="1600p"?4:0;
+        ProfileBox.SelectedIndex=p switch{"1600p"=>4,"1600p-dlss"=>5,_=>0};
         GraphicsNote.Text=p=="saved"?"Os ajustes seguem as opções salvas no jogo.":
+            p=="1600p-dlss"?"DLSS Qualidade usa escala de 67%, saída 2560×1600, cache Equilibrado e geração de quadros desligada.":
             p=="1600p"?"Saída 2560×1600, escala interna de 67% e geração de quadros desligada.":
             p=="amd-low"?"AMD básico: Full HD, escala 50%, FSR 1, portátil ligado e FPS visível. Reinicie o jogo.":
             "Perfil aplicado: Full HD, FSR 1 e FPS visível. A escala interna pode ser ajustada separadamente.";
