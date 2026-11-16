@@ -6,15 +6,14 @@ O AkynoLeyend desenvolve um fluxo para traduzir código ARM64 a partir de arquiv
 
 ## Fontes e downloads
 
-Este repositório contém os fontes da 0.4.8: o launcher, a orquestração em Python, o host, o renderizador Vulkan, os testes e a documentação em `docs/`. Os pacotes para Windows ficam nas [Releases](https://github.com/Akynomaki/AkynoLeyend/releases). A versão mais recente é a [0.4.8 — atualização de desempenho](https://github.com/Akynomaki/AkynoLeyend/releases/tag/v0.4.8-desempenho):
+Este repositório contém os fontes da 0.4.9: o launcher, a orquestração em Python, o host, o renderizador Vulkan, os testes e a documentação em `docs/`. Os pacotes para Windows ficam nas [Releases](https://github.com/Akynomaki/AkynoLeyend/releases). A versão mais recente é a [0.4.9 — vegetação e efeitos decorativos](https://github.com/Akynomaki/AkynoLeyend/releases/tag/v0.4.9):
 
 - **Instalação nova:** o ZIP completo, que já traz o launcher, o renderizador, o Python e o compilador.
-- **Quem já tem a 0.4.8:** o ZIP de atualização, usado em **Atualizar build** no launcher.
-- **Da Teste 4 até a 0.4.7:** o mesmo ZIP no launcher ou o atualizador `.exe`, que já leva o ZIP dentro.
+- **Quem já tem o jogo criado, da Teste 4 até a 0.4.8:** o ZIP de atualização, usado em **Atualizar build** no launcher, ou o atualizador `.exe`, que já leva o ZIP dentro.
 
 O compilador LLVM-MinGW, o Python embutido e as bibliotecas Python vêm apenas no ZIP completo, não no git. O SDK DLSS da NVIDIA é usado na compilação do renderizador. A licença dele não permite redistribuí-lo, então ele não está no repositório nem nos pacotes. O runtime DLSS é baixado no PC do jogador pelo launcher.
 
-## O que a versão de teste 0.4.8 reúne
+## O que a versão de teste 0.4.9 reúne
 
 - Launcher para Windows com perfis gráficos, detecção de CPU, aviso de memória disponível e fluxo de manutenção incremental.
 - Preparação de shaders e pipelines já encontrados em partidas anteriores, com preparação dos pipelines gráficos restantes em segundo plano.
@@ -25,6 +24,7 @@ O compilador LLVM-MinGW, o Python embutido e as bibliotecas Python vêm apenas n
   - Consultas de oclusão em lotes.
   - Descarte de texturas distribuído entre quadros.
   - Preset opcional NVIDIA RTX · 1600p DLSS Qualidade.
+- Opção Gráficos > Vegetação e efeitos decorativos (0.4.9): remove o capim, as plantas, as samambaias e o musgo do chão, as folhas caindo e os vagalumes. Vale ao abrir o jogo. Alivia a placa de vídeo; o FPS sobe quando ela é o limite.
 
 ## Desempenho medido
 
