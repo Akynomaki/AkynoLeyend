@@ -19,10 +19,10 @@ static class Core
 {
     /// (0.4.5-test.1) the versions it starts from: the Teste 4 of either branch, 0.4.4 and 0.4.5 (each accepted by the
     /// package's coherence.py by its exact sources)
-    public static readonly string[] From = { "0.4.3-test.4", "0.4.4", "0.4.5", "0.4.5-test.1", "0.4.5-test.2", "0.4.5-test.3", "0.4.5-test.4", "0.4.5-test.5", "0.4.5-test.6", "0.4.5-test.7", "0.4.5-test.8", "0.4.6", "0.4.7" };
-    public const string To = "0.4.8";
+    public static readonly string[] From = { "0.4.3-test.4", "0.4.4", "0.4.5", "0.4.5-test.1", "0.4.5-test.2", "0.4.5-test.3", "0.4.5-test.4", "0.4.5-test.5", "0.4.5-test.6", "0.4.5-test.7", "0.4.5-test.8", "0.4.6", "0.4.7", "0.4.8" };
+    public const string To = "0.4.9";
     /// (0.4.4) how the installed version is named to the player, and this updater's log in atualizacoes/
-    public const string FromName = "Teste 4, 0.4.4, 0.4.5, 0.4.5-test.1, 0.4.5-test.2, 0.4.5-test.3, 0.4.5-test.4, 0.4.5-test.5, 0.4.5-test.6, 0.4.5-test.7, 0.4.5-test.8, 0.4.6 ou 0.4.7";
+    public const string FromName = "Teste 4, 0.4.4, 0.4.5, 0.4.5-test.1, 0.4.5-test.2, 0.4.5-test.3, 0.4.5-test.4, 0.4.5-test.5, 0.4.5-test.6, 0.4.5-test.7, 0.4.5-test.8, 0.4.6, 0.4.7 ou 0.4.8";
     public const string LogName = "atualizador-" + To + ".log";
     const string Resource = "AkynoLeyend-Atualizacao.zip";
 

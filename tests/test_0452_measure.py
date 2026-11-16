@@ -142,7 +142,7 @@ class Version(unittest.TestCase):
     def test_test_1_installs_update_in_place(self):
         from akynoleyend import __version__
         from akynoleyend.coherence import HOST_REVISION, compatible_previous_host
-        self.assertTrue(__version__.startswith("0.4.5-test.") or __version__ in ("0.4.6", "0.4.7", "0.4.8"))
+        self.assertTrue(__version__.startswith("0.4.5-test.") or __version__ in ("0.4.6", "0.4.7", "0.4.8", "0.4.9"))
         for identity in ("df76cd9ce03758f3382f2d8c92875eb4d7623808f53c77ed53357e18acf309ca",
                          "e8a1da01e2f0e1be65e599551e06e3027cacf7190a9142c86efa689a60dc6b32"):
             self.assertTrue(compatible_previous_host({"version": "0.4.5-test.1", "source_sha256": identity,

@@ -1,10 +1,11 @@
 {
   "schema": 1,
-  "version": "0.4.8",
+  "version": "0.4.9",
   "baseline_version": "0.4.3-test.4",
-  "candidate_id": "0.4.8",
+  "candidate_id": "0.4.9",
   "notes": {
     "new": [
+      "Gráficos > Vegetação e efeitos decorativos: Remover para ganhar FPS deixa de desenhar o capim, as plantas, as samambaias e o musgo do chão (com as sombras deles), as folhas caindo e os vagalumes. Árvores, pedras, construções, personagens, a Navi e a névoa continuam. Vale ao abrir o jogo: feche e clique em Jogar. Normal, o padrão, deixa o jogo como antes. No Ryzen 5 3500X o FPS do campo não mudou (o processador é o limite), mas a placa de vídeo usou cerca de 20 W e 550 MB de VRAM a menos; o ganho de FPS aparece quando a placa de vídeo é o limite.",
       "Gráficos > NVIDIA RTX · 1600p DLSS Qualidade combina escala interna de 67%, saída 2560×1600, cache Equilibrado e orçamentos Vulkan ajustados. A geração de quadros fica desligada.",
       "Pré-carregamento a cada início, como o do NX2navi: o jogo pré-carrega os shaders (traduções já guardadas) e os pipelines que as suas partidas encontraram, na ordem em que apareceram. Os de compute ficam prontos antes de abrir. O início espera os gráficos por até 20 segundos, e os que faltam continuam sendo montados em segundo plano, com prioridade mínima, enquanto você joga. Um desenho que chega a um deles usa o pipeline pronto em vez de esperar. RX_VK_PRELOAD_WAIT_MS muda a espera (0 espera todos, como antes); RX_VK_PRELOAD_THREADS, quantos continuam em segundo plano (2).",
       "Visual novo do launcher: tema preto e dourado, navegação lateral, janela que maximiza e restaura, seletor de saves com barra própria e Cancelar sempre visível. O botão EXPORTAR SAVES passa a se chamar Exportar Save.",

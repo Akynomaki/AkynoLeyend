@@ -89,7 +89,7 @@ class Version(unittest.TestCase):
     def test_test_2_installs_update_in_place(self):
         from akynoleyend import __version__
         from akynoleyend.coherence import HOST_REVISION, compatible_previous_host
-        self.assertTrue(__version__.startswith("0.4.5-test.") or __version__ in ("0.4.6", "0.4.7", "0.4.8"))
+        self.assertTrue(__version__.startswith("0.4.5-test.") or __version__ in ("0.4.6", "0.4.7", "0.4.8", "0.4.9"))
         self.assertTrue(compatible_previous_host({"version": "0.4.5-test.2", "host_revision": HOST_REVISION,
             "source_sha256": "081373776e2f4647d34dc88686a3814be8c860087fe15443b146a1b2a17007ed", "game_build_id": "e0f3ccfa"}))
         self.assertIn('"0.4.5-test.2"', source("builder/AkynoLeyendUpdater/Core.cs"))   # (test.4: test.3 after it)

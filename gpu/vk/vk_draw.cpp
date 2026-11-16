@@ -38,6 +38,7 @@
 #include "cache_rate.h"
 #include "cache_io.h"
 #include "boot_options.h"
+#include "lite_scene.h"
 
 #include "shaders/clear_f_frag_spv.h"
 #include "shaders/clear_i_frag_spv.h"
@@ -3381,6 +3382,8 @@ struct StatsMeta {
     uint8_t dispatch;                 // (a compute dispatch: its grid, or its indirect arguments as above)
     uint32_t grid[3];
     uint64_t args_vkbuf, args_vkoff;  // (the Vulkan buffer and offset the arguments were read from)
+    // (AkynoLeyend 0.4.9: what kind of draw it is, for telling particles from lighting and interface: stats_note_state)
+    uint8_t blend, blend_src, blend_dst, depth_test, depth_write, a2c;
 };
 VkQueryPool stats_pool = VK_NULL_HANDLE;
 // (indirect draws: after the draw, the first 16 bytes of its arguments and its count word as the GPU holds them, 32 bytes a
@@ -3567,6 +3570,8 @@ void stats_tick() {
                      : VK_SUCCESS;
     struct Sum {
         uint64_t draws = 0, vs = 0, clip_in = 0, clip_out = 0, fs = 0, cs = 0, task = 0, mesh = 0;
+        uint64_t blended = 0, depth_tested = 0, depth_written = 0, a2c = 0, instances = 0;   // (draws so, and instances in all)
+        uint32_t blend_src = 0, blend_dst = 0;   // (the first blended draw's colour factors, NVN's numbers)
         bool is_mesh = false, indirect = false, is_dispatch = false;
         std::string args;   // (indirect: the GPU's argument words and count of its first draws)
     };
@@ -3578,6 +3583,9 @@ void stats_tick() {
         x.draws++, x.vs += v[0], x.clip_in += v[1], x.clip_out += v[2], x.fs += v[3], x.cs += v[4];
         if (stats_mesh_bits) x.task += v[5], x.mesh += v[6];
         x.is_mesh |= m.mesh != 0, x.indirect |= m.indirect != 0, x.is_dispatch |= m.dispatch != 0;
+        if (m.blend && !x.blended) x.blend_src = m.blend_src, x.blend_dst = m.blend_dst;
+        x.blended += m.blend != 0, x.depth_tested += m.depth_test != 0, x.depth_written += m.depth_write != 0, x.a2c += m.a2c != 0;
+        x.instances += m.indirect ? 0 : (uint64_t)std::max(m.instances, 1);
         if (m.dispatch && x.draws == 1) x.args += " #" + std::to_string(i);   // (its place in the frame's recording)
         if (m.dispatch && !m.indirect && x.args.size() < 200) {
             char b[64];
@@ -3618,11 +3626,17 @@ void stats_tick() {
                         (unsigned long long)x.cs, k == 4 ? "NO THREADS" : "", (x.indirect ? " (indirect)" + x.args : x.args).c_str());
                 continue;
             }
-            fprintf(f, "%s %016llx %6llu | %10llu %8llu %10llu | %10llu %10llu | %11llu | %s%s\n", x.is_mesh ? "mesh" : "draw",
+            // (0.4.9: then how its draws were set: blended (and the first one's source and destination colour factors),
+            // depth tested, depth written, alpha to coverage, of its draws; inst: the direct draws' instances in all)
+            char kind[128];
+            snprintf(kind, sizeof kind, " {blend %llu src %u dst %u | ztest %llu | zwrite %llu | a2c %llu | inst %llu}",
+                     (unsigned long long)x.blended, x.blend_src, x.blend_dst, (unsigned long long)x.depth_tested,
+                     (unsigned long long)x.depth_written, (unsigned long long)x.a2c, (unsigned long long)x.instances);
+            fprintf(f, "%s %016llx %6llu | %10llu %8llu %10llu | %10llu %10llu | %11llu | %s%s%s\n", x.is_mesh ? "mesh" : "draw",
                     (unsigned long long)prog, (unsigned long long)x.draws, (unsigned long long)x.vs, (unsigned long long)x.task,
                     (unsigned long long)x.mesh, (unsigned long long)x.clip_in, (unsigned long long)x.clip_out,
                     (unsigned long long)x.fs, k == 0 ? "RAN, NO PRIMITIVES" : k == 1 ? "primitives, no fragments" : k == 2 ? "no shader work" : "",
-                    x.indirect ? (" (indirect)" + x.args).c_str() : "");
+                    kind, x.indirect ? (" (indirect)" + x.args).c_str() : "");
         }
         // who binds each indirect draw's argument words in this frame: written (W) or only read (r), by which programs
         std::vector<StatsBind> binds;
@@ -3859,6 +3873,15 @@ struct StatsQuery {
     static void copy_args(VkCommandBuffer cmd, const DrawArgs& d, uint32_t index);
     static void copy_watch(VkCommandBuffer cmd, uint32_t index);
 };
+/// (AkynoLeyend 0.4.9) a measured draw's blending, depth and coverage state, from the NVN state it is recorded with: first
+/// colour target's blend (NVN's blend_en bit 0 and blend[0]'s colour factors), depth test and write, alpha to coverage
+void stats_note_state(uint32_t i, const NvnState& s) {
+    if (i >= kStatsQueries) return;
+    StatsMeta& m = stats_meta[i];
+    m.blend = (uint8_t)(s.color.blend_en & 1u);
+    m.blend_src = (uint8_t)s.blend[0].src_rgb, m.blend_dst = (uint8_t)s.blend[0].dst_rgb;
+    m.depth_test = (uint8_t)s.ds.dt, m.depth_write = (uint8_t)s.ds.dw, m.a2c = s.ms.a2c;
+}
 void StatsQuery::copy_watch(VkCommandBuffer cmd, uint32_t index) {
     const std::vector<uint64_t>& w = watch_addrs();
     if (w.empty() || !stats_watch) return;
@@ -4308,6 +4331,14 @@ void draw(VkCommandBuffer cmd, NvnState& s, const DrawArgs& d) {
     if (cp->key == 0x1a7482c0ec9991eaULL) world_drawn_at.store(presents_now, std::memory_order_relaxed);
     if (cp->key == 0x02ff9920c2571cc2ULL) wheel_drawn_at.store(presents_now, std::memory_order_relaxed);
     if (skip_live(cp->key)) return;   // (EvilOOT, RX_VK_SKIP_FILE)
+    {   // (AkynoLeyend 0.4.9, gpu/vk/lite_scene.h) the launcher's decorative vegetation option, read once at the start
+        static const bool lite = [] {
+            const bool on = akyno_lite_scene_value(getenv("AKYNO_LITE_SCENE"));
+            logf("vk: decorative vegetation %s (AKYNO_LITE_SCENE)", on ? "left out" : "drawn");
+            return on;
+        }();
+        if (lite && akyno_lite_scene_key(cp->key)) return;
+    }
     {   // (hookshot, RX_VK_SKIP_PROG: draws too, their native code keys logged once; =-: none. By default OoT's 53509044401d78d2, 128
         // draws of a full-screen pass over two 64^3 volumes, once, while the game loads: on about half the first starts the GPU stalled in
         // them for Windows' two seconds and the device was lost, a black screen with the frame counter over it. Its shaders are straight-line
@@ -4582,6 +4613,7 @@ void draw(VkCommandBuffer cmd, NvnState& s, const DrawArgs& d) {
         }
     }
     StatsQuery stats_query(cmd, p.key, d);   // (EvilOOT, RX_VK_DRAW_STATS)
+    if (stats_query.cmd) stats_note_state(stats_query.index, s);
     if (stats_frame_now() && stats_prog_wanted(p.key)) {   // (and the wanted programs' buffers: a mesh draw's stages, fragment)
         for (const int stage : {6, 7, 1}) stats_dump_stage(p.key, s, stage);
         // (and as the GPU holds them, after it: RX_VK_GPU_DUMP=1 only; its bindings can sync a pool's mirror mid-frame, and

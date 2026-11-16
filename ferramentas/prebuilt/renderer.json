@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "release": "0.4.8",
+  "release": "0.4.9",
   "config": {
     "target": "windows-gnu",
     "march": "x86-64-v3",
     "release": "1"
   },
-  "source_sha256": "6ec393235880a54808e39129252d7d1d288b923c8be27ecfd28acae572db7359",
-  "binary_sha256": "1fecacf17e3535ab7fd9cc09049b53238c389ff99b7771d9801b5ecd6c14f7e7",
+  "source_sha256": "b853a3fa687d7195b4bb1a01103a511e350b409893a49016f76b9ffccba52cd2",
+  "binary_sha256": "e5084c9d15d5cbef1ce1ce2ce973a51b496930bc56f786aa829da4754b67e1e2",
   "compiler": "LLVM-MinGW do SDK instalado (clang 23.1.4), Windows",
   "shader_stamp": "4cdbb0029868040b",
   "renderer_api": 2,

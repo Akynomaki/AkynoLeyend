@@ -1498,3 +1498,33 @@ A atualização cumulativa de desempenho (ZIP `52184f25…`) foi aplicada sobre 
 A DLL do ZIP (`cb2357e3…`) foi recompilada destes fontes, com o mesmo LLVM-MinGW e o mesmo SDK NGX, numa pasta cujo caminho tem o mesmo comprimento da pasta original. `.text`, `.data`, `.pdata` e `.reloc` saíram idênticas. A diferença ficou só nos 180 bytes dos caminhos dos fontes gravados na DLL, no carimbo de data e no build id. O pacote leva essa recompilação (`1fecacf1…`): o código é o mesmo que rodou no jogo, sem o caminho local de quem compilou.
 
 O launcher foi republicado destes fontes com o .NET SDK 10.0.404, e o RunnerChecks passou 16 de 16.
+
+## 0.4.9: vegetação e efeitos decorativos
+
+A opção Gráficos > Vegetação e efeitos decorativos (`--lite-scene on`, `AKYNO_LITE_SCENE=1`) deixa de desenhar 36 programas
+do jogo: 32 de vegetação e 4 de efeitos. Ela vale ao abrir o jogo, porque o renderizador lê a variável uma vez. Em Normal,
+o padrão, o launcher não passa nada. As configurações salvas antes da 0.4.9 abrem em Normal.
+
+- **Vegetação:** 13 grupos de desenhos por mesh com argumentos indiretos, cada um em 2 ou 3 passes (sombra, profundidade e
+  cor). Cobrem o capim de perto e de longe, as samambaias, as plantas e o musgo do chão.
+- **Efeitos:** as folhas caindo (`a37e5fc5…`, `5bea5f63…`) e os vagalumes, com rastro e brilho (`cd9e931f…`, `bd375eef…`).
+- **Ficam de fora de propósito:**
+  - as copas das árvores (`6b4dea60…`, `e28434e1…`, `3b8c07f2…` e `f93c1d64…`), porque sem elas as árvores ficam só com o
+    tronco;
+  - a névoa do chão (`701ae221…`), porque sem ela o chão fica com manchas brancas;
+  - as passadas sem as quais a tela mostra uma imagem velha do menu;
+  - a interface.
+
+O catálogo foi feito em 15/11/2026 no Campo de Hyrule e na Floresta Kokiri, com `RX_VK_DRAW_STATS` e `RX_VK_SKIP_FILE`.
+Para separar as partículas, o `RX_VK_DRAW_STATS` passou a registrar, por programa:
+
+- a mistura de cor, com os fatores de origem e destino;
+- o teste e a escrita de profundidade;
+- o alfa para cobertura;
+- as instâncias.
+
+Partículas são transparentes, ficam no mundo 3D e não gravam profundidade. Esse filtro reduziu os 165 programas
+transparentes a poucos candidatos. Cada grupo de candidatos foi escondido e conferido nos prints.
+
+A lista está em `gpu/vk/lite_scene.h`. `draw()` confere a opção logo depois do `RX_VK_SKIP_FILE`. A mudança não altera
+shaders, ABI, host nem o carimbo do cache de shaders.

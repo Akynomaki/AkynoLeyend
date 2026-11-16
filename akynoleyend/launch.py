@@ -166,6 +166,7 @@ def launch(
     shader_workers: int | None = None,
     fps_counter: bool | None = None,
     handheld: bool | None = None,
+    lite_scene: bool | None = None,
     auto_prepare: bool = True,
     measure: bool = False,
     experiment: str = "nenhum",
@@ -181,6 +182,7 @@ def launch(
         pacing=pacing,
         fps_counter=fps_counter,
         handheld=handheld,
+        lite_scene=lite_scene,
     )
     graphics = graphics_environment(**graphics_options)
     if profile == "compatibilidade":
@@ -381,6 +383,7 @@ def launch(
             "pacing": pacing,
             "fps_counter": fps_counter,
             "handheld": handheld,
+            "lite_scene": lite_scene,
         },
         "prepare_again": prepare_again,
         "auto_prepare": auto_prepare,

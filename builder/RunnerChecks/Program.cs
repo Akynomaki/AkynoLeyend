@@ -115,6 +115,27 @@ try
         Require(legacy.Resolution=="100" && legacy.OutputResolution=="4k", "Legacy native output did not migrate.");
         return Task.CompletedTask;
     });
+    await Check("decorative vegetation: off passes nothing, on reaches the CLI, old settings read as off", () =>
+    {
+        var path = Path.Combine(folder, "settings-vegetation.json");
+        var graphics = new GraphicsSettings { Resolution = "100", Upscaling = "lanczos", Cache = "streaming" };
+        Require(graphics.LiteScene == "off" && !graphics.Arguments().Contains("--lite-scene"), "Off must leave the game as before.");
+        var on = (graphics with { LiteScene = "on" }).Arguments();
+        Require(on.SequenceEqual(graphics.Arguments().Concat(new[] { "--lite-scene", "on" })), "On did not reach the CLI.");
+        var refused = false;
+        try { (graphics with { LiteScene = "maybe" }).Arguments(); }
+        catch (InvalidOperationException) { refused = true; }
+        Require(refused, "An unknown vegetation value was accepted.");
+        var saved = new LauncherSettings { Graphics = graphics with { LiteScene = "on" } };
+        saved.Save(path);
+        Require(LauncherSettings.Load(path) == saved, "The vegetation choice did not roundtrip.");
+        // (settings saved before 0.4.9 have no LiteScene field)
+        File.WriteAllText(path, File.ReadAllText(path).Replace("\"LiteScene\": \"on\",", "").Replace(",\n    \"LiteScene\": \"on\"", "").Replace(",\r\n    \"LiteScene\": \"on\"", ""));
+        Require(!File.ReadAllText(path).Contains("LiteScene"), "The test could not remove the field.");
+        Require(LauncherSettings.Load(path)!.Graphics.LiteScene == "off", "Settings from before 0.4.9 must read as off.");
+        File.Delete(path);
+        return Task.CompletedTask;
+    });
     await Check("AMD basic and three graphics presets retain Full HD, FSR and FPS", () => {
         foreach(var name in new[]{"amd-low","smooth","balanced","quality"}){
             var g=GraphicsSettings.Preset(name);

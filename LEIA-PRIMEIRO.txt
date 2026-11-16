@@ -1,7 +1,7 @@
-AkynoLeyend 0.4.8 — pacote completo para Windows x64
+AkynoLeyend 0.4.9 — pacote completo para Windows x64
 
 1. Extraia o ZIP inteiro em uma pasta curta, como C:\Jogos.
-2. Na pasta AkynoLeyend-0.4.8, abra AkynoLeyendBuilder.exe.
+2. Na pasta AkynoLeyend-0.4.9, abra AkynoLeyendBuilder.exe.
 3. Selecione o seu arquivo .nup compatível ou as pastas romfs e exefs do seu dump.
 4. Deixe Processos de compilação em Automático, clique em Criar e aguarde.
 5. Quando o build terminar, clique em Jogar. A primeira abertura prepara os
@@ -11,21 +11,29 @@ O pacote inclui o launcher, o renderizador, o Python e o compilador. O jogo
 é criado no seu PC a partir do dump local. Mantenha a pasta inteira junta.
 
 Já tem o jogo criado (Teste 4, 0.4.4, 0.4.5, qualquer 0.4.5-test, a unificada
-0.4.5-test.1, a 0.4.6 ou a 0.4.7)? Use o ZIP de atualização em Atualizações >
-Selecionar atualização (.zip), ou o AkynoLeyend-Atualizador-0.4.8.exe. O jogo não é
+0.4.5-test.1, a 0.4.6, a 0.4.7 ou a 0.4.8)? Use o ZIP de atualização em Atualizações >
+Selecionar atualização (.zip), ou o AkynoLeyend-Atualizador-0.4.9.exe. O jogo não é
 traduzido de novo: só os blocos dos ganchos novos são recompilados e o EXE é
 religado. Os shaders já preparados continuam valendo.
 
+A 0.4.9 traz a opção Gráficos > Vegetação e efeitos decorativos. Em Remover para
+ganhar FPS, o jogo deixa de desenhar o capim, as plantas, as samambaias e o musgo
+do chão, as folhas caindo e os vagalumes. Árvores, pedras, construções,
+personagens, a Navi e a névoa continuam. Vale ao abrir o jogo. Em Normal, o
+padrão, nada muda. O ganho de FPS aparece quando a placa de vídeo é o limite;
+com o processador no limite, a placa só trabalha menos.
+Notas completas em docs/origem.md.
+
+Versões anteriores:
 A 0.4.8 pré-carrega shaders e pipelines a cada início, como o NX2navi: os
 programas e pipelines que as suas partidas já encontraram são lidos do cache e
 montados na ordem em que apareceram. Os de compute ficam prontos antes de
 abrir; o início espera os gráficos por até 20 segundos e os que faltam são
 montados em segundo plano, com prioridade mínima, enquanto você joga. Antes, nos
 modos Streaming e Equilibrado, só uma fração deles era pré-carregada (11 de
-3.759 pipelines gráficos no Teste-1).
-Notas completas em docs/origem.md.
-
-Versões anteriores:
+3.759 pipelines gráficos no Teste-1). A atualização de desempenho da 0.4.8
+trouxe o preset NVIDIA RTX · 1600p DLSS Qualidade e ajustes de memória e
+oclusão no Vulkan.
 A 0.4.7 junta os dois ramos que saíram da 0.4.5-test.1:
 - Linha principal (test.2 a 0.4.6): esperas curtas exatas (todos os sonos curtos
   giram no relógio), texturas e alvos de render em grupos separados na VRAM,

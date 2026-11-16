@@ -80,6 +80,7 @@ def graphics_environment(
     pacing=None,
     fps_counter=None,
     handheld=None,
+    lite_scene=None,
 ):
     if backend != "vulkan":
         raise ProjectError(
@@ -150,4 +151,11 @@ def graphics_environment(
             if type(value) is not bool:
                 raise ProjectError(label + " deve ser ligado ou desligado.")
             result[key] = "1" if value else "0"
+    # (0.4.9, gpu/vk/lite_scene.h) Only when on: off leaves the variable out, and the renderer draws everything as before.
+    # The renderer reads it once at the start, so a change applies when the game is opened again.
+    if lite_scene is not None:
+        if type(lite_scene) is not bool:
+            raise ProjectError("Vegetacao decorativa deve ser ligada ou desligada.")
+        if lite_scene:
+            result["AKYNO_LITE_SCENE"] = "1"
     return result

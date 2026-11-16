@@ -447,15 +447,16 @@ public partial class MainWindow : Window
     }
     static string Choice(ComboBox b)=>(b.SelectedItem as ComboBoxItem)?.Tag?.ToString()??"saved";
     static void Select(ComboBox b,string value){b.SelectedIndex=0;for(int i=0;i<b.Items.Count;i++)if(b.Items[i] is ComboBoxItem x&&x.IsEnabled&&x.Tag?.ToString()==value){b.SelectedIndex=i;break;}}
-    GraphicsSettings CaptureGraphics()=>new(){Backend=Choice(BackendBox),Resolution=Choice(ResolutionBox),OutputResolution=Choice(OutputBox),Speed=Choice(SpeedBox),Upscaling=Choice(UpscaleBox),Sharpness=Choice(SharpnessBox),Framegen=Choice(FramegenBox),Pacing=Choice(PacingBox),Cache=Choice(CacheBox),FpsCounter=Choice(FpsBox),Handheld=Choice(HandheldBox)};
-    void ApplyGraphics(GraphicsSettings g){g=g.NormalizeLegacyOutput();Select(BackendBox,g.Backend);Select(ResolutionBox,g.Resolution);Select(OutputBox,g.OutputResolution);Select(SpeedBox,g.Speed);Select(UpscaleBox,g.Upscaling);Select(SharpnessBox,g.Sharpness);Select(FramegenBox,g.Framegen);Select(PacingBox,g.Pacing);Select(CacheBox,g.Cache);Select(FpsBox,g.FpsCounter);Select(HandheldBox,g.Handheld);}
+    GraphicsSettings CaptureGraphics()=>new(){Backend=Choice(BackendBox),Resolution=Choice(ResolutionBox),OutputResolution=Choice(OutputBox),Speed=Choice(SpeedBox),Upscaling=Choice(UpscaleBox),Sharpness=Choice(SharpnessBox),Framegen=Choice(FramegenBox),Pacing=Choice(PacingBox),Cache=Choice(CacheBox),FpsCounter=Choice(FpsBox),Handheld=Choice(HandheldBox),LiteScene=Choice(LiteSceneBox)};
+    void ApplyGraphics(GraphicsSettings g){g=g.NormalizeLegacyOutput();Select(BackendBox,g.Backend);Select(ResolutionBox,g.Resolution);Select(OutputBox,g.OutputResolution);Select(SpeedBox,g.Speed);Select(UpscaleBox,g.Upscaling);Select(SharpnessBox,g.Sharpness);Select(FramegenBox,g.Framegen);Select(PacingBox,g.Pacing);Select(CacheBox,g.Cache);Select(FpsBox,g.FpsCounter);Select(HandheldBox,g.Handheld);Select(LiteSceneBox,g.LiteScene);}
     void LoadSettings(){try{var s=LauncherSettings.Load(SettingsPath);if(s==null)return;if(!string.IsNullOrWhiteSpace(s.Output))OutPath.Text=s.Output;NupPath.Text=s.Nup;RomfsPath.Text=s.Romfs;ExefsPath.Text=s.Exefs;UseFolders.IsChecked=s.Folders;UseNup.IsChecked=!s.Folders;JobsBox.SelectedIndex=Math.Clamp(s.Jobs,0,8);ProfileBox.SelectedIndex=Math.Clamp(s.Profile,0,ProfileBox.Items.Count-1);LanguageBox.SelectedItem=Strings.All.FirstOrDefault(x=>x.Code==s.Language)??lang;ApplyGraphics(s.Graphics);}catch(Exception e){GraphicsNote.Text="Não foi possível ler ajustes anteriores; usando padrões: "+e.Message;}}
     bool SaveSettings(){try{new LauncherSettings{Output=OutPath.Text,Nup=NupPath.Text,Romfs=RomfsPath.Text,Exefs=ExefsPath.Text,Folders=UseFolders.IsChecked==true,Jobs=JobsBox.SelectedIndex,Profile=ProfileBox.SelectedIndex,Language=lang.Code,Graphics=CaptureGraphics()}.Save(SettingsPath);return true;}catch(Exception e){GraphicsNote.Text="Não foi possível salvar: "+e.Message;return false;}}
     void SaveGraphics(object sender,RoutedEventArgs e){if(SaveSettings())GraphicsNote.Text="Ajustes salvos. Serão aplicados ao jogar.";}
     void Preset(object sender,RoutedEventArgs e)
     {
         var p=(sender as Button)?.Tag?.ToString();
-        ApplyGraphics(p=="saved"?new GraphicsSettings():GraphicsSettings.Preset(p??"smooth"));
+        // (a preset leaves the vegetation row as the player set it)
+        ApplyGraphics((p=="saved"?new GraphicsSettings():GraphicsSettings.Preset(p??"smooth")) with {LiteScene=Choice(LiteSceneBox)});
         ProfileBox.SelectedIndex=p switch{"1600p"=>4,"1600p-dlss"=>5,_=>0};
         GraphicsNote.Text=p=="saved"?"Os ajustes seguem as opções salvas no jogo.":
             p=="1600p-dlss"?"DLSS Qualidade usa escala de 67%, saída 2560×1600, cache Equilibrado e geração de quadros desligada.":

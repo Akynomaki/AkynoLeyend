@@ -401,6 +401,14 @@
                 </ComboBox>
               </StackPanel>
             </Grid>
+            <StackPanel Margin="0,0,0,20">
+              <TextBlock Text="Vegetação e efeitos decorativos (reiniciar o jogo)" Style="{StaticResource Label}" />
+              <ComboBox x:Name="LiteSceneBox" Style="{StaticResource Choice}" SelectedIndex="0" AutomationProperties.Name="Vegetação e efeitos decorativos">
+                <ComboBoxItem Content="Normal · como no jogo" Tag="off" />
+                <ComboBoxItem Content="Remover para ganhar FPS" Tag="on" />
+              </ComboBox>
+              <TextBlock Text="Remove capim, plantas, samambaias e musgo do chão, com as sombras deles, e as folhas caindo e os vagalumes. Árvores, pedras, construções, personagens, a Navi e a névoa continuam. Feche o jogo e clique em Jogar para aplicar." Style="{StaticResource Note}" FontSize="11" Margin="0,6,0,0" />
+            </StackPanel>
             <TextBlock Text="No jogo: Ctrl+M abre o menu. Use mouse ou WASD. Os shaders são conferidos e preparados automaticamente ao jogar. Tempo real mantém a simulação; não aumenta os quadros renderizados." Style="{StaticResource Note}" FontSize="11" />
           </StackPanel>
         </Border>

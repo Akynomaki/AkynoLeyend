@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Bridge from 0.4.3-test.4 (Teste 4, either branch: r13c to r13j, or the Intel branch r13d/r13e) 0.4.4 0.4.5, 0.4.5-test.1, 0.4.5-test.2, 0.4.5-test.3, 0.4.5-test.4, 0.4.5-test.5, 0.4.5-test.6, 0.4.5-test.7, 0.4.5-test.8, 0.4.6 or 0.4.7 to 0.4.8. Built for Test 3 to
+    Bridge from 0.4.3-test.4 (Teste 4, either branch: r13c to r13j, or the Intel branch r13d/r13e) 0.4.4 0.4.5, 0.4.5-test.1, 0.4.5-test.2, 0.4.5-test.3, 0.4.5-test.4, 0.4.5-test.5, 0.4.5-test.6, 0.4.5-test.7, 0.4.5-test.8, 0.4.6, 0.4.7 or 0.4.8 to 0.4.9. Built for Test 3 to
     0.4.3-test.4 first (that "Atualizar build" button could not start the updater).
     Build (the update package is embedded and its SHA-256 is checked at run time):
-      dotnet publish -c Release -p:PackagePath=<AkynoLeyend-Atualizacao-0.4.8.zip> -p:PackageSha256=<sha256>
+      dotnet publish -c Release -p:PackagePath=<AkynoLeyend-Atualizacao-0.4.9.zip> -p:PackageSha256=<sha256>
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -13,9 +13,9 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>AkynoLeyend-Atualizador-0.4.8</AssemblyName>
+    <AssemblyName>AkynoLeyend-Atualizador-0.4.9</AssemblyName>
     <RootNamespace>AkynoLeyendUpdater</RootNamespace>
-    <Version>0.4.8</Version>
+    <Version>0.4.9</Version>
     <Product>AkynoLeyend</Product>
     <ApplicationIcon>../../assets/AkynoLeyend.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>

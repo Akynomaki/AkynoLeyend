@@ -82,7 +82,7 @@ def main():
     if args.update:
         from akynoleyend import __version__
         from akynoleyend.coherence import PREVIOUS_HOST_SOURCES
-        if __version__ != "0.4.8" or "0.4.7" not in PREVIOUS_HOST_SOURCES or "0.4.6" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.8" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.7" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.6" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.5" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.4" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.3" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.2" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.1" not in PREVIOUS_HOST_SOURCES or "0.4.5" not in PREVIOUS_HOST_SOURCES or "0.4.4" not in PREVIOUS_HOST_SOURCES:
+        if __version__ != "0.4.9" or "0.4.8" not in PREVIOUS_HOST_SOURCES or "0.4.7" not in PREVIOUS_HOST_SOURCES or "0.4.6" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.8" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.7" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.6" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.5" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.4" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.3" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.2" not in PREVIOUS_HOST_SOURCES or "0.4.5-test.1" not in PREVIOUS_HOST_SOURCES or "0.4.5" not in PREVIOUS_HOST_SOURCES or "0.4.4" not in PREVIOUS_HOST_SOURCES:
             parser.error("Atualizacao incremental sem host anterior conferido.")
     if not args.source_only:
         from akynoleyend.release import verify_windows_release

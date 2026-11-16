@@ -171,3 +171,36 @@ O teste na RTX 5070 Ti Laptop comparou a segunda atualização com a cumulativa.
 | Rotação da câmera | 27,5 → 31,4 | 12,2 → 15,6 | 66,3 → 50,3 ms | 40 → 8 |
 
 A medição começa após a carga inicial e cobre uma cena. Ainda há picos de tempo de quadro ao girar a câmera. A inicialização do DLSS, a travessia entre áreas, a RTX 3060 Ti, o processador i5 e a estabilidade de uma sessão longa exigem medições próprias.
+
+## 0.4.9 – vegetação e efeitos decorativos
+
+O teste usou uma cópia da 0.4.8 com a DLL nova, numa RTX 3060 Ti com Ryzen 5 3500X, DLAA, cache Original e o mesmo save.
+
+| Campo de Hyrule, mesmo ponto | Opção ligada | Opção desligada |
+| --- | --- | --- |
+| FPS | 27–28 | 27–28 |
+| Uso da GPU | 44–48 % | 50–55 % |
+| Consumo da GPU | 78–80 W | 100–101 W |
+| VRAM | 7.317 MB | 7.869 MB |
+| CPU | 90–95 % | 92–98 % |
+
+**Campo de Hyrule:**
+
+- A cena é limitada pelo processador: a opção alivia a placa de vídeo, mas o FPS não muda.
+- No capim alto, escondendo a vegetação pelo arquivo de diagnóstico, o FPS subiu de 15 para 18.
+- Com a opção desligada, o log mostra `decorative vegetation drawn` e a cena é a mesma da 0.4.8.
+
+**Floresta Kokiri, com a lista final de 36 programas:**
+
+- O capim, as plantas do chão, as folhas caindo e os vagalumes somem.
+- Link, Navi, névoa, árvores, luz e interface continuam.
+- O FPS ficou entre 24 e 25, mas a câmera estava em outro ângulo que a medição de 16 FPS. Os dois números não se comparam.
+
+**Testes:** passaram os 10 testes da opção (`tests/test_049_lite_scene.py`) e as 17 verificações do RunnerChecks.
+
+**Ainda não conferido:**
+
+- o capim e os arbustos que se cortam, com a opção ligada;
+- a poeira do campo;
+- os brotos de samambaia da Kokiri, que vêm de outro programa e continuam aparecendo;
+- outras áreas, com programas que o catálogo ainda não viu.

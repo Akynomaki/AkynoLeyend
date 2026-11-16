@@ -13,6 +13,9 @@ sealed record GraphicsSettings {
  public string FpsCounter{get;init;}="saved";
  public string Handheld{get;init;}="saved";
  public string Cache{get;init;}="original";
+ // (0.4.9) Graphics > Vegetação decorativa: "on" leaves the decorative vegetation out (gpu/vk/lite_scene.h); "off", the
+ // default and what settings saved before 0.4.9 read as, passes nothing and the game draws everything
+ public string LiteScene{get;init;}="off";
  string LaunchResolution()=>Upscaling switch {
   "dlaa" or "fsr-native-aa" or "fsr4-native-aa"=>"100",
   "dlss" or "fsr-temporal" or "fsr4" when Resolution is not ("50" or "67" or "75")=>"50",
@@ -35,6 +38,8 @@ sealed record GraphicsSettings {
   var handheld=OutputResolution is "1440p" or "4k" or "1600p"?"off":Handheld;
   Add("--handheld",handheld,"on","off");
   Add("--cache-mode",Cache,"original","streaming","equilibrado");
+  if(LiteScene is not ("off" or "on"))throw new InvalidOperationException($"Opção inválida: --lite-scene={LiteScene}");
+  if(LiteScene=="on"){args.Add("--lite-scene");args.Add("on");}
   return args.ToArray();
  }
  public GraphicsSettings FollowGameOptions(GameGraphicsOptions? before, GameGraphicsOptions? after){

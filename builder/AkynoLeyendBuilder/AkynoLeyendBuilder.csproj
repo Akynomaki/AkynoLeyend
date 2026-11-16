@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AkynoLeyendBuilder</AssemblyName>
     <RootNamespace>AkynoLeyendBuilder</RootNamespace>
-    <Version>0.4.8</Version>
+    <Version>0.4.9</Version>
     <Product>AkynoLeyend</Product>
     <ApplicationIcon>../../assets/AkynoLeyend.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>

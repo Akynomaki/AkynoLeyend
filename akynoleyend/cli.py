@@ -117,6 +117,8 @@ def parser() -> argparse.ArgumentParser:
                         help="Teste A/B de desempenho, com --measure.")
     player.add_argument("--fps-counter", choices=("on", "off"))
     player.add_argument("--handheld", choices=("on", "off"))
+    player.add_argument("--lite-scene", choices=("on", "off"),
+                        help="on: sem a vegetacao e os efeitos decorativos (capim, plantas, samambaias, folhas caindo, vagalumes), para ganhar FPS. Vale ao abrir o jogo.")
     player.add_argument(
         "--prepare-again",
         action="store_true",
@@ -357,6 +359,7 @@ def main(arguments: list[str] | None = None) -> int:
             pacing=None if args.pacing is None else args.pacing == "on",
             fps_counter=None if args.fps_counter is None else args.fps_counter == "on",
             handheld=None if args.handheld is None else args.handheld == "on",
+            lite_scene=None if args.lite_scene is None else args.lite_scene == "on",
         )
         return launch(
             args.out,
@@ -378,6 +381,7 @@ def main(arguments: list[str] | None = None) -> int:
             pacing=None if args.pacing is None else args.pacing == "on",
             fps_counter=None if args.fps_counter is None else args.fps_counter == "on",
             handheld=None if args.handheld is None else args.handheld == "on",
+            lite_scene=None if args.lite_scene is None else args.lite_scene == "on",
             cache_mode=args.cache_mode,
             texture_mode=args.texture_mode,
             visual_mode=args.visual_mode,

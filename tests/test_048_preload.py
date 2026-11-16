@@ -23,16 +23,13 @@ def function(text, signature):
 
 class Version(unittest.TestCase):
     def test_this_is_0_4_8(self):
+        # (0.4.9: the version itself is test_049_lite_scene's; the updater still starts from 0.4.7)
         from akynoleyend import __version__
         from akynoleyend.coherence import PREVIOUS_HOST_SOURCES
-        self.assertEqual(__version__, "0.4.8")
-        self.assertEqual(source("VERSION").strip(), "0.4.8")
-        self.assertIn("<Version>0.4.8</Version>", source("builder/AkynoLeyendBuilder/AkynoLeyendBuilder.csproj"))
-        self.assertIn("<Version>0.4.8</Version>", source("builder/AkynoLeyendUpdater/AkynoLeyendUpdater.csproj"))
+        self.assertIn(__version__, ("0.4.8", "0.4.9"))
         core = source("builder/AkynoLeyendUpdater/Core.cs")
-        self.assertIn('public const string To = "0.4.8";', core)
-        self.assertIn('"0.4.6", "0.4.7" };', core)
-        self.assertIn('__version__ != "0.4.8" or "0.4.7" not in PREVIOUS_HOST_SOURCES', source("tools/make_distribution.py"))
+        self.assertIn('"0.4.6", "0.4.7"', core)
+        self.assertIn('"0.4.7" not in PREVIOUS_HOST_SOURCES', source("tools/make_distribution.py"))
         # the 0.4.7 before and after the unified branch, as installed (Windows and POSIX orders)
         for identity in ("bc8ecd3c98c85da4be33ab8bbf1ba5af5e1b41731872f6f2c84c42839adfd8e9",
                          "7661e6c99c842080c46e0bbc56119109cbdee925b26c6651174fa9654b706f65",
@@ -41,9 +38,9 @@ class Version(unittest.TestCase):
 
     def test_notes_and_readme(self):
         notes = json.loads(source("docs/notas-atualizacao.json"))
-        self.assertEqual(notes["version"], "0.4.8")
+        self.assertIn(notes["version"], ("0.4.8", "0.4.9"))
         self.assertIn("pré-carrega", " ".join(notes["notes"]["new"]).lower())
-        self.assertIn("0.4.8", source("LEIA-PRIMEIRO.txt").splitlines()[0])
+        self.assertIn("0.4.8", source("LEIA-PRIMEIRO.txt"))
 
 
 class Preload(unittest.TestCase):

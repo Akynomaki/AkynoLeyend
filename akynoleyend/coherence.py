@@ -245,6 +245,10 @@ PREVIOUS_HOST_SOURCES = {
         "47c4982f115f741d470c06162e01070a57fda94d19385684322bf4b154d39f70",
         "d2795b59e0d15f57515d8f65d5d69e11ad89a405124b7c9ffddd76ae25482b73",
         "c56b011b501eb87f56b4a1cf6d26c8290d13cc3eb190ac725b9c8f86c559a90d",
+        # (0.4.9) the final 0.4.8 source tree (the performance update included, commit 334c75b), what its complete package's
+        # Criar records. 0.4.9 changes the renderer (the decorative vegetation and effects option, the draw stats' columns),
+        # Python and the launcher: no host C, same ABI, the game's objects kept.
+        "bc0d21660a20abcc6746d257c24f73ba7d73adf8bfdac683af64f3493bed6913",
     },
 }
 

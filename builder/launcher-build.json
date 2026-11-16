@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "0.4.8",
-  "pe_product_version": "0.4.8",
-  "source_sha256": "7dfafa99d5c98eec46070e2268f0d43d1516d35374e613aa45e218a4847b3553",
-  "binary_sha256": "5316425355a2b173ad89a8b5d0bce4be28dd903075177e1caf9161ea9d3bb596",
+  "version": "0.4.9",
+  "pe_product_version": "0.4.9",
+  "source_sha256": "b7f99a06dbbad8bee03eff9c79586d55ca8e205c5259adccc41136f8596fc8a1",
+  "binary_sha256": "b1cb998e9c0a065c9e0e4746b28ea641840a5dd1f8c806b308323e5d68a4d4b9",
   "toolchain": ".NET SDK 10.0.404, net8.0-windows, self-contained win-x64 single-file",
-  "runner_checks": "16/16 (Windows, .NET SDK 10.0.404 and the packaged Python 3.14.9)",
+  "runner_checks": "17/17 (Windows, .NET SDK 10.0.404 and the packaged Python 3.14.9)",
   "wpf_window_executed": false
 }

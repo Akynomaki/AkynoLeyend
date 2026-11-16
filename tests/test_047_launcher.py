@@ -56,7 +56,7 @@ class Version(unittest.TestCase):
         from akynoleyend import __version__
         from akynoleyend.coherence import PREVIOUS_HOST_SOURCES
         # (0.4.8: the version itself is test_048_preload's)
-        self.assertIn(__version__, ("0.4.7", "0.4.8"))
+        self.assertIn(__version__, ("0.4.7", "0.4.8", "0.4.9"))
         self.assertEqual(source("VERSION").strip(), __version__)
         self.assertIn("01dd7fee3d40dc2feee1e74d81ee26c9ed6364d9b4ceab5d904ad0cc6ccb7ddb", PREVIOUS_HOST_SOURCES["0.4.6"])
         self.assertIn('"0.4.6"', source("builder/AkynoLeyendUpdater/Core.cs"))

@@ -106,7 +106,7 @@ class Version(unittest.TestCase):
     def test_test_8_installs_update_in_place(self):
         from akynoleyend import __version__
         from akynoleyend.coherence import PREVIOUS_HOST_SOURCES
-        self.assertIn(__version__, ("0.4.6", "0.4.7", "0.4.8"))   # (0.4.7: test_047_launcher)
+        self.assertIn(__version__, ("0.4.6", "0.4.7", "0.4.8", "0.4.9"))   # (0.4.7: test_047_launcher)
         self.assertIn("b7e6521ffb4b78b043c1401eb444dc82901890974d95310aa5176b71cd64de06",
                       PREVIOUS_HOST_SOURCES["0.4.5-test.8"])
         self.assertIn('"0.4.5-test.8"', source("builder/AkynoLeyendUpdater/Core.cs"))
