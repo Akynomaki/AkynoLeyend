@@ -6,14 +6,30 @@ O AkynoLeyend desenvolve um fluxo para traduzir código ARM64 a partir de arquiv
 
 ## Fontes e downloads
 
-Este repositório contém os fontes da 0.4.9: o launcher, a orquestração em Python, o host, o renderizador Vulkan, os testes e a documentação em `docs/`. Os pacotes para Windows ficam nas [Releases](https://github.com/Akynomaki/AkynoLeyend/releases). A versão mais recente é a [0.4.9 — vegetação e efeitos decorativos](https://github.com/Akynomaki/AkynoLeyend/releases/tag/v0.4.9):
+Os pacotes para Windows ficam nas [Releases](https://github.com/Akynomaki/AkynoLeyend/releases). A versão mais recente é a [0.5.5 — multiplayer dentro do jogo](https://github.com/Akynomaki/AkynoLeyend/releases/tag/v0.5.5):
 
-- **Instalação nova:** o ZIP completo, que já traz o launcher, o renderizador, o Python e o compilador.
-- **Quem já tem o jogo criado, da Teste 4 até a 0.4.8:** o ZIP de atualização, usado em **Atualizar build** no launcher, ou o atualizador `.exe`, que já leva o ZIP dentro.
+- **Instalação nova:** `AkynoLeyend-0.5.5.zip`. Extraia e abra o `AkynoLeyend-Launcher.exe`.
+- **Quem já tem a 0.5.4 ou a 0.5.4-MOD:** `AkynoLeyend-Atualizacao-0.5.5.zip`. No launcher, **Atualizações** acha essa versão sozinho em **Procurar atualização**, ou você escolhe o ZIP em **Selecionar atualização (.zip)**. Depois clique em **Atualizar o jogo**.
+- **Quem está numa versão mais antiga:** use o ZIP completo.
 
-O compilador LLVM-MinGW, o Python embutido e as bibliotecas Python vêm apenas no ZIP completo, não no git. O SDK DLSS da NVIDIA é usado na compilação do renderizador. A licença dele não permite redistribuí-lo, então ele não está no repositório nem nos pacotes. O runtime DLSS é baixado no PC do jogador pelo launcher.
+Os dois ZIPs têm o mesmo conteúdo: o launcher, as ferramentas com os fontes do host e do renderizador, o Python e o compilador. A atualização do launcher troca a pasta `ferramentas` inteira, por isso o pacote de atualização também é completo.
 
-## O que a versão de teste 0.4.9 reúne
+O git deste repositório ainda contém os fontes da 0.4.9: o launcher, a orquestração em Python, o host, o renderizador Vulkan, os testes e a documentação em `docs/`. Os fontes da 0.5.5 vão dentro do pacote, na pasta `ferramentas`. O compilador LLVM-MinGW, o Python embutido e as bibliotecas Python vêm apenas nos pacotes, não no git. O SDK DLSS da NVIDIA é usado na compilação do renderizador. A licença dele não permite redistribuí-lo, então ele não está no repositório nem nos pacotes. O runtime DLSS é baixado no PC do jogador pelo launcher.
+
+## Novidades da 0.5.5
+
+- **Multiplayer dentro do jogo (em teste):**
+  - O menu do F1 (ou Insert) tem as abas **Multijogador**, **Sala** e **Mods** do co-op do [Squadala!](https://github.com/daurosk/oot-remake-multiplayer), entre Controles e Sistema.
+  - Nelas dá para hospedar e entrar numa partida, jogar co-op local, mudar o nome e as cores do Link e ver quem está na partida.
+  - Os textos das abas estão em português.
+  - O **Jogar** do launcher deixa o multiplayer carregado e parado até você hospedar ou entrar.
+- **Página Multiplayer no launcher:** instala o Squadala! v0.11.7 conferido pelo SHA-256, hospeda com código de convite e entra com o código de um amigo.
+- **Placa de vídeo no launcher:** em Gráficos, ao lado do perfil de memória, você escolhe a placa em que o jogo abre.
+- **Mods do GameBanana no launcher:** busca, instalação e organização dos mods de RomFS.
+
+O multiplayer foi testado com um jogador por PC. Uma partida entre dois PCs ainda não foi testada.
+
+## O que já vinha na 0.4.9
 
 - Launcher para Windows com perfis gráficos, detecção de CPU, aviso de memória disponível e fluxo de manutenção incremental.
 - Preparação de shaders e pipelines já encontrados em partidas anteriores, com preparação dos pipelines gráficos restantes em segundo plano.
@@ -46,6 +62,6 @@ O projeto não inclui nem indica onde obter cópias do jogo, firmware, chaves, a
 
 ## Créditos
 
-O Hookshot fornece a base técnica. O histórico do projeto reconhece também contribuições do Eden, suyu, yuzu, Sirit, a64-kit e demais dependências, com os respectivos avisos nos fontes. O NX2navi serviu de referência de comportamento para o pré-carregamento. As mudanças do AkynoLeyend incluem o launcher, a automação de compilação e atualização, ajustes de renderização e ferramentas de diagnóstico.
+O Hookshot fornece a base técnica. O histórico do projeto reconhece também contribuições do Eden, suyu, yuzu, Sirit, a64-kit e demais dependências, com os respectivos avisos nos fontes. O NX2navi serviu de referência de comportamento para o pré-carregamento. O multiplayer é o Squadala! (daurosk e contribuidores, GPL-3.0); a ponte e as abas do menu adaptam patches dele ao motor, e o módulo e o servidor são baixados do release dele. As mudanças do AkynoLeyend incluem o launcher, a automação de compilação e atualização, ajustes de renderização e ferramentas de diagnóstico.
 
 Veja [como contribuir](CONTRIBUTING.md).
